@@ -48,7 +48,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
   const handleRunSearch = async () => {
     setIsSearching(true);
     try {
-      const newItems = await researchService.runAudienceResearch(client);
+      const newItems = await researchService.runAudienceDiscovery(client);
       notificationService.addNotification(
         'Pesquisa de Público Concluída',
         `${newItems.length} novos insights identificados nas buscas públicas.`,
@@ -75,6 +75,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
       sourceDate: new Date().toLocaleDateString('pt-BR'),
       context: form.context,
       interpretation: form.interpretation,
+      confidence: form.isHypothesis ? 'LOW' : 'HIGH',
       isHypothesis: form.isHypothesis
     });
 

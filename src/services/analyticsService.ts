@@ -1,253 +1,302 @@
 /**
  * GABRIEL SPERATTI | SOCIAL INTELLIGENCE
- * Analytics Service - Cálculos determinísticos e rigorosos de métricas reais
+ * Analytics Service - Mathematical and Deterministic Calculations
  * 
- * Regra: DADOS REAIS e DADOS CALCULADOS devem ser matematicamente exatos.
- * Nunca misturar com inferências da IA.
+ * Strict rule: REAL_DATA and CALCULATED_DATA must be mathematically exact.
+ * Never fabricate previous periods, never use array slice as days, never invent numbers.
  */
 
-import { Content, MetricSnapshot, ContentMetrics } from '../types';
+import { AccountSnapshot, Content, ContentFormat, PeriodComparison, PeriodAnalytics } from '../types';
 
-export interface MetricComparison {
-  current: number;
-  previous: number;
-  diffAbsolute: number;
-  diffPercent: number; // e.g. +14.2%
+export interface DateRange {
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
 }
 
-export interface PeriodSummary {
-  periodDays: number;
-  startDate: string;
-  endDate: string;
-  followers: MetricComparison;
-  views: MetricComparison;
-  reach: MetricComparison;
-  likes: MetricComparison;
-  comments: MetricComparison;
-  shares: MetricComparison;
-  saves: MetricComparison;
-  engagementRate: MetricComparison;
-  totalPosts: number;
-  hasSufficientData: boolean;
-  notes?: string;
+function parseISODate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(year, (month || 1) - 1, day || 1));
+}
+
+function formatISODate(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+function getDayDiff(d1: Date, d2: Date): number {
+  return Math.round(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export const analyticsService = {
   /**
-   * Calcula comparação entre período atual e período imediatamente anterior
-   * @param snapshots Array de snapshots diários ordenados por data cronológica
-   * @param periodDays 7, 14, 30 ou 90 dias
+   * Helper to build a comparison between current and previous numbers.
+   * If previous is null or zero with no data, comparison is honest.
    */
-  calculatePeriodSummary(snapshots: MetricSnapshot[], periodDays: number = 30): PeriodSummary {
-    if (!snapshots || snapshots.length === 0) {
-      return this.getEmptyPeriodSummary(periodDays, 'Dados insuficientes. Nenhum snapshot diário registrado.');
-    }
-
-    // Snapshots chronologically sorted
-    const sorted = [...snapshots].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    
-    // Check available length
-    const totalSnapshots = sorted.length;
-    if (totalSnapshots < 2) {
-      const latest = sorted[sorted.length - 1];
+  createComparison(current: number, previous: number | null): PeriodComparison {
+    if (previous === null || isNaN(previous)) {
       return {
-        periodDays,
-        startDate: latest.timestamp,
-        endDate: latest.timestamp,
-        followers: { current: latest.followers, previous: latest.followers, diffAbsolute: 0, diffPercent: 0 },
-        views: { current: latest.views, previous: 0, diffAbsolute: latest.views, diffPercent: 100 },
-        reach: { current: latest.reach, previous: 0, diffAbsolute: latest.reach, diffPercent: 100 },
-        likes: { current: latest.likes, previous: 0, diffAbsolute: latest.likes, diffPercent: 100 },
-        comments: { current: latest.comments, previous: 0, diffAbsolute: latest.comments, diffPercent: 100 },
-        shares: { current: latest.shares, previous: 0, diffAbsolute: latest.shares, diffPercent: 100 },
-        saves: { current: latest.saves, previous: 0, diffAbsolute: latest.saves, diffPercent: 100 },
-        engagementRate: { current: latest.engagementRate, previous: 0, diffAbsolute: latest.engagementRate, diffPercent: 0 },
-        totalPosts: latest.postsCount,
+        current,
+        previous: null,
+        absoluteDiff: null,
+        percentDiff: null,
         hasSufficientData: false,
-        notes: 'Apenas 1 snapshot registrado. Histórico em construção.'
+        provenance: 'REAL_DATA'
       };
     }
 
-    // Current period slice: last N snapshots
-    const currentSlice = sorted.slice(-periodDays);
-    // Previous period slice: N snapshots before the current slice
-    const previousSlice = sorted.slice(-periodDays * 2, -periodDays);
+    const absoluteDiff = Number((current - previous).toFixed(2));
+    let percentDiff: number | null = null;
 
-    const latestSnap = currentSlice[currentSlice.length - 1];
-    const firstCurrentSnap = currentSlice[0];
-
-    // Current period cumulative / average calculations
-    const currentFollowers = latestSnap.followers;
-    const currentViews = currentSlice.reduce((sum, s) => sum + s.views, 0);
-    const currentReach = currentSlice.reduce((sum, s) => sum + s.reach, 0);
-    const currentLikes = currentSlice.reduce((sum, s) => sum + s.likes, 0);
-    const currentComments = currentSlice.reduce((sum, s) => sum + s.comments, 0);
-    const currentShares = currentSlice.reduce((sum, s) => sum + s.shares, 0);
-    const currentSaves = currentSlice.reduce((sum, s) => sum + s.saves, 0);
-    const currentPosts = currentSlice.reduce((sum, s) => sum + (s.postsCount || 0), 0);
-    
-    // Average engagement rate of current period
-    const avgEngCurrent = currentReach > 0
-      ? Number((((currentLikes + currentComments + currentShares + currentSaves) / currentReach) * 100).toFixed(2))
-      : Number((currentSlice.reduce((sum, s) => sum + s.engagementRate, 0) / currentSlice.length).toFixed(2));
-
-    // Previous period calculations
-    let prevFollowers = firstCurrentSnap.followers;
-    let prevViews = 0;
-    let prevReach = 0;
-    let prevLikes = 0;
-    let prevComments = 0;
-    let prevShares = 0;
-    let prevSaves = 0;
-    let prevEng = 0;
-
-    if (previousSlice.length > 0) {
-      prevFollowers = previousSlice[previousSlice.length - 1].followers;
-      prevViews = previousSlice.reduce((sum, s) => sum + s.views, 0);
-      prevReach = previousSlice.reduce((sum, s) => sum + s.reach, 0);
-      prevLikes = previousSlice.reduce((sum, s) => sum + s.likes, 0);
-      prevComments = previousSlice.reduce((sum, s) => sum + s.comments, 0);
-      prevShares = previousSlice.reduce((sum, s) => sum + s.shares, 0);
-      prevSaves = previousSlice.reduce((sum, s) => sum + s.saves, 0);
-      prevEng = prevReach > 0 
-        ? Number((((prevLikes + prevComments + prevShares + prevSaves) / prevReach) * 100).toFixed(2))
-        : Number((previousSlice.reduce((sum, s) => sum + s.engagementRate, 0) / previousSlice.length).toFixed(2));
+    if (previous !== 0) {
+      percentDiff = Number((((current - previous) / Math.abs(previous)) * 100).toFixed(1));
+    } else if (current > 0) {
+      percentDiff = 100.0;
     } else {
-      // Normalize when previous slice doesn't exist yet
-      prevFollowers = firstCurrentSnap.followers;
-      prevViews = Math.round(currentViews * 0.85);
-      prevReach = Math.round(currentReach * 0.85);
-      prevLikes = Math.round(currentLikes * 0.85);
-      prevComments = Math.round(currentComments * 0.85);
-      prevShares = Math.round(currentShares * 0.85);
-      prevSaves = Math.round(currentSaves * 0.85);
-      prevEng = avgEngCurrent;
+      percentDiff = 0.0;
     }
 
-    const calcComparison = (cur: number, prev: number): MetricComparison => {
-      const diffAbsolute = cur - prev;
-      const diffPercent = prev !== 0 ? Number(((diffAbsolute / prev) * 100).toFixed(1)) : 0;
-      return { current: cur, previous: prev, diffAbsolute, diffPercent };
-    };
-
     return {
-      periodDays,
-      startDate: firstCurrentSnap.timestamp,
-      endDate: latestSnap.timestamp,
-      followers: calcComparison(currentFollowers, prevFollowers),
-      views: calcComparison(currentViews, prevViews),
-      reach: calcComparison(currentReach, prevReach),
-      likes: calcComparison(currentLikes, prevLikes),
-      comments: calcComparison(currentComments, prevComments),
-      shares: calcComparison(currentShares, prevShares),
-      saves: calcComparison(currentSaves, prevSaves),
-      engagementRate: calcComparison(avgEngCurrent, prevEng),
-      totalPosts: currentPosts,
-      hasSufficientData: true
+      current,
+      previous,
+      absoluteDiff,
+      percentDiff,
+      hasSufficientData: true,
+      provenance: 'CALCULATED_DATA'
     };
   },
 
   /**
-   * Ordena conteúdos por métrica selecionada
+   * Filter snapshots by actual calendar date range
    */
-  rankContents(
-    contents: Content[],
-    metric: keyof ContentMetrics = 'views',
-    direction: 'desc' | 'asc' = 'desc'
-  ): Content[] {
-    return [...contents].sort((a, b) => {
-      const valA = a.metrics[metric] ?? 0;
-      const valB = b.metrics[metric] ?? 0;
-      return direction === 'desc' ? valB - valA : valA - valB;
-    });
+  filterSnapshotsByDate(snapshots: AccountSnapshot[], startDate: string, endDate: string): AccountSnapshot[] {
+    if (!snapshots || snapshots.length === 0) return [];
+    return snapshots
+      .filter(s => {
+        const d = s.date;
+        return d >= startDate && d <= endDate;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
   },
 
   /**
-   * Calcula média de uma métrica para uma lista de conteúdos
+   * Calculate deterministic analytics for a defined period (7, 14, 30, 90 or custom)
    */
-  getAverageMetric(contents: Content[], metric: keyof ContentMetrics): number {
-    if (!contents || contents.length === 0) return 0;
-    const sum = contents.reduce((acc, c) => acc + (c.metrics[metric] || 0), 0);
-    return Math.round(sum / contents.length);
-  },
+  calculatePeriod(
+    snapshots: AccountSnapshot[],
+    periodDaysOrCustom: 7 | 14 | 30 | 90 | 'custom',
+    customRange?: DateRange
+  ): PeriodAnalytics {
+    if (!snapshots || snapshots.length === 0) {
+      return this.getEmptyPeriodAnalytics(typeof periodDaysOrCustom === 'number' ? periodDaysOrCustom : 30);
+    }
 
-  /**
-   * Retorna quanto um conteúdo superou ou ficou abaixo da média (ex: "+184%")
-   */
-  getContentVsAverage(content: Content, contents: Content[], metric: keyof ContentMetrics = 'views'): {
-    diffPercent: number;
-    formatted: string;
-    isAbove: boolean;
-  } {
-    const avg = this.getAverageMetric(contents, metric);
-    if (avg === 0) return { diffPercent: 0, formatted: '0%', isAbove: false };
-    const val = content.metrics[metric] || 0;
-    const diffPct = Number((((val - avg) / avg) * 100).toFixed(1));
-    const isAbove = diffPct >= 0;
-    const sign = isAbove ? '+' : '';
-    return {
-      diffPercent: diffPct,
-      formatted: `${sign}${diffPct}% em relação à média`,
-      isAbove
-    };
-  },
+    // Determine actual start and end date
+    const sortedAll = [...snapshots].sort((a, b) => a.date.localeCompare(b.date));
+    const latestAvailableDate = sortedAll[sortedAll.length - 1].date;
 
-  /**
-   * Agrupa conteúdos por formato com médias calculadas
-   */
-  getFormatPerformance(contents: Content[]) {
-    const groups: Record<string, { count: number; totalViews: number; totalEng: number }> = {};
-    contents.forEach(c => {
-      if (!groups[c.format]) {
-        groups[c.format] = { count: 0, totalViews: 0, totalEng: 0 };
+    let startDate: string;
+    let endDate: string;
+    let durationDays: number;
+
+    if (periodDaysOrCustom === 'custom' && customRange) {
+      startDate = customRange.startDate;
+      endDate = customRange.endDate;
+      durationDays = Math.max(1, getDayDiff(parseISODate(startDate), parseISODate(endDate)));
+    } else {
+      durationDays = typeof periodDaysOrCustom === 'number' ? periodDaysOrCustom : 30;
+      endDate = latestAvailableDate;
+      const endD = parseISODate(endDate);
+      const startD = new Date(endD);
+      startD.setUTCDate(endD.getUTCDate() - (durationDays - 1));
+      startDate = formatISODate(startD);
+    }
+
+    // Previous period range
+    const curStartD = parseISODate(startDate);
+    const prevEndD = new Date(curStartD);
+    prevEndD.setUTCDate(curStartD.getUTCDate() - 1);
+    const prevStartD = new Date(prevEndD);
+    prevStartD.setUTCDate(prevEndD.getUTCDate() - (durationDays - 1));
+
+    const prevStartDateStr = formatISODate(prevStartD);
+    const prevEndDateStr = formatISODate(prevEndD);
+
+    // Filter current and previous snapshots strictly by date
+    const currentSnaps = this.filterSnapshotsByDate(snapshots, startDate, endDate);
+    const previousSnaps = this.filterSnapshotsByDate(snapshots, prevStartDateStr, prevEndDateStr);
+
+    const hasPrevious = previousSnaps.length > 0;
+
+    // 1. Followers: VALOR FINAL do período atual vs VALOR FINAL do período anterior
+    const curFollowerFinal = currentSnaps.length > 0 ? currentSnaps[currentSnaps.length - 1].followers : 0;
+    const prevFollowerFinal = hasPrevious ? previousSnaps[previousSnaps.length - 1].followers : null;
+    const followersGrowth = this.createComparison(curFollowerFinal, prevFollowerFinal);
+
+    // 2. Totais do período
+    const curViews = currentSnaps.reduce((acc, s) => acc + s.views, 0);
+    const prevViews = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.views, 0) : null;
+    const totalViews = this.createComparison(curViews, prevViews);
+
+    const curReach = currentSnaps.reduce((acc, s) => acc + s.reach, 0);
+    const prevReach = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.reach, 0) : null;
+    const totalReach = this.createComparison(curReach, prevReach);
+
+    const curLikes = currentSnaps.reduce((acc, s) => acc + s.likes, 0);
+    const prevLikes = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.likes, 0) : null;
+    const totalLikes = this.createComparison(curLikes, prevLikes);
+
+    const curComments = currentSnaps.reduce((acc, s) => acc + s.comments, 0);
+    const prevComments = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.comments, 0) : null;
+    const totalComments = this.createComparison(curComments, prevComments);
+
+    const curShares = currentSnaps.reduce((acc, s) => acc + s.shares, 0);
+    const prevShares = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.shares, 0) : null;
+    const totalShares = this.createComparison(curShares, prevShares);
+
+    const curSaves = currentSnaps.reduce((acc, s) => acc + s.saves, 0);
+    const prevSaves = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.saves, 0) : null;
+    const totalSaves = this.createComparison(curSaves, prevSaves);
+
+    const curPosts = currentSnaps.reduce((acc, s) => acc + s.postsPublished, 0);
+    const prevPosts = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.postsPublished, 0) : null;
+    const postsPublished = this.createComparison(curPosts, prevPosts);
+
+    // 3. Taxa média de engajamento: MÉDIA ponderada por alcance
+    let curAvgEng = 0;
+    if (curReach > 0) {
+      const curInteractions = curLikes + curComments + curShares + curSaves;
+      curAvgEng = Number(((curInteractions / curReach) * 100).toFixed(2));
+    } else if (currentSnaps.length > 0) {
+      curAvgEng = Number((currentSnaps.reduce((acc, s) => acc + s.engagementRate, 0) / currentSnaps.length).toFixed(2));
+    }
+
+    let prevAvgEng: number | null = null;
+    if (hasPrevious && prevReach !== null) {
+      if (prevReach > 0 && prevLikes !== null && prevComments !== null && prevShares !== null && prevSaves !== null) {
+        const prevInteractions = prevLikes + prevComments + prevShares + prevSaves;
+        prevAvgEng = Number(((prevInteractions / prevReach) * 100).toFixed(2));
+      } else if (previousSnaps.length > 0) {
+        prevAvgEng = Number((previousSnaps.reduce((acc, s) => acc + s.engagementRate, 0) / previousSnaps.length).toFixed(2));
       }
-      groups[c.format].count += 1;
-      groups[c.format].totalViews += c.metrics.views || 0;
-      groups[c.format].totalEng += c.metrics.engagementRate || 0;
-    });
+    }
 
-    return Object.entries(groups).map(([format, data]) => ({
-      format,
-      count: data.count,
-      avgViews: Math.round(data.totalViews / data.count),
-      avgEngagementRate: Number((data.totalEng / data.count).toFixed(2))
-    }));
+    const avgEngagementRate = this.createComparison(curAvgEng, prevAvgEng);
+
+    return {
+      periodDays: durationDays,
+      startDate,
+      endDate,
+      followersGrowth,
+      totalViews,
+      totalReach,
+      avgEngagementRate,
+      totalLikes,
+      totalComments,
+      totalShares,
+      totalSaves,
+      postsPublished,
+      hasPreviousPeriod: hasPrevious
+    };
   },
 
-  /**
-   * Agrupa conteúdos por pilar estratégico com médias calculadas
-   */
-  getPillarDistribution(contents: Content[]) {
-    const groups: Record<string, number> = {};
-    contents.forEach(c => {
-      groups[c.pillar] = (groups[c.pillar] || 0) + 1;
-    });
-    const total = contents.length;
-    return Object.entries(groups).map(([pillar, count]) => ({
-      pillar,
-      count,
-      sharePct: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0
-    }));
-  },
-
-  getEmptyPeriodSummary(periodDays: number, notes: string): PeriodSummary {
-    const today = new Date().toISOString().split('T')[0];
-    const emptyComp: MetricComparison = { current: 0, previous: 0, diffAbsolute: 0, diffPercent: 0 };
+  getEmptyPeriodAnalytics(periodDays: number): PeriodAnalytics {
+    const today = formatISODate(new Date());
     return {
       periodDays,
       startDate: today,
       endDate: today,
-      followers: emptyComp,
-      views: emptyComp,
-      reach: emptyComp,
-      likes: emptyComp,
-      comments: emptyComp,
-      shares: emptyComp,
-      saves: emptyComp,
-      engagementRate: emptyComp,
-      totalPosts: 0,
-      hasSufficientData: false,
-      notes
+      followersGrowth: this.createComparison(0, null),
+      totalViews: this.createComparison(0, null),
+      totalReach: this.createComparison(0, null),
+      avgEngagementRate: this.createComparison(0, null),
+      totalLikes: this.createComparison(0, null),
+      totalComments: this.createComparison(0, null),
+      totalShares: this.createComparison(0, null),
+      totalSaves: this.createComparison(0, null),
+      postsPublished: this.createComparison(0, null),
+      hasPreviousPeriod: false
     };
+  },
+
+  /**
+   * Strategic content score calculation with weighted parameters
+   */
+  calculateContentScore(content: Content): number {
+    const m = content.metrics;
+    if (!m) return 0;
+
+    // Weights: Saves (35%), Shares (25%), Comments (20%), Reach (10%), Views (10%)
+    const savesScore = m.saves * 3.5;
+    const sharesScore = m.shares * 2.5;
+    const commentsScore = m.comments * 2.0;
+    const reachScore = (m.reach / 100) * 1.0;
+    const viewsScore = (m.views / 200) * 1.0;
+
+    return Math.round(savesScore + sharesScore + commentsScore + reachScore + viewsScore);
+  },
+
+  /**
+   * Sort contents by actual ranking criteria
+   */
+  rankContents(contents: Content[], sortBy: 'score' | 'views' | 'reach' | 'saves' | 'engagement' = 'score', ascending = false): Content[] {
+    if (!contents || contents.length === 0) return [];
+    const list = [...contents];
+
+    list.sort((a, b) => {
+      let valA = 0;
+      let valB = 0;
+
+      if (sortBy === 'score') {
+        valA = this.calculateContentScore(a);
+        valB = this.calculateContentScore(b);
+      } else if (sortBy === 'views') {
+        valA = a.metrics.views;
+        valB = b.metrics.views;
+      } else if (sortBy === 'reach') {
+        valA = a.metrics.reach;
+        valB = b.metrics.reach;
+      } else if (sortBy === 'saves') {
+        valA = a.metrics.saves;
+        valB = b.metrics.saves;
+      } else if (sortBy === 'engagement') {
+        valA = a.metrics.engagementRate;
+        valB = b.metrics.engagementRate;
+      }
+
+      return ascending ? valA - valB : valB - valA;
+    });
+
+    return list;
+  },
+
+  /**
+   * Breakdown metrics by format
+   */
+  breakdownByFormat(contents: Content[]): Record<ContentFormat, { count: number; avgViews: number; avgEngagement: number; totalSaves: number }> {
+    const formats: ContentFormat[] = ['Reels', 'Carrossel', 'Foto', 'Stories', 'Live'];
+    const result: Record<ContentFormat, { count: number; avgViews: number; avgEngagement: number; totalSaves: number }> = {
+      Reels: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 },
+      Carrossel: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 },
+      Foto: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 },
+      Stories: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 },
+      Live: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 }
+    };
+
+    formats.forEach(fmt => {
+      const items = (contents || []).filter(c => c.format === fmt);
+      if (items.length > 0) {
+        const totalViews = items.reduce((acc, c) => acc + c.metrics.views, 0);
+        const totalEng = items.reduce((acc, c) => acc + c.metrics.engagementRate, 0);
+        const totalSaves = items.reduce((acc, c) => acc + c.metrics.saves, 0);
+
+        result[fmt] = {
+          count: items.length,
+          avgViews: Math.round(totalViews / items.length),
+          avgEngagement: Number((totalEng / items.length).toFixed(2)),
+          totalSaves
+        };
+      }
+    });
+
+    return result;
   }
 };

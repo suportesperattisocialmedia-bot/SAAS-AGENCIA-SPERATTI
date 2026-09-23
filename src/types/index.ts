@@ -1,9 +1,11 @@
 /**
  * Gabriel Speratti | Social Intelligence
- * Domain Entities & Core Types
+ * Domain Entities & Core Types (Prompt V2 Standardized)
  */
 
 export type ClientStatus = 'active' | 'archived' | 'onboarding';
+
+export type HealthStatus = 'healthy' | 'attention' | 'critical' | 'not_connected';
 
 export interface Client {
   id: string;
@@ -22,36 +24,50 @@ export interface Client {
   services: string;
   objectives: string[];
   pillars: string[];
-  formats: string[];
+  formats: ContentFormat[];
   toneOfVoice: string;
   differentiators: string;
   notes: string;
-  competitors: string[];
+  status: ClientStatus;
+  onboardingStep: number; // 1 to 10
+  avatarUrl?: string;
+  lastSyncAt?: string;
+  healthStatus: HealthStatus;
   createdAt: string;
   updatedAt: string;
-  status: ClientStatus;
-  onboardingStep: number;
-  avatarUrl?: string;
 }
+
+export type InstagramConnectionStatus = 
+  | 'NOT_CONNECTED'
+  | 'CONNECTING'
+  | 'CONNECTED'
+  | 'TOKEN_EXPIRED'
+  | 'PERMISSION_ERROR'
+  | 'SYNCING'
+  | 'SYNCED'
+  | 'ERROR';
 
 export interface InstagramAccount {
   clientId: string;
   handle: string;
+  status: InstagramConnectionStatus;
   isConnected: boolean;
   connectedAt?: string;
   lastSyncAt?: string;
   nextSyncScheduled?: string;
   appId?: string;
   accountId?: string;
+  pageId?: string;
   permissions: string[];
   errorStatus?: string | null;
-  syncState?: 'idle' | 'syncing' | 'synced' | 'error';
 }
 
-export interface MetricSnapshot {
+export type SnapshotSource = 'META_API' | 'IMPORT' | 'MANUAL' | 'DEMO';
+
+export interface AccountSnapshot {
   id: string;
   clientId: string;
-  timestamp: string; // ISO date string YYYY-MM-DD
+  date: string; // ISO date string YYYY-MM-DD
   followers: number;
   reach: number;
   views: number;
@@ -60,9 +76,15 @@ export interface MetricSnapshot {
   shares: number;
   saves: number;
   profileVisits: number;
-  postsCount: number;
+  websiteClicks: number;
+  postsPublished: number;
   engagementRate: number;
+  source: SnapshotSource;
+  sourceTimestamp: string;
 }
+
+// Backward compatibility alias
+export type MetricSnapshot = AccountSnapshot;
 
 export type ContentFormat = 'Reels' | 'Carrossel' | 'Foto' | 'Stories' | 'Live';
 
@@ -78,18 +100,21 @@ export interface ContentMetrics {
 
 export interface ContentAiAnalysis {
   summary: string;
-  whyItWorked: string;
-  whyItMayHaveUnderperformed: string;
+  whyItWorked?: string;
+  whyItMayHaveUnderperformed?: string;
   strengths: string[];
   weaknesses: string[];
   opportunity: string;
   hypothesisNote: string;
+  isHypothesis: boolean;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  evidence: string[];
 }
 
 export interface Content {
   id: string;
   clientId: string;
-  instagramPostId?: string;
+  instagramMediaId?: string;
   title: string;
   caption: string;
   publishedAt: string;
@@ -105,6 +130,21 @@ export interface Content {
   aiAnalysis?: ContentAiAnalysis;
 }
 
+export interface ContentMetricSnapshot {
+  id: string;
+  contentId: string;
+  timestamp: string;
+  views: number;
+  reach: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  profileActivity: number;
+  engagementRate: number;
+  source: SnapshotSource;
+}
+
 export type CompetitorStatus = 'approved' | 'candidate' | 'ignored';
 
 export interface Competitor {
@@ -114,18 +154,34 @@ export interface Competitor {
   instagram: string;
   website: string;
   segment: string;
-  similarityScore: number;
+  similarityScore: number; // 0 to 100 based on verified criteria
+  similarityCriteria?: string[];
   followers: number;
   postingFrequencyWeekly: number;
-  topFormats: string[];
+  topFormats: ContentFormat[];
   avgViews: number;
   avgEngagementRate: number;
   recentThemes: string[];
   notes: string;
   status: CompetitorStatus;
   candidateReason?: string;
+  evidenceUrl?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CompetitorSnapshot {
+  id: string;
+  competitorId: string;
+  date: string;
+  followers: number;
+  postingFrequency: number;
+  recentPosts: number;
+  topFormats: ContentFormat[];
+  themes: string[];
+  avgViews: number;
+  avgEngagement: number;
+  source: SnapshotSource;
 }
 
 export type AudienceInsightCategory = 
@@ -146,42 +202,34 @@ export interface AudienceInsight {
   title: string;
   description: string;
   source: string;
+  sourceUrl?: string;
   sourceDate: string;
-  context: string;
+  evidence?: string;
+  context?: string;
   interpretation: string;
   isHypothesis: boolean;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
   createdAt: string;
 }
 
 export type ContentPillar = string;
-export type ContentIdeaStatus = IdeaStatus | 'PRODUÇÃO';
 
-export type IdeaStatus = 
+export type PipelineStatus = 
   | 'IDEIA'
   | 'PLANEJADO'
   | 'ROTEIRO'
-  | 'EM PRODUÇÃO'
-  | 'PRODUÇÃO'
+  | 'EM_PRODUCAO'
   | 'EDITANDO'
-  | 'APROVAÇÃO'
+  | 'APROVACAO'
   | 'AGENDADO'
   | 'PUBLICADO'
   | 'ANALISADO';
 
-export type WeekDay =
-  | 'Segunda'
-  | 'Terça'
-  | 'Quarta'
-  | 'Quinta'
-  | 'Sexta'
-  | 'Sábado'
-  | 'Domingo'
-  | 'Segunda-feira'
-  | 'Terça-feira'
-  | 'Quarta-feira'
-  | 'Quinta-feira'
-  | 'Sexta-feira'
-  | string;
+// Alias
+export type IdeaStatus = PipelineStatus;
+export type ContentIdeaStatus = PipelineStatus;
+
+export type WeekDay = 'segunda' | 'terca' | 'quarta' | 'quinta' | 'sexta' | 'sabado' | 'domingo';
 
 export interface ContentIdea {
   id: string;
@@ -198,7 +246,7 @@ export interface ContentIdea {
   potential: 'Alto' | 'Médio' | 'Muito Alto';
   whyDoThis: string;
   targetAudienceSnippet: string;
-  status: IdeaStatus;
+  status: PipelineStatus;
   notes: string;
   calendarDay?: WeekDay;
   scheduledTime?: string;
@@ -210,7 +258,6 @@ export interface CalendarItem {
   id: string;
   clientId: string;
   ideaId?: string;
-  contentIdeaId?: string;
   dayOfWeek: WeekDay;
   timeSlot?: string;
   title: string;
@@ -219,9 +266,9 @@ export interface CalendarItem {
   objective?: string;
   hook?: string;
   cta?: string;
-  status?: IdeaStatus;
+  status?: PipelineStatus;
   notes?: string;
-  orderIndex?: number;
+  orderIndex: number;
 }
 
 export type HookCategory = 
@@ -248,7 +295,7 @@ export interface HookTemplate {
   example: string;
   bestForPillars: string[];
   historicalAvgViewsDiff?: string;
-  recommendedFormat?: string;
+  recommendedFormat?: ContentFormat;
   psychologicalTrigger?: string;
 }
 
@@ -259,11 +306,13 @@ export type AlertType =
   | 'FREQUÊNCIA'
   | 'OPORTUNIDADE'
   | 'CONCORRENTE'
-  | 'TENDÊNCIA';
+  | 'TENDÊNCIA'
+  | 'ERRO_SINCRONIZACAO'
+  | 'TOKEN_EXPIRADO';
 
-export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical' | 'warning' | 'success' | 'info';
+export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
 
-export type AlertStatus = 'NOVO' | 'VISUALIZADO' | 'RESOLVIDO' | 'new' | 'read' | 'resolved';
+export type AlertStatus = 'NEW' | 'READ' | 'RESOLVED';
 
 export interface Alert {
   id: string;
@@ -273,9 +322,35 @@ export interface Alert {
   severity: AlertSeverity;
   title: string;
   message: string;
+  evidence?: string;
   calculatedMetricComparison?: string;
   status: AlertStatus;
   createdAt: string;
+}
+
+export interface PeriodComparison {
+  current: number;
+  previous: number | null;
+  absoluteDiff: number | null;
+  percentDiff: number | null;
+  hasSufficientData: boolean;
+  provenance: 'REAL_DATA' | 'CALCULATED_DATA';
+}
+
+export interface PeriodAnalytics {
+  periodDays: number;
+  startDate: string;
+  endDate: string;
+  followersGrowth: PeriodComparison;
+  totalViews: PeriodComparison;
+  totalReach: PeriodComparison;
+  avgEngagementRate: PeriodComparison;
+  totalLikes: PeriodComparison;
+  totalComments: PeriodComparison;
+  totalShares: PeriodComparison;
+  totalSaves: PeriodComparison;
+  postsPublished: PeriodComparison;
+  hasPreviousPeriod: boolean;
 }
 
 export interface Report {
@@ -290,13 +365,13 @@ export interface Report {
   executiveSummary: string;
   kpis: {
     followers: number;
-    followersDiffPct: number;
+    followersDiffPct: number | null;
     views: number;
-    viewsDiffPct: number;
+    viewsDiffPct: number | null;
     reach: number;
-    reachDiffPct: number;
+    reachDiffPct: number | null;
     engagementRate: number;
-    engagementDiffPct: number;
+    engagementDiffPct: number | null;
     postsCount: number;
   };
   topContents: Content[];
@@ -315,6 +390,7 @@ export interface AppSettings {
   storageType: 'localStorage' | 'indexedDB' | 'supabase_ready';
   agencyName: string;
   ownerName: string;
+  appMode: 'PRODUCTION' | 'DEMO';
 }
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';

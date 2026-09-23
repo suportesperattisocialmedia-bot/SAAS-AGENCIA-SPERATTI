@@ -1,10 +1,14 @@
 /**
  * GABRIEL SPERATTI | SOCIAL INTELLIGENCE
- * Competitor Service - Mapeamento, Benchmarking e Monitoramento de Mercado
+ * Competitor Service - Market Intelligence, Discovery & Objective Benchmarking
+ * 
+ * Strict rule: NEVER hardcode fake competitors (e.g. Thiago Esteves, L'Atelier).
+ * Candidates require explicit discovery, criteria-based similarity, and manual approval.
  */
 
-import { Client, Competitor } from '../types';
-import { storageService } from './storageService';
+import { Client, Competitor, CompetitorStatus, ContentFormat } from '../types';
+import { defaultStorageAdapter } from './storage/LocalStorageAdapter';
+import { logger } from '../utils/logger';
 
 export interface CompetitorBenchmarkRow {
   name: string;
@@ -14,185 +18,241 @@ export interface CompetitorBenchmarkRow {
   weeklyFrequency: number;
   avgViews: number;
   avgEngagementRate: number;
-  topFormats: string[];
+  topFormats: ContentFormat[];
   mainThemes: string[];
 }
 
 export interface CompetitorPatternInsight {
   id: string;
-  type: 'THEME_SURGE' | 'FORMAT_TRANSITION' | 'FREQUENCY_SHIFT' | 'POSITIONING';
+  type: string;
   title: string;
   description: string;
-  affectedCompetitors: string[];
   strategicImplication: string;
 }
 
 export const competitorService = {
-  /**
-   * Obtém concorrentes aprovados para benchmarking do cliente
-   */
+  getStorageKey(): string {
+    return 'gs_intel_competitors';
+  },
+
+  getAll(): Competitor[] {
+    return defaultStorageAdapter.getCollection<Competitor>(this.getStorageKey());
+  },
+
+  getByClient(clientId: string): Competitor[] {
+    return this.getAll().filter(c => c.clientId === clientId);
+  },
+
   getApprovedCompetitors(clientId: string): Competitor[] {
-    return storageService.competitors.getByClient(clientId).filter(c => c.status === 'approved');
+    return this.getByClient(clientId).filter(c => c.status === 'approved');
   },
 
-  /**
-   * Obtém concorrentes em status de candidato (sugeridos para aprovação do Gabriel)
-   */
   getCandidateCompetitors(clientId: string): Competitor[] {
-    return storageService.competitors.getByClient(clientId).filter(c => c.status === 'candidate');
+    return this.getByClient(clientId).filter(c => c.status === 'candidate');
   },
 
-  /**
-   * Aprova candidato a concorrente
-   */
+  addCompetitor(competitor: Omit<Competitor, 'id' | 'createdAt' | 'updatedAt'>): Competitor {
+    const newItem: Competitor = {
+      ...competitor,
+      id: `comp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const all = this.getAll();
+    defaultStorageAdapter.setCollection(this.getStorageKey(), [newItem, ...all]);
+    logger.info(`Competitor added for client ${competitor.clientId}`, { id: newItem.id, name: newItem.name });
+    return newItem;
+  },
+
+  updateCompetitor(id: string, updates: Partial<Competitor>): Competitor | null {
+    const all = this.getAll();
+    const index = all.findIndex(c => c.id === id);
+    if (index === -1) return null;
+
+    all[index] = {
+      ...all[index],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    defaultStorageAdapter.setCollection(this.getStorageKey(), all);
+    return all[index];
+  },
+
+  deleteCompetitor(id: string): boolean {
+    const all = this.getAll();
+    const filtered = all.filter(c => c.id !== id);
+    if (filtered.length === all.length) return false;
+
+    defaultStorageAdapter.setCollection(this.getStorageKey(), filtered);
+    return true;
+  },
+
   approveCandidate(id: string): void {
-    storageService.competitors.update(id, { status: 'approved' });
+    this.updateCompetitor(id, { status: 'approved' });
   },
 
-  /**
-   * Ignora candidato a concorrente
-   */
   ignoreCandidate(id: string): void {
-    storageService.competitors.update(id, { status: 'ignored' });
+    this.updateCompetitor(id, { status: 'ignored' });
   },
 
   /**
-   * Gera comparação tabular objetiva entre cliente e concorrentes (sem nota inventada)
+   * Objective comparison without declaring subjective winners
    */
-  generateBenchmarkMatrix(client: Client, competitors: Competitor[]): CompetitorBenchmarkRow[] {
-    const clientContents = storageService.contents.getByClient(client.id);
-    const clientSnapshots = storageService.history.getByClient(client.id);
-    const latestSnapshot = clientSnapshots[clientSnapshots.length - 1];
+  generateBenchmarkTable(client: Client, clientFollowers = 0, clientWeeklyFreq = 0): CompetitorBenchmarkRow[] {
+    const approved = this.getApprovedCompetitors(client.id);
 
-    const clientFollowers = latestSnapshot ? latestSnapshot.followers : 18430;
-    const clientAvgViews = clientContents.length > 0
-      ? Math.round(clientContents.reduce((sum, c) => sum + c.metrics.views, 0) / clientContents.length)
-      : 25000;
-    const clientAvgEng = clientContents.length > 0
-      ? Number((clientContents.reduce((sum, c) => sum + c.metrics.engagementRate, 0) / clientContents.length).toFixed(2))
-      : 8.1;
+    const clientRow: CompetitorBenchmarkRow = {
+      name: `${client.name} (Cliente)`,
+      instagram: client.instagram,
+      isClient: true,
+      followers: clientFollowers,
+      weeklyFrequency: clientWeeklyFreq,
+      avgViews: 0,
+      avgEngagementRate: 0,
+      topFormats: client.formats,
+      mainThemes: client.pillars
+    };
 
-    const rows: CompetitorBenchmarkRow[] = [
-      {
-        name: client.name,
-        instagram: client.instagram,
-        isClient: true,
-        followers: clientFollowers,
-        weeklyFrequency: client.formats.length >= 3 ? 4.0 : 3.0,
-        avgViews: clientAvgViews,
-        avgEngagementRate: clientAvgEng,
-        topFormats: client.formats,
-        mainThemes: client.pillars
-      }
-    ];
+    const competitorRows: CompetitorBenchmarkRow[] = approved.map(c => ({
+      name: c.name,
+      instagram: c.instagram,
+      isClient: false,
+      followers: c.followers,
+      weeklyFrequency: c.postingFrequencyWeekly,
+      avgViews: c.avgViews,
+      avgEngagementRate: c.avgEngagementRate,
+      topFormats: c.topFormats,
+      mainThemes: c.recentThemes
+    }));
 
-    competitors.forEach(comp => {
-      rows.push({
-        name: comp.name,
-        instagram: comp.instagram,
-        isClient: false,
-        followers: comp.followers,
-        weeklyFrequency: comp.postingFrequencyWeekly,
-        avgViews: comp.avgViews,
-        avgEngagementRate: comp.avgEngagementRate,
-        topFormats: comp.topFormats,
-        mainThemes: comp.recentThemes
-      });
-    });
-
-    return rows;
+    return [clientRow, ...competitorRows];
   },
 
-  /**
-   * "O QUE OS CONCORRENTES ESTÃO FAZENDO?"
-   * Detector de padrões, temas emergentes e mudanças de formato entre os concorrentes
-   */
+  generateBenchmarkMatrix(client: Client, approvedCompetitors: Competitor[]): CompetitorBenchmarkRow[] {
+    return this.generateBenchmarkTable(client);
+  },
+
   detectCompetitorPatterns(competitors: Competitor[]): CompetitorPatternInsight[] {
     if (competitors.length === 0) return [];
+    const insights: CompetitorPatternInsight[] = [];
 
-    const insights: CompetitorPatternInsight[] = [
-      {
-        id: 'pat-01',
-        type: 'THEME_SURGE',
-        title: 'Foco intensivo em "Tempo de Afastamento e Recuperação Rápida"',
-        description: `${competitors.slice(0, 2).map(c => c.name).join(' e ')} passaram a publicar conteúdos respondendo a dúvidas de pós-operatório imediato e tempo para retorno profissional.`,
-        affectedCompetitors: competitors.slice(0, 2).map(c => c.instagram),
-        strategicImplication: 'Oportunidade para Gabriel Speratti posicionar o cliente com um protocolo transparente de desinchaço e laserterapia nos primeiros 10 dias.'
-      },
-      {
-        id: 'pat-02',
-        type: 'FORMAT_TRANSITION',
-        title: 'Migração de fotos estáticas de antes/depois para Carrosséis Didáticos',
-        description: 'Observada queda no uso de fotos simples e alta taxa de adoção de Carrosséis explicativos sobre ligamentos faciais e vetores anatômicos.',
-        affectedCompetitors: competitors.map(c => c.instagram),
-        strategicImplication: 'O público qualificado valoriza a explicação científica da técnica cirúrgica muito mais do que promessas de resultados imediatos.'
-      },
-      {
-        id: 'pat-03',
-        type: 'POSITIONING',
-        title: 'Aumento da frequência média para 4+ publicações semanais',
-        description: 'Os principais concorrentes com mais de 40k seguidores aumentaram a frequência de Reels dinâmicos de 3 para 5 por semana.',
-        affectedCompetitors: competitors.filter(c => c.postingFrequencyWeekly >= 4).map(c => c.instagram),
-        strategicImplication: 'Manter cadência de 3 a 4 conteúdos de altíssima qualidade técnica para vencer em engajamento qualificado e não entrar em guerra de volume vazio.'
-      }
-    ];
+    const formatsCount: Record<string, number> = {};
+    competitors.forEach(c => {
+      c.topFormats.forEach(f => {
+        formatsCount[f] = (formatsCount[f] || 0) + 1;
+      });
+    });
+    const dominantFormat = Object.entries(formatsCount).sort((a, b) => b[1] - a[1])[0];
+    if (dominantFormat) {
+      insights.push({
+        id: 'pat-1',
+        type: 'FORMATO PREDOMINANTE',
+        title: `Predomínio de ${dominantFormat[0]} no Nicho`,
+        description: `${dominantFormat[1]} de ${competitors.length} concorrentes utilizam ${dominantFormat[0]} como principal alavanca de alcance.`,
+        strategicImplication: `Priorizar ${dominantFormat[0]} com ganchos de alta retenção nos primeiros 3 segundos.`
+      });
+    }
+
+    const avgFreq = competitors.reduce((sum, c) => sum + c.postingFrequencyWeekly, 0) / competitors.length;
+    insights.push({
+      id: 'pat-2',
+      type: 'CADÊNCIA EDITORIAL',
+      title: `Ritmo Médio de ${avgFreq.toFixed(1)} posts/semana`,
+      description: `Os concorrentes mantêm publicação regular para sustentar relevância perante o algoritmo.`,
+      strategicImplication: `Manter frequência mínima de 3 a 5 posts semanais com calendário estruturado.`
+    });
+
+    const allThemes = competitors.flatMap(c => c.recentThemes);
+    if (allThemes.length > 0) {
+      insights.push({
+        id: 'pat-3',
+        type: 'TEMAS EM ALTA',
+        title: 'Foco em Solução de Dores e Prova Social',
+        description: `Pautas frequentes observadas: ${allThemes.slice(0, 3).join(', ')}.`,
+        strategicImplication: `Abordar estes temas com ângulo mais técnico e autoral para se diferenciar.`
+      });
+    }
 
     return insights;
   },
 
-  /**
-   * Procura candidatos a concorrentes com base nos parâmetros do cliente
-   */
   async discoverCandidateCompetitors(client: Client): Promise<Competitor[]> {
-    // Simulate web discovery based on client segment and city
-    await new Promise(res => setTimeout(res, 900));
+    return this.getCandidateCompetitors(client.id);
+  },
 
-    const candidates: Array<Omit<Competitor, 'id' | 'createdAt' | 'updatedAt'>> = [
-      {
-        clientId: client.id,
-        name: 'Dr. Thiago Esteves Facial',
-        instagram: '@drthiagoesteves',
-        website: 'https://thiagoestevesface.com.br',
-        segment: client.segment,
-        similarityScore: 84,
-        followers: 29400,
-        postingFrequencyWeekly: 3.5,
-        topFormats: ['Reels', 'Carrossel'],
-        avgViews: 24800,
-        avgEngagementRate: 4.2,
-        recentThemes: ['Rinoplastia estruturada', 'Cicatriz invisível', 'Pós-operatório sem dor'],
-        notes: `Identificado na busca pelo segmento "${client.segment}" na região de ${client.city}.`,
-        status: 'candidate',
-        candidateReason: `Atua no mesmo segmento (${client.segment}) com foco em procedimentos de alto valor.`
-      },
-      {
-        clientId: client.id,
-        name: 'Clínica L’Atelier Face & Body',
-        instagram: '@clinica.latelier',
-        website: 'https://latelierclinic.com.br',
-        segment: 'Medicina Estética & Cirurgia',
-        similarityScore: 78,
-        followers: 54100,
-        postingFrequencyWeekly: 5.0,
-        topFormats: ['Carrossel', 'Stories'],
-        avgViews: 31000,
-        avgEngagementRate: 3.6,
-        recentThemes: ['Protocolos combinados', 'Bioestimuladores vs Cirurgia', 'Envelhecimento saudável'],
-        notes: 'Clínica multidisciplinar com forte investimento em anúncios patrocinados.',
-        status: 'candidate',
-        candidateReason: 'Disputa a atenção da mesma persona de alta renda na mesma praça geográfica.'
-      }
-    ];
+  /**
+   * Calculate similarity score based on verifiable criteria (Segment, Geography, Persona, Formats)
+   */
+  calculateSimilarity(client: Client, candidate: Partial<Competitor>): { score: number; criteria: string[] } {
+    const criteria: string[] = [];
+    let score = 0;
 
-    const existing = storageService.competitors.getByClient(client.id);
-    const added: Competitor[] = [];
-
-    for (const c of candidates) {
-      if (!existing.some(e => e.instagram === c.instagram)) {
-        added.push(storageService.competitors.create(c));
-      }
+    if (candidate.segment && candidate.segment.toLowerCase() === client.segment.toLowerCase()) {
+      score += 40;
+      criteria.push(`Mesmo segmento de atuação (${client.segment})`);
     }
 
-    return added;
+    if (candidate.notes && client.city && candidate.notes.toLowerCase().includes(client.city.toLowerCase())) {
+      score += 30;
+      criteria.push(`Mesma praça geográfica (${client.city})`);
+    }
+
+    if (candidate.topFormats && client.formats && candidate.topFormats.some(f => client.formats.includes(f))) {
+      score += 15;
+      criteria.push('Formatos prioritários coincidentes');
+    }
+
+    if (candidate.followers && candidate.followers > 0) {
+      score += 15;
+      criteria.push('Presença ativa no Instagram comprovada');
+    }
+
+    return { score, criteria };
+  },
+
+  /**
+   * Candidate discovery from user input or verified market search
+   */
+  async registerCandidate(
+    client: Client,
+    data: {
+      name: string;
+      instagram: string;
+      website?: string;
+      followers?: number;
+      weeklyFrequency?: number;
+      topFormats?: ContentFormat[];
+      notes?: string;
+      evidenceUrl?: string;
+    }
+  ): Promise<Competitor> {
+    const { score, criteria } = this.calculateSimilarity(client, {
+      segment: client.segment,
+      topFormats: data.topFormats,
+      followers: data.followers || 0,
+      notes: data.notes
+    });
+
+    return this.addCompetitor({
+      clientId: client.id,
+      name: data.name,
+      instagram: data.instagram.startsWith('@') ? data.instagram : `@${data.instagram}`,
+      website: data.website || '',
+      segment: client.segment,
+      similarityScore: score,
+      similarityCriteria: criteria,
+      followers: data.followers || 0,
+      postingFrequencyWeekly: data.weeklyFrequency || 0,
+      topFormats: data.topFormats || ['Reels', 'Carrossel'],
+      avgViews: 0,
+      avgEngagementRate: 0,
+      recentThemes: [],
+      notes: data.notes || '',
+      status: 'candidate',
+      candidateReason: `Candidato sugerido para o segmento ${client.segment}.`,
+      evidenceUrl: data.evidenceUrl
+    });
   }
 };

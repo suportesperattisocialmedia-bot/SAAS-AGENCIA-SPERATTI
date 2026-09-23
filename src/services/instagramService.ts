@@ -1,200 +1,260 @@
 /**
  * GABRIEL SPERATTI | SOCIAL INTELLIGENCE
- * Instagram Service - Camada desacoplada para Meta Instagram Graph API
+ * Instagram / Meta Service - Real Meta Graph API Integration Client
  * 
- * Suporta contas individuais por cliente sem misturar dados.
- * Sinaliza explicitamente quando credenciais da API Meta não estão presentes
- * e persiste snapshots diários sem sobrescrever histórico.
+ * Strict rule: NEVER generate fake numbers (18430 followers, 28420 reach, etc.).
+ * Status must strictly reflect reality:
+ * NOT_CONNECTED, CONNECTING, CONNECTED, TOKEN_EXPIRED, PERMISSION_ERROR, SYNCING, SYNCED, ERROR.
  */
 
-import { InstagramAccount, MetricSnapshot } from '../types';
+import { InstagramAccount, InstagramConnectionStatus, AccountSnapshot } from '../types';
 import { storageService } from './storageService';
+import { apiClient } from './api/apiClient';
+import { logger } from '../utils/logger';
 
 export interface SyncResult {
   success: boolean;
   timestamp: string;
   itemsSynced: number;
   error?: string;
-  snapshotCreated?: MetricSnapshot;
-}
-
-export interface InstagramCredentialsInput {
-  appId: string;
-  accountId: string;
-  // Tokens/Secrets are validated server-side and never exposed in client DOM
-  hasTokenConfigured: boolean;
+  snapshotCreated?: AccountSnapshot;
 }
 
 export const instagramService = {
   /**
-   * Verifica se as credenciais da API oficial da Meta estão ativas no ambiente
-   */
-  isApiConfigured(): boolean {
-    const settings = storageService.settings.get();
-    return Boolean(settings.instagramApiConfigured);
-  },
-
-  /**
-   * Obtém a conta vinculada a um cliente específico
+   * Get account for a given client from storage
    */
   getAccount(clientId: string): InstagramAccount {
-    const account = storageService.instagram.getByClient(clientId);
-    if (account) return account;
+    const existing = storageService.instagram.getAccount(clientId);
+    if (existing) return existing;
 
-    // Default unlinked account structure
     const client = storageService.clients.getById(clientId);
-    return {
+    const initial: InstagramAccount = {
       clientId,
       handle: client?.instagram || '',
+      status: 'NOT_CONNECTED',
       isConnected: false,
-      permissions: ['instagram_basic', 'instagram_manage_insights'],
-      syncState: 'idle'
+      permissions: ['instagram_basic', 'instagram_manage_insights', 'pages_read_engagement']
     };
+    storageService.instagram.saveAccount(initial);
+    return initial;
   },
 
   /**
-   * Conecta a conta de Instagram para um cliente
+   * Connects or updates account credentials locally and triggers verification
    */
   async connectAccount(clientId: string, handle: string, config?: { appId?: string; accountId?: string }): Promise<InstagramAccount> {
-    const isConfigured = this.isApiConfigured();
-    
-    const account: InstagramAccount = {
-      clientId,
-      handle: handle.startsWith('@') ? handle : `@${handle}`,
+    const current = this.getAccount(clientId);
+    const updated: InstagramAccount = {
+      ...current,
+      handle,
+      accountId: config?.accountId || current.accountId,
+      status: 'CONNECTED',
       isConnected: true,
-      connectedAt: new Date().toISOString(),
       lastSyncAt: new Date().toISOString(),
-      nextSyncScheduled: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      appId: config?.appId || (isConfigured ? 'meta_app_active' : undefined),
-      accountId: config?.accountId || (isConfigured ? `act_${handle.replace('@', '')}` : undefined),
-      permissions: ['instagram_basic', 'instagram_manage_insights', 'pages_read_engagement'],
-      errorStatus: isConfigured ? null : 'Aviso: API Meta oficial aguardando credenciais de produção no servidor.',
-      syncState: 'synced'
+      errorStatus: null
     };
+    storageService.instagram.saveAccount(updated);
+    logger.info(`Instagram account connected for client ${clientId}`, { handle });
+    return updated;
+  },
 
-    storageService.instagram.save(account);
+  /**
+   * Check connection status with backend Meta Graph API proxy
+   */
+  async checkStatus(clientId: string): Promise<InstagramAccount> {
+    try {
+      const current = this.getAccount(clientId);
+      const res = await apiClient.get<{
+        status: InstagramConnectionStatus;
+        isConnected: boolean;
+        accountId?: string;
+        message?: string;
+      }>(`/api/integrations/instagram/status?clientId=${encodeURIComponent(clientId)}`);
 
-    // Create immediate initial snapshot if none exists
-    const snapshots = storageService.history.getByClient(clientId);
-    if (snapshots.length === 0) {
-      const today = new Date().toISOString().split('T')[0];
-      storageService.history.addSnapshot({
-        clientId,
-        timestamp: today,
-        followers: 18430,
-        reach: 28420,
-        views: 41290,
-        likes: 1284,
-        comments: 143,
-        shares: 421,
-        saves: 312,
-        profileVisits: 824,
-        postsCount: 1,
-        engagementRate: 5.2
-      });
+      const updated: InstagramAccount = {
+        ...current,
+        status: res.status,
+        isConnected: res.isConnected,
+        accountId: res.accountId || current.accountId,
+        errorStatus: res.status === 'ERROR' || res.status === 'TOKEN_EXPIRED' ? (res.message || null) : null
+      };
+
+      storageService.instagram.saveAccount(updated);
+      return updated;
+    } catch (err) {
+      logger.warn('Failed checking Instagram status on server', { error: String(err) });
+      return this.getAccount(clientId);
+    }
+  },
+
+  /**
+   * Initiates Meta OAuth flow by obtaining authorization URL from server
+   */
+  async getConnectUrl(clientId: string): Promise<{ authUrl?: string; error?: string }> {
+    try {
+      const res = await apiClient.get<{ authUrl: string; status: string }>(
+        `/api/integrations/instagram/connect?clientId=${encodeURIComponent(clientId)}`
+      );
+      return { authUrl: res.authUrl };
+    } catch (err: any) {
+      const msg = err.message || 'Meta OAuth não configurado no servidor';
+      return { error: msg };
+    }
+  },
+
+  /**
+   * Disconnects account both on server and locally
+   */
+  async disconnectAccount(clientId: string): Promise<void> {
+    try {
+      await apiClient.post('/api/integrations/instagram/disconnect', { clientId });
+    } catch (err) {
+      logger.warn('Server disconnect failed, proceeding with local disconnection', { error: String(err) });
     }
 
-    return account;
+    const current = this.getAccount(clientId);
+    const disconnected: InstagramAccount = {
+      ...current,
+      status: 'NOT_CONNECTED',
+      isConnected: false,
+      errorStatus: null
+    };
+    storageService.instagram.saveAccount(disconnected);
+    logger.info(`Instagram account disconnected for client ${clientId}`);
   },
 
   /**
-   * Desconecta a conta do cliente
-   */
-  disconnectAccount(clientId: string): void {
-    storageService.instagram.disconnect(clientId);
-  },
-
-  /**
-   * Executa sincronização de dados (manual ou automática)
-   * Garante a criação de um snapshot diário sem sobrescrever datas passadas
+   * Synchronize account metrics via real server endpoint
    */
   async syncNow(clientId: string): Promise<SyncResult> {
     const account = this.getAccount(clientId);
+
     if (!account.isConnected) {
       return {
         success: false,
         timestamp: new Date().toISOString(),
         itemsSynced: 0,
-        error: 'Esta conta de Instagram ainda não foi conectada.'
+        error: 'Instagram não autenticado via Meta OAuth. Configure as credenciais no servidor.'
       };
     }
 
-    // Set state to syncing
-    storageService.instagram.save({
+    // Set status to syncing
+    storageService.instagram.saveAccount({
       ...account,
-      syncState: 'syncing'
+      status: 'SYNCING'
     });
 
     try {
-      // Simulate real network request to Meta Graph API
-      await new Promise(res => setTimeout(res, 850));
+      const syncResponse = await apiClient.post<{
+        success: boolean;
+        profile: {
+          followers_count?: number;
+          media_count?: number;
+          username?: string;
+        };
+        media: Array<{
+          id: string;
+          caption?: string;
+          media_type: string;
+          like_count?: number;
+          comments_count?: number;
+          timestamp: string;
+        }>;
+        syncedAt: string;
+      }>('/api/integrations/instagram/sync', { clientId });
 
+      const followers = syncResponse.profile.followers_count || 0;
       const today = new Date().toISOString().split('T')[0];
-      const existingSnapshots = storageService.history.getByClient(clientId);
-      const latestSnapshot = existingSnapshots[existingSnapshots.length - 1];
 
-      // If a snapshot already exists for today, increment latest daily stats slightly
-      // Otherwise create a fresh daily snapshot based on latest known trajectory
-      const baseFollowers = latestSnapshot ? latestSnapshot.followers : 18000;
-      const baseViews = latestSnapshot ? latestSnapshot.views : 32000;
-      const baseReach = latestSnapshot ? latestSnapshot.reach : 24000;
-
-      const randomGrowth = Math.floor(Math.random() * 18) + 5;
-      const newFollowers = baseFollowers + randomGrowth;
-      const newViews = Math.floor(baseViews * (1 + (Math.random() * 0.04 - 0.01)));
-      const newReach = Math.floor(baseReach * (1 + (Math.random() * 0.04 - 0.01)));
-      const newLikes = Math.floor(newViews * 0.038);
-      const newComments = Math.floor(newViews * 0.004);
-      const newShares = Math.floor(newViews * 0.011);
-      const newSaves = Math.floor(newViews * 0.014);
-      const newVisits = Math.floor(newViews * 0.035);
-      const engRate = Number((((newLikes + newComments + newShares + newSaves) / (newReach || 1)) * 100).toFixed(2));
-
-      const createdSnapshot = storageService.history.addSnapshot({
+      // Record snapshot with REAL_DATA source
+      const snapshot = storageService.history.saveSnapshot({
         clientId,
-        timestamp: today,
-        followers: newFollowers,
-        reach: newReach,
-        views: newViews,
-        likes: newLikes,
-        comments: newComments,
-        shares: newShares,
-        saves: newSaves,
-        profileVisits: newVisits,
-        postsCount: 1,
-        engagementRate: engRate
+        date: today,
+        followers,
+        reach: 0,
+        views: 0,
+        likes: syncResponse.media.reduce((acc, m) => acc + (m.like_count || 0), 0),
+        comments: syncResponse.media.reduce((acc, m) => acc + (m.comments_count || 0), 0),
+        shares: 0,
+        saves: 0,
+        profileVisits: 0,
+        websiteClicks: 0,
+        postsPublished: syncResponse.media.filter(m => m.timestamp.startsWith(today)).length,
+        engagementRate: 0,
+        source: 'META_API',
+        sourceTimestamp: syncResponse.syncedAt
       });
 
-      const clientContents = storageService.contents.getByClient(clientId);
-
-      // Update account status
-      storageService.instagram.save({
+      storageService.instagram.saveAccount({
         ...account,
-        lastSyncAt: new Date().toISOString(),
-        nextSyncScheduled: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        syncState: 'synced',
+        status: 'SYNCED',
+        lastSyncAt: syncResponse.syncedAt,
         errorStatus: null
       });
 
       return {
         success: true,
-        timestamp: new Date().toISOString(),
-        itemsSynced: clientContents.length + 1,
-        snapshotCreated: createdSnapshot
+        timestamp: syncResponse.syncedAt,
+        itemsSynced: syncResponse.media.length,
+        snapshotCreated: snapshot
       };
-    } catch (err) {
-      console.error('[InstagramService] Sync error:', err);
-      storageService.instagram.save({
+    } catch (err: any) {
+      logger.error('Meta sync failed', { error: err.message });
+      storageService.instagram.saveAccount({
         ...account,
-        syncState: 'error',
-        errorStatus: 'Não foi possível sincronizar o Instagram. Verifique a conexão ou as permissões da conta.'
+        status: 'ERROR',
+        errorStatus: err.message || 'Falha ao sincronizar com Meta Graph API'
       });
+
       return {
         success: false,
         timestamp: new Date().toISOString(),
         itemsSynced: 0,
-        error: 'Não foi possível sincronizar o Instagram. Verifique a conexão ou as permissões da conta.'
+        error: err.message || 'Falha na conexão com a Meta Graph API.'
       };
     }
+  },
+
+  /**
+   * Allows manual registration of verified metrics without fabricating data
+   */
+  recordManualSnapshot(
+    clientId: string,
+    data: {
+      date: string;
+      followers: number;
+      reach: number;
+      views: number;
+      likes: number;
+      comments: number;
+      shares: number;
+      saves: number;
+      profileVisits?: number;
+      postsPublished?: number;
+    }
+  ): AccountSnapshot {
+    const interactions = data.likes + data.comments + data.shares + data.saves;
+    const engagementRate = data.reach > 0
+      ? Number(((interactions / data.reach) * 100).toFixed(2))
+      : 0;
+
+    return storageService.history.saveSnapshot({
+      clientId,
+      date: data.date,
+      followers: data.followers,
+      reach: data.reach,
+      views: data.views,
+      likes: data.likes,
+      comments: data.comments,
+      shares: data.shares,
+      saves: data.saves,
+      profileVisits: data.profileVisits || 0,
+      websiteClicks: 0,
+      postsPublished: data.postsPublished || 0,
+      engagementRate,
+      source: 'MANUAL',
+      sourceTimestamp: new Date().toISOString()
+    });
   }
 };

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Alert, Client } from '../../types';
-import { storageService } from '../../services/storageService';
 import { Modal } from '../common/Modal';
+import { Alert, Client, AlertSeverity, AlertStatus } from '../../types';
+import { storageService } from '../../services/storageService';
+import { alertEngine } from '../../services/alerts/alertEngine';
 import {
-  Bell,
   AlertTriangle,
-  TrendingUp,
   CheckCircle2,
-  Clock,
   Trash2,
-  Filter
+  ExternalLink,
+  ShieldCheck,
+  TrendingUp,
+  Clock
 } from 'lucide-react';
 
 interface AlertsCenterModalProps {
@@ -27,22 +28,16 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
   clients,
   onRefresh
 }) => {
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'new' | 'resolved'>('all');
 
   const filteredAlerts = alerts.filter(a => {
-    if (filterStatus === 'new') return a.status === 'new';
-    if (filterStatus === 'read') return a.status === 'read';
-    if (filterStatus === 'resolved') return a.status === 'resolved';
+    if (filterStatus === 'new') return a.status === 'NEW' || a.status === 'READ';
+    if (filterStatus === 'resolved') return a.status === 'RESOLVED';
     return true;
   });
 
   const handleResolve = (id: string) => {
-    storageService.alerts.updateStatus(id, 'resolved');
-    onRefresh();
-  };
-
-  const handleMarkRead = (id: string) => {
-    storageService.alerts.updateStatus(id, 'read');
+    alertEngine.updateStatus(id, 'RESOLVED');
     onRefresh();
   };
 
@@ -51,16 +46,18 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
     onRefresh();
   };
 
-  const getSeverityStyle = (severity: Alert['severity']) => {
+  const getSeverityStyle = (severity: AlertSeverity) => {
     switch (severity) {
       case 'critical':
         return 'border-rose-500/30 bg-rose-950/20 text-rose-400';
-      case 'warning':
+      case 'high':
+        return 'border-orange-500/30 bg-orange-950/20 text-orange-400';
+      case 'medium':
         return 'border-amber-500/30 bg-amber-950/20 text-amber-400';
-      case 'success':
-        return 'border-emerald-500/30 bg-emerald-950/20 text-emerald-400';
-      default:
+      case 'low':
         return 'border-sky-500/30 bg-sky-950/20 text-sky-400';
+      default:
+        return 'border-neutral-500/30 bg-neutral-900 text-neutral-300';
     }
   };
 
@@ -94,7 +91,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
                   : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
-              Novos ({alerts.filter(a => a.status === 'new').length})
+              Ativos ({alerts.filter(a => a.status !== 'RESOLVED').length})
             </button>
             <button
               onClick={() => setFilterStatus('resolved')}
@@ -104,7 +101,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
                   : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
-              Resolvidos ({alerts.filter(a => a.status === 'resolved').length})
+              Resolvidos ({alerts.filter(a => a.status === 'RESOLVED').length})
             </button>
           </div>
         </div>
@@ -147,7 +144,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
                   </span>
 
                   <div className="flex items-center gap-2">
-                    {alert.status !== 'resolved' && (
+                    {alert.status !== 'RESOLVED' && (
                       <button
                         onClick={() => handleResolve(alert.id)}
                         className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-semibold"
@@ -159,7 +156,8 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
 
                     <button
                       onClick={() => handleDelete(alert.id)}
-                      className="text-neutral-500 hover:text-rose-400 p-1"
+                      className="text-neutral-500 hover:text-rose-400 transition-colors"
+                      title="Excluir alerta"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -171,7 +169,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
 
           {filteredAlerts.length === 0 && (
             <div className="py-8 text-center text-xs text-neutral-500 font-mono">
-              Nenhum alerta encontrado neste filtro.
+              Nenhum alerta registrado nesta categoria.
             </div>
           )}
         </div>

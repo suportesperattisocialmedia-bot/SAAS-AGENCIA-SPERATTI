@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Client, MetricSnapshot } from '../../types';
+import { Client, AccountSnapshot } from '../../types';
 import { ChartArea } from '../common/ChartArea';
 import { reportService } from '../../services/reportService';
 import {
@@ -13,7 +13,7 @@ import {
 
 interface HistoryTabProps {
   client: Client;
-  snapshots: MetricSnapshot[];
+  snapshots: AccountSnapshot[];
 }
 
 export const HistoryTab: React.FC<HistoryTabProps> = ({
@@ -21,7 +21,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
   snapshots
 }) => {
   const [filterDays, setFilterDays] = useState<number>(30);
-  const [activeChartMetric, setActiveChartMetric] = useState<keyof MetricSnapshot>('followers');
+  const [activeChartMetric, setActiveChartMetric] = useState<keyof AccountSnapshot>('followers');
 
   const filteredSnapshots = filterDays === 0
     ? snapshots
@@ -29,12 +29,12 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
 
   // Chart data
   const chartData = filteredSnapshots.map(s => ({
-    date: s.timestamp,
-    label: s.timestamp.split('-').slice(1).reverse().join('/'),
+    date: s.date,
+    label: s.date.split('-').slice(1).reverse().join('/'),
     value: Number(s[activeChartMetric]) || 0
   }));
 
-  const metricsSelectOptions: Array<{ id: keyof MetricSnapshot; label: string }> = [
+  const metricsSelectOptions: Array<{ id: keyof AccountSnapshot; label: string }> = [
     { id: 'followers', label: 'Seguidores' },
     { id: 'views', label: 'Visualizações' },
     { id: 'reach', label: 'Alcance' },
@@ -149,7 +149,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
               {[...filteredSnapshots].reverse().map(snap => (
                 <tr key={snap.id} className="hover:bg-neutral-800/40 transition-colors">
                   <td className="py-2.5 font-bold text-neutral-200">
-                    {snap.timestamp}
+                    {snap.date}
                   </td>
                   <td className="py-2.5 text-right font-bold text-amber-300 tabular-nums">
                     {snap.followers.toLocaleString('pt-BR')}

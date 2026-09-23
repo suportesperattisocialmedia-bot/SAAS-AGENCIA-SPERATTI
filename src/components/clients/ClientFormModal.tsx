@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
-import { Client } from '../../types';
-import { Plus, X, Check } from 'lucide-react';
+import { Client, ContentFormat, HealthStatus } from '../../types';
+import { Plus, X, Check, AlertCircle } from 'lucide-react';
 
 interface ClientFormModalProps {
   isOpen: boolean;
@@ -21,7 +21,7 @@ const DEFAULT_OBJECTIVES = [
   'Comunidade'
 ];
 
-const DEFAULT_FORMATS = ['Reels', 'Carrossel', 'Foto', 'Stories', 'Lives'];
+const VALID_FORMATS: ContentFormat[] = ['Reels', 'Carrossel', 'Foto', 'Stories', 'Live'];
 
 const DEFAULT_PILLARS = [
   'Educação',
@@ -31,6 +31,19 @@ const DEFAULT_PILLARS = [
   'Bastidores',
   'Venda',
   'Conexão'
+];
+
+const ONBOARDING_STEPS = [
+  { step: 1, label: '1. Identificação' },
+  { step: 2, label: '2. Estratégia' },
+  { step: 3, label: '3. Público' },
+  { step: 4, label: '4. Objetivos' },
+  { step: 5, label: '5. Conexão Instagram' },
+  { step: 6, label: '6. Análise Inicial' },
+  { step: 7, label: '7. Concorrentes' },
+  { step: 8, label: '8. Pesquisa' },
+  { step: 9, label: '9. Ideias' },
+  { step: 10, label: '10. Conclusão' }
 ];
 
 export const ClientFormModal: React.FC<ClientFormModalProps> = ({
@@ -57,22 +70,26 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     differentiators: '',
     notes: '',
     status: 'active' as Client['status'],
-    onboardingStep: 10
+    healthStatus: 'not_connected' as HealthStatus,
+    onboardingStep: 1,
+    avatarUrl: ''
   });
 
   const [objectives, setObjectives] = useState<string[]>(['Autoridade', 'Leads']);
-  const [formats, setFormats] = useState<string[]>(['Reels', 'Carrossel']);
+  const [formats, setFormats] = useState<ContentFormat[]>(['Reels', 'Carrossel']);
   const [pillars, setPillars] = useState<string[]>(['Educação', 'Autoridade']);
 
   const [customObjective, setCustomObjective] = useState('');
   const [customPillar, setCustomPillar] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     if (initialData) {
       setFormData({
         name: initialData.name,
-        company: initialData.company,
-        instagram: initialData.instagram,
+        company: initialData.company || '',
+        instagram: initialData.instagram || '',
         website: initialData.website || '',
         whatsapp: initialData.whatsapp || '',
         city: initialData.city || '',
@@ -87,13 +104,15 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         differentiators: initialData.differentiators || '',
         notes: initialData.notes || '',
         status: initialData.status || 'active',
-        onboardingStep: initialData.onboardingStep || 10
+        healthStatus: initialData.healthStatus || 'not_connected',
+        onboardingStep: initialData.onboardingStep || 1,
+        avatarUrl: initialData.avatarUrl || ''
       });
       setObjectives(initialData.objectives || []);
-      setFormats(initialData.formats || []);
+      setFormats(initialData.formats || ['Reels', 'Carrossel']);
       setPillars(initialData.pillars || []);
+      setIsDirty(false);
     } else {
-      // Reset defaults
       setFormData({
         name: '',
         company: '',
@@ -112,107 +131,190 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         differentiators: '',
         notes: '',
         status: 'active',
-        onboardingStep: 5
+        healthStatus: 'not_connected',
+        onboardingStep: 1,
+        avatarUrl: ''
       });
-      setObjectives(['Autoridade', 'Leads', 'Vendas']);
-      setFormats(['Reels', 'Carrossel', 'Stories']);
-      setPillars(['Educação', 'Autoridade', 'Prova social']);
+      setObjectives(['Autoridade', 'Leads']);
+      setFormats(['Reels', 'Carrossel']);
+      setPillars(['Educação', 'Autoridade']);
+      setIsDirty(false);
     }
+    setErrors({});
   }, [initialData, isOpen]);
 
-  const toggleArrayItem = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
-    if (list.includes(item)) {
-      setList(list.filter(i => i !== item));
-    } else {
-      setList([...list, item]);
+  const handleChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setIsDirty(true);
+    if (errors[field]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
     }
   };
 
-  const handleAddCustomObjective = () => {
+  const toggleObjective = (item: string) => {
+    setIsDirty(true);
+    setObjectives(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
+  const toggleFormat = (item: ContentFormat) => {
+    setIsDirty(true);
+    setFormats(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
+  const togglePillar = (item: string) => {
+    setIsDirty(true);
+    setPillars(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
+  const addCustomObjective = (e: React.FormEvent) => {
+    e.preventDefault();
     if (customObjective.trim() && !objectives.includes(customObjective.trim())) {
-      setObjectives([...objectives, customObjective.trim()]);
+      setObjectives(prev => [...prev, customObjective.trim()]);
       setCustomObjective('');
+      setIsDirty(true);
     }
   };
 
-  const handleAddCustomPillar = () => {
+  const addCustomPillar = (e: React.FormEvent) => {
+    e.preventDefault();
     if (customPillar.trim() && !pillars.includes(customPillar.trim())) {
-      setPillars([...pillars, customPillar.trim()]);
+      setPillars(prev => [...prev, customPillar.trim()]);
       setCustomPillar('');
+      setIsDirty(true);
+    }
+  };
+
+  const handleSafeClose = () => {
+    if (isDirty) {
+      if (window.confirm('Existem alterações não salvas. Deseja realmente fechar?')) {
+        onClose();
+      }
+    } else {
+      onClose();
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.instagram.trim()) return;
+
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Nome do cliente é obrigatório';
+    }
+
+    if (!formData.instagram.trim()) {
+      newErrors.instagram = 'Instagram é obrigatório';
+    }
+
+    if (!formData.segment.trim()) {
+      newErrors.segment = 'Segmento é obrigatório';
+    }
+
+    if (formData.website && !formData.website.startsWith('http://') && !formData.website.startsWith('https://')) {
+      newErrors.website = 'URL deve começar com https:// ou http://';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    // Normalize Instagram handle: remove @, spaces, then prefix single @
+    const cleanHandle = formData.instagram.replace(/[@\s]/g, '');
+    const normalizedInstagram = `@${cleanHandle}`;
 
     onSave({
       ...formData,
-      instagram: formData.instagram.startsWith('@') ? formData.instagram : `@${formData.instagram.trim()}`,
+      instagram: normalizedInstagram,
       objectives,
       formats,
-      pillars,
-      competitors: initialData?.competitors || []
+      pillars
     });
-    onClose();
+    setIsDirty(false);
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleSafeClose}
       title={initialData ? `Editar Cliente: ${initialData.name}` : 'Cadastrar Novo Cliente'}
-      subtitle="Dados de inteligência, posicionamento e estratégia da conta"
-      maxWidth="2xl"
+      maxWidth="4xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Identificação Básica */}
+        {/* Section 1: Basic Info */}
         <div className="space-y-4">
-          <div className="text-xs font-mono uppercase text-amber-400 font-semibold border-b border-neutral-800 pb-1">
-            01. Identificação e Contato
+          <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400">
+              1. Identificação & Contato
+            </h3>
+            <span className="text-[10px] text-neutral-500 font-mono">* Campos obrigatórios</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
                 Nome do Cliente / Especialista *
               </label>
               <input
                 type="text"
-                required
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ex: Dr. Ravi Alencar"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-500 font-medium"
+                onChange={e => handleChange('name', e.target.value)}
+                placeholder="Ex: Dr. Roberto Guimarães"
+                className={`w-full bg-neutral-950 border ${
+                  errors.name ? 'border-rose-500 focus:border-rose-400' : 'border-neutral-800 focus:border-amber-500'
+                } rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden`}
               />
+              {errors.name && (
+                <div className="flex items-center gap-1 text-[11px] text-rose-400 mt-1 font-mono">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{errors.name}</span>
+                </div>
+              )}
             </div>
 
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
-                Empresa / Clínica / Marca *
+                Empresa / Clínica / Marca
               </label>
               <input
                 type="text"
-                required
                 value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                placeholder="Ex: Instituto Ravi de Cirurgia Plástica"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-500 font-medium"
+                onChange={e => handleChange('company', e.target.value)}
+                placeholder="Ex: Instituto Guimarães de Saúde"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500"
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
-                @ Instagram *
+                Instagram Oficial *
               </label>
               <input
                 type="text"
-                required
                 value={formData.instagram}
-                onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
-                placeholder="Ex: @dr.ravialencar"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-amber-300 font-mono placeholder-neutral-500"
+                onChange={e => handleChange('instagram', e.target.value)}
+                placeholder="@dr.robertoguimaraes"
+                className={`w-full bg-neutral-950 border ${
+                  errors.instagram ? 'border-rose-500 focus:border-rose-400' : 'border-neutral-800 focus:border-amber-500'
+                } rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden font-mono`}
               />
+              {errors.instagram && (
+                <div className="flex items-center gap-1 text-[11px] text-rose-400 mt-1 font-mono">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{errors.instagram}</span>
+                </div>
+              )}
             </div>
 
             <div>
@@ -222,58 +324,76 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               <input
                 type="text"
                 value={formData.whatsapp}
-                onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                onChange={e => handleChange('whatsapp', e.target.value)}
                 placeholder="+55 11 99999-9999"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100 font-mono placeholder-neutral-500"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500 font-mono"
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
-                Site Oficial
+                Website / Landing Page
               </label>
               <input
                 type="text"
                 value={formData.website}
-                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                placeholder="https://..."
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-500"
+                onChange={e => handleChange('website', e.target.value)}
+                placeholder="https://robertoguimaraes.com.br"
+                className={`w-full bg-neutral-950 border ${
+                  errors.website ? 'border-rose-500 focus:border-rose-400' : 'border-neutral-800 focus:border-amber-500'
+                } rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden font-mono`}
               />
+              {errors.website && (
+                <div className="flex items-center gap-1 text-[11px] text-rose-400 mt-1 font-mono">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{errors.website}</span>
+                </div>
+              )}
             </div>
 
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
-                Cidade / Região
+                Cidade / Praça de Atuação
               </label>
               <input
                 type="text"
                 value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                placeholder="Ex: São Paulo - SP (Jardins)"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-500"
+                onChange={e => handleChange('city', e.target.value)}
+                placeholder="Ex: Curitiba - PR (Batel)"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500"
               />
             </div>
           </div>
         </div>
 
-        {/* Mercado, Segmento e Persona */}
+        {/* Section 2: Market & Segmentation */}
         <div className="space-y-4">
-          <div className="text-xs font-mono uppercase text-amber-400 font-semibold border-b border-neutral-800 pb-1">
-            02. Mercado, Segmento e Persona
+          <div className="border-b border-neutral-800 pb-2">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400">
+              2. Segmento & Posicionamento Comercial
+            </h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
-                Segmento Principal
+                Segmento Principal *
               </label>
               <input
                 type="text"
                 value={formData.segment}
-                onChange={(e) => setFormData({ ...formData, segment: e.target.value })}
-                placeholder="Ex: Saúde e Alta Performance"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100"
+                onChange={e => handleChange('segment', e.target.value)}
+                placeholder="Ex: Medicina Estética, Advocacia Corporativa, Imóveis de Luxo..."
+                className={`w-full bg-neutral-950 border ${
+                  errors.segment ? 'border-rose-500 focus:border-rose-400' : 'border-neutral-800 focus:border-amber-500'
+                } rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden`}
               />
+              {errors.segment && (
+                <div className="flex items-center gap-1 text-[11px] text-rose-400 mt-1 font-mono">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{errors.segment}</span>
+                </div>
+              )}
             </div>
 
             <div>
@@ -283,239 +403,237 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               <input
                 type="text"
                 value={formData.subsegment}
-                onChange={(e) => setFormData({ ...formData, subsegment: e.target.value })}
-                placeholder="Ex: Cirurgia Plástica Facial & Longevidade"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100"
+                onChange={e => handleChange('subsegment', e.target.value)}
+                placeholder="Ex: Rejuvenescimento Facial, Fusões e Aquisições..."
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500"
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
-                Ticket Médio de Venda
+                Ticket Médio de Referência
               </label>
               <input
                 type="text"
                 value={formData.averageTicket}
-                onChange={(e) => setFormData({ ...formData, averageTicket: e.target.value })}
-                placeholder="Ex: R$ 38.000,00"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100 font-mono"
+                onChange={e => handleChange('averageTicket', e.target.value)}
+                placeholder="Ex: R$ 15.000,00"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500 font-mono"
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
-                Tom de Comunicação
+                Etapa do Onboarding (1 a 10)
               </label>
-              <input
-                type="text"
-                value={formData.toneOfVoice}
-                onChange={(e) => setFormData({ ...formData, toneOfVoice: e.target.value })}
-                placeholder="Ex: Elegante, sóbrio, clínico e empático"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-100"
-              />
+              <select
+                value={formData.onboardingStep}
+                onChange={e => handleChange('onboardingStep', parseInt(e.target.value, 10))}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-hidden focus:border-amber-500 font-mono cursor-pointer"
+              >
+                {ONBOARDING_STEPS.map(s => (
+                  <option key={s.step} value={s.step}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-neutral-300 mb-1">
-              Público-Alvo Demográfico e Comportamental
-            </label>
-            <textarea
-              rows={2}
-              value={formData.targetAudience}
-              onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
-              placeholder="Ex: Homens e mulheres de 38 a 60 anos, classe A, focados em rejuvenescimento natural e discrição..."
-              className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-2.5 text-xs text-neutral-100"
-            />
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
+                Público-Alvo
+              </label>
+              <textarea
+                rows={2}
+                value={formData.targetAudience}
+                onChange={e => handleChange('targetAudience', e.target.value)}
+                placeholder="Faixa etária, classe econômica, profissão, estilo de vida..."
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500 resize-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-xs font-medium text-neutral-300 mb-1">
-              Persona Detalhada
-            </label>
-            <textarea
-              rows={2}
-              value={formData.persona}
-              onChange={(e) => setFormData({ ...formData, persona: e.target.value })}
-              placeholder="Ex: Juliana, 44 anos, executiva em SP, teme aspecto esticado, busca segurança clínica absoluta..."
-              className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-2.5 text-xs text-neutral-100"
-            />
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
+                Persona Central
+              </label>
+              <textarea
+                rows={2}
+                value={formData.persona}
+                onChange={e => handleChange('persona', e.target.value)}
+                placeholder="Nome fictício, idade, maiores medos, desejos e objeções..."
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500 resize-none"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Multi-seletores: Objetivos, Formatos e Pilares */}
+        {/* Section 3: Editorial Strategy */}
         <div className="space-y-4">
-          <div className="text-xs font-mono uppercase text-amber-400 font-semibold border-b border-neutral-800 pb-1">
-            03. Estratégia de Conteúdo
+          <div className="border-b border-neutral-800 pb-2">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400">
+              3. Estratégia Editorial & Pilares
+            </h3>
           </div>
 
-          {/* Objetivos */}
-          <div>
-            <label className="block text-xs font-medium text-neutral-300 mb-2">
-              Objetivos Estratégicos (Multi-seleção com Checkbox)
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {DEFAULT_OBJECTIVES.map(obj => {
-                const isSelected = objectives.includes(obj);
-                return (
-                  <button
-                    type="button"
-                    key={obj}
-                    onClick={() => toggleArrayItem(objectives, setObjectives, obj)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors border ${
-                      isSelected
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
-                    }`}
-                  >
-                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isSelected ? 'bg-amber-500 border-amber-500 text-neutral-950' : 'border-neutral-700'}`}>
-                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                    </div>
-                    {obj}
-                  </button>
-                );
-              })}
-            </div>
-            {/* Custom objective input */}
-            <div className="flex items-center gap-2 mt-2">
-              <input
-                type="text"
-                value={customObjective}
-                onChange={(e) => setCustomObjective(e.target.value)}
-                placeholder="+ Adicionar objetivo personalizado"
-                className="bg-neutral-950 border border-neutral-800 rounded px-2.5 py-1 text-xs text-neutral-200 placeholder-neutral-600 focus:border-amber-500"
-              />
-              <button
-                type="button"
-                onClick={handleAddCustomObjective}
-                className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Formatos */}
+          {/* Formats */}
           <div>
             <label className="block text-xs font-medium text-neutral-300 mb-2">
               Formatos Prioritários
             </label>
             <div className="flex flex-wrap gap-2">
-              {DEFAULT_FORMATS.map(fmt => {
-                const isSelected = formats.includes(fmt);
+              {VALID_FORMATS.map(fmt => {
+                const active = formats.includes(fmt);
                 return (
                   <button
-                    type="button"
                     key={fmt}
-                    onClick={() => toggleArrayItem(formats, setFormats, fmt)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors border ${
-                      isSelected
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                    type="button"
+                    onClick={() => toggleFormat(fmt)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                      active
+                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
                     }`}
                   >
-                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isSelected ? 'bg-amber-500 border-amber-500 text-neutral-950' : 'border-neutral-700'}`}>
-                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                    </div>
-                    {fmt}
+                    {active && <Check className="w-3.5 h-3.5" />}
+                    <span>{fmt}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Pilares */}
+          {/* Pillars */}
           <div>
             <label className="block text-xs font-medium text-neutral-300 mb-2">
               Pilares de Conteúdo
             </label>
-            <div className="flex flex-wrap gap-2">
-              {DEFAULT_PILLARS.map(plr => {
-                const isSelected = pillars.includes(plr);
+            <div className="flex flex-wrap gap-2 mb-2">
+              {DEFAULT_PILLARS.map(p => {
+                const active = pillars.includes(p);
                 return (
                   <button
+                    key={p}
                     type="button"
-                    key={plr}
-                    onClick={() => toggleArrayItem(pillars, setPillars, plr)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors border ${
-                      isSelected
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                    onClick={() => togglePillar(p)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                      active
+                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
                     }`}
                   >
-                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isSelected ? 'bg-amber-500 border-amber-500 text-neutral-950' : 'border-neutral-700'}`}>
-                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                    </div>
-                    {plr}
+                    {active && <Check className="w-3.5 h-3.5" />}
+                    <span>{p}</span>
                   </button>
                 );
               })}
             </div>
-            {/* Custom pillar input */}
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 max-w-sm">
               <input
                 type="text"
                 value={customPillar}
-                onChange={(e) => setCustomPillar(e.target.value)}
-                placeholder="+ Adicionar pilar personalizado"
-                className="bg-neutral-950 border border-neutral-800 rounded px-2.5 py-1 text-xs text-neutral-200 placeholder-neutral-600 focus:border-amber-500"
+                onChange={e => setCustomPillar(e.target.value)}
+                placeholder="Adicionar pilar personalizado..."
+                className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1 text-xs text-neutral-200 focus:outline-hidden focus:border-amber-500"
               />
               <button
                 type="button"
-                onClick={handleAddCustomPillar}
-                className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+                onClick={addCustomPillar}
+                className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
+                Adicionar
               </button>
+            </div>
+          </div>
+
+          {/* Objectives */}
+          <div>
+            <label className="block text-xs font-medium text-neutral-300 mb-2">
+              Objetivos de Negócio
+            </label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {DEFAULT_OBJECTIVES.map(obj => {
+                const active = objectives.includes(obj);
+                return (
+                  <button
+                    key={obj}
+                    type="button"
+                    onClick={() => toggleObjective(obj)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                      active
+                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                    }`}
+                  >
+                    {active && <Check className="w-3.5 h-3.5" />}
+                    <span>{obj}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 max-w-sm">
+              <input
+                type="text"
+                value={customObjective}
+                onChange={e => setCustomObjective(e.target.value)}
+                placeholder="Adicionar objetivo personalizado..."
+                className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1 text-xs text-neutral-200 focus:outline-hidden focus:border-amber-500"
+              />
+              <button
+                type="button"
+                onClick={addCustomObjective}
+                className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Adicionar
+              </button>
+            </div>
+          </div>
+
+          {/* Differentiators & Tone */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
+                Diferenciais Competitivos
+              </label>
+              <textarea
+                rows={2}
+                value={formData.differentiators}
+                onChange={e => handleChange('differentiators', e.target.value)}
+                placeholder="Tecnologia exclusiva, formação, atendimento VIP..."
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500 resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
+                Tom de Voz & Diretrizes
+              </label>
+              <textarea
+                rows={2}
+                value={formData.toneOfVoice}
+                onChange={e => handleChange('toneOfVoice', e.target.value)}
+                placeholder="Ex: Clínico, sofisticado, sóbrio, empático..."
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500 resize-none"
+              />
             </div>
           </div>
         </div>
 
-        {/* Diferenciais e Observações */}
-        <div className="space-y-4">
-          <div className="text-xs font-mono uppercase text-amber-400 font-semibold border-b border-neutral-800 pb-1">
-            04. Diferenciais Competitivos e Notas
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-neutral-300 mb-1">
-              Diferenciais Únicos
-            </label>
-            <textarea
-              rows={2}
-              value={formData.differentiators}
-              onChange={(e) => setFormData({ ...formData, differentiators: e.target.value })}
-              placeholder="Ex: Pioneiro em Deep Plane sem anestesia traumática, hotel boutique hospitalar..."
-              className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-2.5 text-xs text-neutral-100"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-neutral-300 mb-1">
-              Observações Estratégicas da Agência
-            </label>
-            <textarea
-              rows={2}
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Notas confidenciais sobre negociação, ticket ou restrições de imagem..."
-              className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-2.5 text-xs text-neutral-100"
-            />
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="pt-4 border-t border-neutral-800 flex items-center justify-end gap-3">
+        {/* Footer Actions */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-800">
           <button
             type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-medium rounded-lg transition-colors"
+            onClick={handleSafeClose}
+            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 rounded-lg text-xs font-medium transition-colors"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-semibold rounded-lg transition-colors shadow-sm"
+            className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-bold transition-colors shadow-lg shadow-amber-500/10 font-mono"
           >
             {initialData ? 'Salvar Alterações' : 'Concluir Cadastro'}
           </button>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Client, CalendarItem, ContentFormat, ContentPillar } from '../../types';
 import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
+import { normalizeWeekDay } from '../../services/storage/migration';
 import { Modal } from '../common/Modal';
 import {
   Calendar,
@@ -54,9 +55,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
     e.preventDefault();
     if (!newItemForm.title) return;
 
-    storageService.calendar.addItem({
+    storageService.calendar.saveItem({
       clientId: client.id,
-      dayOfWeek: targetDay,
+      dayOfWeek: normalizeWeekDay(targetDay),
       title: newItemForm.title,
       format: newItemForm.format,
       pillar: newItemForm.pillar,
@@ -84,8 +85,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
     onRefresh();
   };
 
-  const handleMoveDay = (item: CalendarItem, newDay: string) => {
-    storageService.calendar.updateItem(item.id, { dayOfWeek: newDay });
+  const handleMoveDay = (item: CalendarItem, newDay: any) => {
+    storageService.calendar.saveItem({ ...item, dayOfWeek: newDay });
     notificationService.showToast(`Movido para ${newDay}`, 'info');
     onRefresh();
   };

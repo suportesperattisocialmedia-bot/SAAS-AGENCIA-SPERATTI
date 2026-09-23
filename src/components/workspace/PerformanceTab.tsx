@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Client, Content, MetricSnapshot, ContentMetrics } from '../../types';
+import { Client, Content, AccountSnapshot, ContentFormat } from '../../types';
 import { analyticsService } from '../../services/analyticsService';
 import { StatCard } from '../common/StatCard';
 import { ChartArea } from '../common/ChartArea';
 import { ChartBar } from '../common/ChartBar';
+import { ProvenanceBadge } from '../common/ProvenanceBadge';
 import {
   TrendingUp,
   ArrowUpRight,
@@ -11,15 +12,16 @@ import {
   Eye,
   Bookmark,
   Share2,
-  Heart,
-  MessageSquare,
-  Filter
+  Calendar,
+  Filter,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 
 interface PerformanceTabProps {
   client: Client;
   contents: Content[];
-  snapshots: MetricSnapshot[];
+  snapshots: AccountSnapshot[];
 }
 
 export const PerformanceTab: React.FC<PerformanceTabProps> = ({
@@ -27,257 +29,308 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
   contents,
   snapshots
 }) => {
-  const [selectedPeriod, setSelectedPeriod] = useState<7 | 14 | 30 | 90>(30);
-  const [selectedSortMetric, setSelectedSortMetric] = useState<keyof ContentMetrics>('views');
+  const [selectedPeriod, setSelectedPeriod] = useState<7 | 14 | 30 | 90 | 'custom'>(30);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [selectedSortMetric, setSelectedSortMetric] = useState<'score' | 'views' | 'reach' | 'saves' | 'engagement'>('score');
 
-  const summary = analyticsService.calculatePeriodSummary(snapshots, selectedPeriod);
-  const bestContents = analyticsService.rankContents(contents, selectedSortMetric, 'desc').slice(0, 5);
-  const worstContents = analyticsService.rankContents(contents, selectedSortMetric, 'asc').slice(0, 3);
-  const formatStats = analyticsService.getFormatPerformance(contents);
+  const customRange = selectedPeriod === 'custom' && customStartDate && customEndDate
+    ? { startDate: customStartDate, endDate: customEndDate }
+    : undefined;
 
-  const chartData = snapshots.slice(-selectedPeriod).map(s => ({
-    date: s.timestamp,
-    label: s.timestamp.split('-').slice(1).reverse().join('/'),
+  const periodData = analyticsService.calculatePeriod(snapshots, selectedPeriod, customRange);
+
+  const bestContents = analyticsService.rankContents(contents, selectedSortMetric, false).slice(0, 5);
+  const underperformingContents = analyticsService.rankContents(contents, selectedSortMetric, true).slice(0, 3);
+  const formatStats = analyticsService.breakdownByFormat(contents);
+
+  // Filter snapshots strictly by date for the area chart
+  const chartSnapshots = analyticsService.filterSnapshotsByDate(
+    snapshots,
+    periodData.startDate,
+    periodData.endDate
+  );
+
+  const chartData = chartSnapshots.map(s => ({
+    date: s.date,
+    label: s.date.split('-').slice(1).reverse().join('/'),
     value: s.views
   }));
 
-  const formatBarData = formatStats.map(f => ({
-    label: f.format,
-    value: f.avgViews,
-    sublabel: `${f.count} posts · eng ${f.avgEngagementRate}%`
-  }));
+  const formatBarData = (Object.keys(formatStats) as ContentFormat[])
+    .filter(fmt => formatStats[fmt].count > 0)
+    .map(fmt => ({
+      label: fmt,
+      value: formatStats[fmt].avgViews,
+      sublabel: `${formatStats[fmt].count} posts · eng ${formatStats[fmt].avgEngagement}%`
+    }));
 
-  const metricOptions: Array<{ id: keyof ContentMetrics; label: string }> = [
-    { id: 'views', label: 'Visualizações' },
-    { id: 'saves', label: 'Salvamentos' },
-    { id: 'shares', label: 'Compartilhamentos' },
-    { id: 'engagementRate', label: 'Engajamento %' },
-    { id: 'likes', label: 'Curtidas' },
-    { id: 'comments', label: 'Comentários' }
-  ];
+  const renderComparison = (comparison: typeof periodData.totalViews) => {
+    if (!comparison.hasSufficientData || comparison.previous === null) {
+      return (
+        <span className="text-[11px] text-neutral-500 font-mono">
+          Sem base comparativa suficiente
+        </span>
+      );
+    }
+
+    const isPos = (comparison.percentDiff ?? 0) >= 0;
+    const diffIcon = isPos ? (
+      <ArrowUpRight className="w-3 h-3 text-emerald-400" />
+    ) : (
+      <ArrowDownRight className="w-3 h-3 text-rose-400" />
+    );
+
+    return (
+      <div className="flex items-center gap-1.5 text-[11px] font-mono">
+        {diffIcon}
+        <span className={isPos ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
+          {isPos ? '+' : ''}{comparison.percentDiff}%
+        </span>
+        <span className="text-neutral-500">
+          ({isPos ? '+' : ''}{comparison.absoluteDiff?.toLocaleString('pt-BR')} vs anterior)
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Top Period Selector Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
+      {/* Header & Strict Calendar Period Selector */}
+      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-bold text-neutral-100">
-            Comparativo de Performance: Atual vs Anterior
-          </h3>
-          <p className="text-xs text-neutral-400 font-mono mt-0.5">
-            Período: {summary.startDate} até {summary.endDate} ({selectedPeriod} dias)
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-amber-400" />
+              <span>Análise de Performance & Métricas Rigorosas</span>
+            </h2>
+            <ProvenanceBadge type="CALCULATED_DATA" />
+          </div>
+          <p className="text-xs text-neutral-400 mt-1 font-sans">
+            Período ativo: <span className="font-mono text-neutral-200">{periodData.startDate}</span> até <span className="font-mono text-neutral-200">{periodData.endDate}</span> ({periodData.periodDays} dias)
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-neutral-950 p-1 rounded-lg border border-neutral-800 self-start sm:self-center font-mono text-xs">
-          {[7, 14, 30, 90].map((days) => (
+        {/* Period Selector */}
+        <div className="flex flex-wrap items-center gap-2 font-mono">
+          <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-xl p-1 text-xs">
+            {([7, 14, 30, 90] as const).map(days => (
+              <button
+                key={days}
+                onClick={() => setSelectedPeriod(days)}
+                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                  selectedPeriod === days
+                    ? 'bg-amber-500/20 text-amber-300 font-bold'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                {days} dias
+              </button>
+            ))}
             <button
-              key={days}
-              onClick={() => setSelectedPeriod(days as any)}
-              className={`px-3 py-1 rounded transition-colors ${
-                selectedPeriod === days
-                  ? 'bg-amber-500 text-neutral-950 font-bold'
-                  : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900'
+              onClick={() => setSelectedPeriod('custom')}
+              className={`px-3 py-1.5 rounded-lg transition-colors ${
+                selectedPeriod === 'custom'
+                  ? 'bg-amber-500/20 text-amber-300 font-bold'
+                  : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
-              {days}d
+              Personalizado
             </button>
-          ))}
+          </div>
+
+          {selectedPeriod === 'custom' && (
+            <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-800 rounded-xl px-2 py-1 text-xs">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={e => setCustomStartDate(e.target.value)}
+                className="bg-transparent text-neutral-200 focus:outline-hidden"
+              />
+              <span className="text-neutral-500">até</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={e => setCustomEndDate(e.target.value)}
+                className="bg-transparent text-neutral-200 focus:outline-hidden"
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* KPI Comparison Cards */}
+      {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Visualizações Totais"
-          value={summary.views.current.toLocaleString('pt-BR')}
-          typeTag="DADO REAL"
-          diffPercent={summary.views.diffPercent}
-          periodLabel={`${selectedPeriod}d`}
-        />
+        {/* Followers */}
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-2">
+          <span className="text-[10px] font-mono uppercase text-neutral-500">Seguidores (Final)</span>
+          <div className="text-2xl font-bold text-neutral-100 font-mono">
+            {periodData.followersGrowth.current.toLocaleString('pt-BR')}
+          </div>
+          {renderComparison(periodData.followersGrowth)}
+        </div>
 
-        <StatCard
-          label="Alcance Único de Contas"
-          value={summary.reach.current.toLocaleString('pt-BR')}
-          typeTag="DADO REAL"
-          diffPercent={summary.reach.diffPercent}
-          periodLabel={`${selectedPeriod}d`}
-        />
+        {/* Views */}
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-2">
+          <span className="text-[10px] font-mono uppercase text-neutral-500">Visualizações (Total)</span>
+          <div className="text-2xl font-bold text-neutral-100 font-mono">
+            {periodData.totalViews.current.toLocaleString('pt-BR')}
+          </div>
+          {renderComparison(periodData.totalViews)}
+        </div>
 
-        <StatCard
-          label="Salvamentos Totais"
-          value={summary.saves.current.toLocaleString('pt-BR')}
-          typeTag="DADO REAL"
-          diffPercent={summary.saves.diffPercent}
-          periodLabel="Alta Intenção"
-        />
+        {/* Reach */}
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-2">
+          <span className="text-[10px] font-mono uppercase text-neutral-500">Alcance (Total)</span>
+          <div className="text-2xl font-bold text-neutral-100 font-mono">
+            {periodData.totalReach.current.toLocaleString('pt-BR')}
+          </div>
+          {renderComparison(periodData.totalReach)}
+        </div>
 
-        <StatCard
-          label="Taxa de Engajamento Real"
-          value={`${summary.engagementRate.current}%`}
-          typeTag="DADO CALCULADO"
-          diffPercent={summary.engagementRate.diffPercent}
-          periodLabel="Base: Alcance"
-        />
+        {/* Engagement Rate */}
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-2">
+          <span className="text-[10px] font-mono uppercase text-neutral-500">Taxa de Engajamento (Média)</span>
+          <div className="text-2xl font-bold text-emerald-400 font-mono">
+            {periodData.avgEngagementRate.current}%
+          </div>
+          {renderComparison(periodData.avgEngagementRate)}
+        </div>
       </div>
 
-      {/* Trend Chart & Format Performance */}
+      {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <ChartArea
-            data={chartData}
-            title={`Evolução Diária de Visualizações (${selectedPeriod} dias)`}
-            subtitle="Métrica observada nos snapshots sincronizados"
-            valueFormatter={(val) => `${val.toLocaleString('pt-BR')} views`}
-            height={250}
-            lineColor="#f59e0b"
-          />
+        {/* Daily Views Trajectory */}
+        <div className="lg:col-span-2 bg-neutral-900 border border-neutral-800 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-neutral-200">
+                Evolução Cronológica de Visualizações
+              </h3>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Filtrado estritamente por intervalo de datas do calendário
+              </p>
+            </div>
+            <ProvenanceBadge type="REAL_DATA" />
+          </div>
+
+          {chartData.length > 0 ? (
+            <ChartArea
+              data={chartData}
+              height={220}
+              lineColor="#f59e0b"
+            />
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-xs text-neutral-500 font-mono">
+              Nenhum snapshot diário registrado para este período.
+            </div>
+          )}
         </div>
 
-        <div>
-          <ChartBar
-            data={formatBarData}
-            title="Média de Visualizações por Formato"
-            subtitle="Comparação de entrega orgânica observada"
-            height={250}
-            valueFormatter={(val) => `${val.toLocaleString('pt-BR')} views`}
-          />
+        {/* Format Performance */}
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-neutral-200">
+                Performance por Formato
+              </h3>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Média de visualizações por tipo de mídia
+              </p>
+            </div>
+            <Layers className="w-4 h-4 text-amber-400" />
+          </div>
+
+          {formatBarData.length > 0 ? (
+            <ChartBar
+              data={formatBarData}
+              height={220}
+            />
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-xs text-neutral-500 font-mono">
+              Nenhum conteúdo catalogado ainda.
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Ranking Header & Sorter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-        <div>
-          <h4 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-            <span>Ranking de Performance de Conteúdos</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-900">
-              {contents.length} postagens
-            </span>
-          </h4>
-          <p className="text-xs text-neutral-400 mt-0.5">
-            Classificação rigorosa baseada em dados reais observados
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 font-mono text-xs">
-          <Filter className="w-3.5 h-3.5 text-neutral-500" />
-          <span className="text-neutral-400 text-[11px]">Ordenar por:</span>
-          <select
-            value={selectedSortMetric}
-            onChange={(e) => setSelectedSortMetric(e.target.value as any)}
-            className="bg-neutral-900 border border-neutral-800 text-amber-300 font-semibold px-2.5 py-1 rounded text-xs focus:outline-hidden focus:border-amber-500"
-          >
-            {metricOptions.map(opt => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Best Contents vs Worst Contents Table */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top 5 Performers */}
-        <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5">
-            <span className="text-xs font-mono uppercase text-emerald-400 font-semibold flex items-center gap-1.5">
-              <ArrowUpRight className="w-4 h-4" /> Top 5 Maiores Resultados
-            </span>
-            <span className="text-[11px] font-mono text-neutral-400">
-              Métrica: {selectedSortMetric}
-            </span>
+      {/* Content Ranking Sections */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span>Ranqueamento de Publicações</span>
+            </h3>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Identificação matemática de conteúdos com maior tração e pontos de ajuste
+            </p>
           </div>
 
-          <div className="space-y-2">
-            {bestContents.map((c, i) => {
-              const comp = analyticsService.getContentVsAverage(c, contents, selectedSortMetric);
-              return (
-                <div
-                  key={c.id}
-                  className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg hover:border-neutral-700 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      <span className="w-5 h-5 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center justify-center shrink-0 mt-0.5">
-                        {i + 1}
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="text-neutral-500">Ordenar por:</span>
+            <select
+              value={selectedSortMetric}
+              onChange={e => setSelectedSortMetric(e.target.value as any)}
+              className="bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-1.5 text-neutral-200 focus:outline-hidden focus:border-amber-500 cursor-pointer"
+            >
+              <option value="score">Score Estratégico (Ponderado)</option>
+              <option value="views">Visualizações</option>
+              <option value="reach">Alcance</option>
+              <option value="saves">Salvamentos</option>
+              <option value="engagement">Engajamento %</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Best Performing Grid */}
+        <div className="space-y-3">
+          <div className="text-xs font-mono uppercase text-amber-400 tracking-wider font-semibold">
+            Top 5 Conteúdos de Maior Impacto
+          </div>
+          {bestContents.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {bestContents.map(c => {
+                const score = analyticsService.calculateContentScore(c);
+                return (
+                  <div
+                    key={c.id}
+                    className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-3"
+                  >
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="px-2 py-0.5 rounded bg-neutral-800 text-amber-400">
+                        {c.format}
                       </span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-neutral-200 truncate">
-                          {c.title}
-                        </div>
-                        <div className="text-[11px] font-mono text-neutral-400 flex items-center gap-2 mt-0.5">
-                          <span>{c.format}</span>
-                          <span>·</span>
-                          <span>{c.pillar}</span>
-                        </div>
-                      </div>
+                      <span className="text-neutral-400">Score: {score}</span>
                     </div>
 
-                    <div className="text-right shrink-0 font-mono">
-                      <div className="text-xs font-bold text-amber-300 tabular-nums">
-                        {c.metrics[selectedSortMetric].toLocaleString('pt-BR')}
+                    <h4 className="text-xs font-semibold text-neutral-100 line-clamp-2">
+                      {c.title}
+                    </h4>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-neutral-800 text-center font-mono">
+                      <div className="bg-neutral-950 p-1.5 rounded-lg">
+                        <span className="text-[10px] text-neutral-500 block">Views</span>
+                        <span className="text-xs text-neutral-200">{c.metrics.views.toLocaleString('pt-BR')}</span>
                       </div>
-                      <div className="text-[10px] text-emerald-400 tabular-nums">
-                        {comp.formatted}
+                      <div className="bg-neutral-950 p-1.5 rounded-lg">
+                        <span className="text-[10px] text-neutral-500 block">Saves</span>
+                        <span className="text-xs text-purple-400 font-bold">{c.metrics.saves}</span>
+                      </div>
+                      <div className="bg-neutral-950 p-1.5 rounded-lg">
+                        <span className="text-[10px] text-neutral-500 block">Engajamento</span>
+                        <span className="text-xs text-emerald-400">{c.metrics.engagementRate}%</span>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Worst 3 Performers */}
-        <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5">
-            <span className="text-xs font-mono uppercase text-rose-400 font-semibold flex items-center gap-1.5">
-              <ArrowDownRight className="w-4 h-4" /> Menores Desempenhos no Período
-            </span>
-            <span className="text-[11px] font-mono text-neutral-400">
-              Oportunidade de Ajuste
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            {worstContents.map((c, i) => {
-              const comp = analyticsService.getContentVsAverage(c, contents, selectedSortMetric);
-              return (
-                <div
-                  key={c.id}
-                  className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      <span className="w-5 h-5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-400 text-xs font-mono font-bold flex items-center justify-center shrink-0 mt-0.5">
-                        {i + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-neutral-300 truncate">
-                          {c.title}
-                        </div>
-                        <div className="text-[11px] font-mono text-neutral-500 flex items-center gap-2 mt-0.5">
-                          <span>{c.format}</span>
-                          <span>·</span>
-                          <span>{c.pillar}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0 font-mono">
-                      <div className="text-xs font-bold text-neutral-300 tabular-nums">
-                        {c.metrics[selectedSortMetric].toLocaleString('pt-BR')}
-                      </div>
-                      <div className="text-[10px] text-rose-400 tabular-nums">
-                        {comp.formatted}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-6 bg-neutral-900/40 border border-neutral-800 rounded-xl text-center text-xs text-neutral-400 font-mono">
+              Nenhum conteúdo cadastrado para avaliação.
+            </div>
+          )}
         </div>
       </div>
     </div>

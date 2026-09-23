@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Client, ContentIdea, ContentIdeaStatus, Content, HookTemplate } from '../../types';
+import { Client, ContentIdea, PipelineStatus, Content, HookTemplate, WeekDay } from '../../types';
 import { HOOK_CATEGORIES, HOOK_TEMPLATES } from '../../data/hookBank';
 import { aiService } from '../../services/aiService';
 import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
+import { normalizeWeekDay } from '../../services/storage/migration';
 import { Modal } from '../common/Modal';
 import {
   Lightbulb,
@@ -26,13 +27,13 @@ interface IdeasTabProps {
   onRefresh: () => void;
 }
 
-const PIPELINE_STATUSES: ContentIdeaStatus[] = [
+const PIPELINE_STATUSES: PipelineStatus[] = [
   'IDEIA',
   'PLANEJADO',
   'ROTEIRO',
-  'PRODUÇÃO',
+  'EM_PRODUCAO',
   'EDITANDO',
-  'APROVAÇÃO',
+  'APROVACAO',
   'AGENDADO',
   'PUBLICADO',
   'ANALISADO'
@@ -62,12 +63,11 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
       const competitors = storageService.competitors.getByClient(client.id);
       const snapshots = storageService.history.getByClient(client.id);
 
-      const generated = await aiService.generateContentIdeas({
+      const generated = await aiService.generateIdeas({
         client,
         topContents,
         audienceInsights,
-        competitors,
-        snapshots
+        competitors
       }, 3);
 
       for (const item of generated) {
@@ -87,27 +87,28 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
     }
   };
 
-  const handleUpdateStatus = (id: string, newStatus: ContentIdeaStatus) => {
+  const handleUpdateStatus = (id: string, newStatus: PipelineStatus) => {
     storageService.ideas.update(id, { status: newStatus });
     notificationService.showToast(`Status atualizado para ${newStatus}.`, 'info');
     onRefresh();
   };
 
   const handleScheduleToCalendar = (idea: ContentIdea, day: string) => {
+    const validDay = normalizeWeekDay(day);
     storageService.ideas.update(idea.id, {
       status: 'PLANEJADO',
-      calendarDay: day
+      calendarDay: validDay
     });
 
-    storageService.calendar.addItem({
+    storageService.calendar.saveItem({
       clientId: client.id,
       title: idea.title,
       format: idea.format,
-      dayOfWeek: day,
+      dayOfWeek: validDay,
       pillar: idea.pillar,
       status: 'PLANEJADO',
       hook: idea.hook,
-      contentIdeaId: idea.id
+      notes: `Origem: Ideia de Conteúdo (${idea.id})`
     });
 
     notificationService.addNotification(
@@ -202,7 +203,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
 
                 <select
                   value={idea.status}
-                  onChange={(e) => handleUpdateStatus(idea.id, e.target.value as ContentIdeaStatus)}
+                  onChange={(e) => handleUpdateStatus(idea.id, e.target.value as PipelineStatus)}
                   className="bg-neutral-950 border border-neutral-800 text-amber-300 text-[10px] font-mono px-1.5 py-0.5 rounded focus:outline-hidden cursor-pointer"
                 >
                   {PIPELINE_STATUSES.map(s => (

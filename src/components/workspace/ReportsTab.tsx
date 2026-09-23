@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Client, Report, Content, MetricSnapshot } from '../../types';
+import { Client, Report, Content, AccountSnapshot } from '../../types';
 import { reportService } from '../../services/reportService';
-import { notificationService } from '../../services/notificationService';
+import { notificationService, notificationStore } from '../../services/notifications/NotificationStore';
 import {
   FileText,
   Printer,
@@ -9,8 +9,6 @@ import {
   Calendar,
   Sparkles,
   TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
   CheckCircle2,
   Bookmark,
   Share2,
@@ -20,15 +18,13 @@ import {
 interface ReportsTabProps {
   client: Client;
   contents: Content[];
-  snapshots: MetricSnapshot[];
+  snapshots: AccountSnapshot[];
   reports: Report[];
   onRefresh: () => void;
 }
 
 export const ReportsTab: React.FC<ReportsTabProps> = ({
   client,
-  contents,
-  snapshots,
   reports,
   onRefresh
 }) => {
@@ -41,7 +37,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
     try {
       const generated = await reportService.generateReport(client, selectedPeriod);
       setActiveReport(generated);
-      notificationService.addNotification(
+      notificationStore.notify(
         'Relatório Executivo Gerado',
         `Relatório de ${selectedPeriod} dias para ${client.name} gerado com sucesso.`,
         'success'
@@ -58,36 +54,49 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
     window.print();
   };
 
+  const handleExportCsv = () => {
+    reportService.exportHistoryCsv(client.id);
+  };
+
+  const formatDiff = (diff: number | null | undefined) => {
+    if (diff === null || diff === undefined) {
+      return <span className="text-neutral-500 font-normal">Sem base anterior</span>;
+    }
+    const isPos = diff >= 0;
+    return (
+      <span className={isPos ? 'text-emerald-400' : 'text-rose-400'}>
+        {isPos ? '+' : ''}{diff}% vs anterior
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Top Action Controls (Hidden on Print) */}
-      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
+      {/* Action Header & Period Selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900 border border-neutral-800 rounded-2xl p-4 sm:p-5">
         <div>
-          <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-            <span>Central de Relatórios Executivos</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-950">
-              Gabriel Speratti Standard
-            </span>
-          </h3>
+          <h2 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-amber-400" />
+            <span>Gerador de Relatórios Executivos</span>
+          </h2>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Relatórios com hierarquia executiva, KPIs de crescimento, oportunidades e próximos passos
+            Documentos consolidados de inteligência de marketing para apresentação a clientes
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Period buttons */}
-          <div className="flex items-center gap-1 bg-neutral-950 p-1 rounded-lg border border-neutral-800 font-mono text-xs">
-            {[7, 14, 30, 90].map(d => (
+        <div className="flex flex-wrap items-center gap-2 font-mono">
+          <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-xl p-1 text-xs">
+            {([7, 14, 30, 90] as const).map(days => (
               <button
-                key={d}
-                onClick={() => setSelectedPeriod(d as any)}
-                className={`px-2.5 py-1 rounded transition-colors ${
-                  selectedPeriod === d
-                    ? 'bg-amber-500 text-neutral-950 font-bold'
+                key={days}
+                onClick={() => setSelectedPeriod(days)}
+                className={`px-3 py-1 rounded-lg transition-colors ${
+                  selectedPeriod === days
+                    ? 'bg-amber-500/20 text-amber-300 font-bold'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
               >
-                {d}d
+                {days}d
               </button>
             ))}
           </div>
@@ -95,98 +104,74 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="flex items-center gap-2 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 shadow-xs"
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-neutral-950 font-bold rounded-xl text-xs transition-colors shadow-md shadow-amber-500/10"
           >
-            <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-            <span>{isGenerating ? 'Gerando...' : 'Gerar Relatório'}</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{isGenerating ? 'Calculando...' : 'Gerar Relatório'}</span>
           </button>
 
           {activeReport && (
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-mono transition-colors"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir / Salvar PDF</span>
-            </button>
+            <>
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-1 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs transition-colors"
+                title="Imprimir ou Salvar como PDF"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">PDF</span>
+              </button>
+              <button
+                onClick={handleExportCsv}
+                className="flex items-center gap-1 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs transition-colors"
+                title="Exportar Métricas em CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {/* CSV Export Bar (Hidden on Print) */}
-      <div className="no-print flex flex-wrap items-center gap-2 p-3 bg-neutral-950/60 border border-neutral-800 rounded-xl text-xs font-mono">
-        <span className="text-neutral-500 text-[11px] flex items-center gap-1">
-          <Download className="w-3 h-3 text-neutral-400" /> Exportações CSV:
-        </span>
-        <button
-          onClick={() => reportService.exportHistoryCsv(client.id)}
-          className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-neutral-700 transition-colors"
-        >
-          Histórico Diário (.csv)
-        </button>
-        <button
-          onClick={() => reportService.exportContentsCsv(client.id)}
-          className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-neutral-700 transition-colors"
-        >
-          Catálogo de Conteúdos (.csv)
-        </button>
-        <button
-          onClick={() => reportService.exportIdeasCsv(client.id)}
-          className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-neutral-700 transition-colors"
-        >
-          Banco de Ideias (.csv)
-        </button>
-        <button
-          onClick={() => reportService.exportCompetitorsCsv(client.id)}
-          className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-neutral-700 transition-colors"
-        >
-          Concorrentes Mapeados (.csv)
-        </button>
-      </div>
-
-      {/* Active Executive Report Container (Optimized for Screen & Print) */}
+      {/* Report Document View */}
       {activeReport ? (
-        <div className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-6 sm:p-8 space-y-8 print:p-0 print:border-none print:bg-white print:text-black">
-          {/* Executive Cover & Header */}
-          <div className="border-b border-neutral-800 pb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 sm:p-10 space-y-8 print:border-none print:p-0 print:bg-white print:text-black">
+          {/* Header Banner */}
+          <div className="border-b border-neutral-800 pb-6 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold font-mono tracking-widest text-amber-400 uppercase">
-                  Gabriel Speratti | Social Intelligence
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-950">
-                  RELATÓRIO EXECUTIVO OFICIAL
-                </span>
+              <div className="text-[11px] font-mono text-amber-400 tracking-wider uppercase">
+                GABRIEL SPERATTI · SOCIAL INTELLIGENCE
               </div>
-              <h2 className="text-2xl font-extrabold text-neutral-100 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-neutral-100 font-serif mt-1">
                 {activeReport.title}
-              </h2>
-              <div className="text-sm font-mono text-neutral-400 mt-1">
-                Cliente: <span className="text-neutral-200 font-bold">{activeReport.clientName}</span> ({activeReport.clientInstagram})
+              </h1>
+              <div className="flex items-center gap-2 mt-2 text-xs text-neutral-400 font-mono">
+                <span>{activeReport.clientName}</span>
+                <span>·</span>
+                <span className="text-amber-400">{activeReport.clientInstagram}</span>
+                <span>·</span>
+                <span>{activeReport.periodLabel}</span>
               </div>
             </div>
 
-            <div className="text-right font-mono text-xs text-neutral-400 self-start sm:self-auto">
-              <div className="text-neutral-300 font-semibold">{activeReport.periodLabel}</div>
-              <div className="text-[11px] text-neutral-500 mt-0.5">
-                Emitido em {new Date(activeReport.generatedAt).toLocaleDateString('pt-BR')}
-              </div>
+            <div className="text-[10px] text-neutral-500 font-mono text-right">
+              Gerado em: {new Date(activeReport.generatedAt).toLocaleDateString('pt-BR')}
             </div>
           </div>
 
           {/* Section: Resumo Executivo */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold font-mono uppercase text-amber-400 tracking-wider">
-              01. Resumo Executivo
+          <div className="space-y-2">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400">
+              01. Resumo Executivo da Operação
             </h3>
-            <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed bg-neutral-950/60 border border-neutral-800/80 rounded-xl p-4">
+            <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed bg-neutral-950/60 p-4 rounded-xl border border-neutral-800 font-sans">
               {activeReport.executiveSummary}
             </p>
           </div>
 
-          {/* Section: KPIs Consolidados */}
+          {/* Section: KPIs */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold font-mono uppercase text-amber-400 tracking-wider">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400">
               02. Indicadores Principais de Performance (KPIs)
             </h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono">
@@ -195,8 +180,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 <div className="text-lg font-bold text-neutral-100 tabular-nums">
                   {activeReport.kpis.followers.toLocaleString('pt-BR')}
                 </div>
-                <div className="text-[11px] text-emerald-400 mt-1">
-                  {activeReport.kpis.followersDiffPct >= 0 ? '+' : ''}{activeReport.kpis.followersDiffPct}% vs anterior
+                <div className="text-[11px] mt-1 font-sans">
+                  {formatDiff(activeReport.kpis.followersDiffPct)}
                 </div>
               </div>
 
@@ -205,8 +190,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 <div className="text-lg font-bold text-neutral-100 tabular-nums">
                   {activeReport.kpis.views.toLocaleString('pt-BR')}
                 </div>
-                <div className="text-[11px] text-emerald-400 mt-1">
-                  {activeReport.kpis.viewsDiffPct >= 0 ? '+' : ''}{activeReport.kpis.viewsDiffPct}% vs anterior
+                <div className="text-[11px] mt-1 font-sans">
+                  {formatDiff(activeReport.kpis.viewsDiffPct)}
                 </div>
               </div>
 
@@ -215,8 +200,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 <div className="text-lg font-bold text-neutral-100 tabular-nums">
                   {activeReport.kpis.reach.toLocaleString('pt-BR')}
                 </div>
-                <div className="text-[11px] text-emerald-400 mt-1">
-                  {activeReport.kpis.reachDiffPct >= 0 ? '+' : ''}{activeReport.kpis.reachDiffPct}% vs anterior
+                <div className="text-[11px] mt-1 font-sans">
+                  {formatDiff(activeReport.kpis.reachDiffPct)}
                 </div>
               </div>
 
@@ -225,93 +210,96 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 <div className="text-lg font-bold text-emerald-400 tabular-nums">
                   {activeReport.kpis.engagementRate}%
                 </div>
-                <div className="text-[11px] text-neutral-400 mt-1">
+                <div className="text-[11px] text-neutral-400 mt-1 font-sans">
                   {activeReport.kpis.postsCount} posts no período
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Section: Melhores Conteúdos vs Menores Desempenhos */}
+          {/* Section: Melhores Conteúdos */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold font-mono uppercase text-amber-400 tracking-wider">
-              03. Conteúdos de Maior Destaque no Período
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400">
+              03. Top Conteúdos de Maior Destaque
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {activeReport.topContents.map((content, idx) => (
-                <div
-                  key={content.id}
-                  className="p-3.5 bg-neutral-950/80 border border-neutral-800 rounded-xl space-y-2 text-xs"
-                >
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="px-1.5 py-0.2 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-bold">
-                      #{idx + 1}
-                    </span>
-                    <span className="text-neutral-500">{content.format}</span>
+            {activeReport.topContents && activeReport.topContents.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {activeReport.topContents.map((content, idx) => (
+                  <div
+                    key={content.id || idx}
+                    className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-[11px] text-amber-400 font-mono">
+                      <span>{content.format}</span>
+                      <span className="text-neutral-500">{content.pillar}</span>
+                    </div>
+                    <div className="text-xs font-semibold text-neutral-200 line-clamp-2">
+                      {content.title}
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] text-neutral-400 font-mono pt-2 border-t border-neutral-800/60">
+                      <span className="flex items-center gap-1">
+                        <Eye className="w-3 h-3 text-sky-400" />
+                        {content.metrics.views.toLocaleString('pt-BR')}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Bookmark className="w-3 h-3 text-purple-400" />
+                        {content.metrics.saves}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Share2 className="w-3 h-3 text-amber-400" />
+                        {content.metrics.shares}
+                      </span>
+                    </div>
                   </div>
-                  <h5 className="font-bold text-neutral-200 line-clamp-2">{content.title}</h5>
-                  <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400 pt-1 border-t border-neutral-800/60">
-                    <span>{content.metrics.views.toLocaleString('pt-BR')} views</span>
-                    <span className="text-emerald-400 font-bold">{content.metrics.saves} salvos</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-400">
+                Nenhum conteúdo registrado para o período.
+              </div>
+            )}
           </div>
 
-          {/* Section: Diagnóstico Analítico & Oportunidades */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="p-4 bg-neutral-950/70 border border-neutral-800 rounded-xl space-y-2 text-xs">
-              <h4 className="font-bold font-mono uppercase text-neutral-200">
-                04. Interpretação Estratégica da Agência
-              </h4>
-              <p className="text-neutral-300 leading-relaxed">
+          {/* Section: Análise Qualitativa e Recomendações */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-neutral-800">
+            <div className="space-y-2">
+              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400">
+                04. Análise Estratégica
+              </h3>
+              <p className="text-xs text-neutral-300 leading-relaxed bg-neutral-950/40 p-4 rounded-xl border border-neutral-800/80">
                 {activeReport.analysisText}
               </p>
             </div>
 
-            <div className="p-4 bg-neutral-950/70 border border-neutral-800 rounded-xl space-y-2 text-xs">
-              <h4 className="font-bold font-mono uppercase text-amber-400">
-                05. Oportunidades Mapeadas
-              </h4>
-              <ul className="space-y-1.5 text-neutral-300">
-                {activeReport.opportunities.map((op, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-amber-400 font-mono font-bold">•</span>
-                    <span>{op}</span>
+            <div className="space-y-2">
+              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400">
+                05. Oportunidades & Próximas Ações
+              </h3>
+              <ul className="space-y-2 bg-neutral-950/40 p-4 rounded-xl border border-neutral-800/80">
+                {(activeReport.nextSteps || activeReport.recommendations || []).map((step, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-xs text-neutral-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{step}</span>
                   </li>
                 ))}
               </ul>
             </div>
           </div>
 
-          {/* Section: Recomendações e Próximos Passos */}
-          <div className="p-5 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3 text-xs">
-            <h4 className="font-bold font-mono uppercase text-emerald-400">
-              06. Próximos Passos Operacionais Prioritários
-            </h4>
-            <div className="space-y-2">
-              {activeReport.nextSteps.map((step, i) => (
-                <div key={i} className="flex items-center gap-2.5 p-2 bg-neutral-900 rounded border border-neutral-800/80">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="text-neutral-200">{step}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Signoff Footer */}
-          <div className="pt-6 border-t border-neutral-800 flex items-center justify-between text-xs font-mono text-neutral-500">
-            <div>Gabriel Speratti · Estratégia de Social Intelligence</div>
-            <div>Documento Confidencial · Uso Exclusivo da Agência</div>
+          {/* Footer */}
+          <div className="pt-6 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-500 font-mono">
+            <span>Gabriel Speratti | Social Intelligence</span>
+            <span>Relatório Confidencial · Uso Exclusivo</span>
           </div>
         </div>
       ) : (
-        <div className="p-12 text-center bg-neutral-900/40 border border-neutral-800 rounded-xl space-y-3">
-          <FileText className="w-8 h-8 text-neutral-500 mx-auto" />
-          <h4 className="text-sm font-semibold text-neutral-300">Nenhum relatório gerado ainda</h4>
+        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-12 text-center space-y-3">
+          <FileText className="w-8 h-8 text-neutral-600 mx-auto" />
+          <h3 className="text-sm font-semibold text-neutral-200">
+            Nenhum relatório gerado ainda
+          </h3>
           <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-            Selecione o período desejado e clique em &quot;Gerar Relatório&quot; para produzir a análise executiva completa.
+            Clique no botão acima para compilar os dados do período selecionado em um documento estratégico executivo.
           </p>
         </div>
       )}

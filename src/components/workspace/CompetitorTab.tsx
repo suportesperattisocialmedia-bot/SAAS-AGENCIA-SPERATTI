@@ -91,7 +91,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
       similarityScore: 85,
       followers: Number(newCompForm.followers),
       postingFrequencyWeekly: Number(newCompForm.postingFrequencyWeekly),
-      topFormats: newCompForm.topFormats.split(',').map(s => s.trim()),
+      topFormats: newCompForm.topFormats.split(',').map(s => s.trim()) as any,
       avgViews: Number(newCompForm.avgViews),
       avgEngagementRate: Number(newCompForm.avgEngagementRate),
       recentThemes: newCompForm.recentThemes.split(',').map(s => s.trim()),

@@ -1,13 +1,18 @@
 /**
  * GABRIEL SPERATTI | SOCIAL INTELLIGENCE
- * Storage Service - Desacoplado para persistência Local e futura migração para Supabase/PostgreSQL
+ * Storage Service - Decoupled Persistence Layer
+ * 
+ * Strict rule: All data operations route through StorageAdapter.
+ * Zod schemas validate data integrity.
+ * Snapshots are immutable per date (updates same date, never overwrites past days).
  */
 
 import {
   Client,
   InstagramAccount,
-  MetricSnapshot,
+  AccountSnapshot,
   Content,
+  ContentMetricSnapshot,
   Competitor,
   AudienceInsight,
   ContentIdea,
@@ -16,372 +21,473 @@ import {
   Report,
   AppSettings
 } from '../types';
+import { defaultStorageAdapter } from './storage/LocalStorageAdapter';
+import { DemoProvider } from './demo/DemoProvider';
 import {
-  DEMO_CLIENT_RAVI,
-  DEMO_INSTAGRAM_ACCOUNT,
-  generateDemoSnapshots,
-  DEMO_CONTENTS,
-  DEMO_COMPETITORS,
-  DEMO_AUDIENCE_INSIGHTS,
-  DEMO_IDEAS,
-  DEMO_CALENDAR_ITEMS,
-  DEMO_ALERTS
-} from '../data/mockData';
+  ClientSchema,
+  InstagramAccountSchema,
+  AccountSnapshotSchema,
+  ContentSchema,
+  CompetitorSchema,
+  AudienceInsightSchema,
+  ContentIdeaSchema,
+  CalendarItemSchema,
+  AlertSchema,
+  ReportSchema
+} from '../schemas';
+import { logger } from '../utils/logger';
 
 const KEYS = {
   CLIENTS: 'gs_intel_clients',
   INSTAGRAM: 'gs_intel_instagram',
   SNAPSHOTS: 'gs_intel_snapshots',
   CONTENTS: 'gs_intel_contents',
+  CONTENT_METRIC_SNAPSHOTS: 'gs_intel_content_metric_snapshots',
   COMPETITORS: 'gs_intel_competitors',
   AUDIENCE: 'gs_intel_audience',
   IDEAS: 'gs_intel_ideas',
   CALENDAR: 'gs_intel_calendar',
   ALERTS: 'gs_intel_alerts',
   REPORTS: 'gs_intel_reports',
-  SETTINGS: 'gs_intel_settings',
-  DEMO_FLAG: 'gs_intel_demo_seeded'
+  SETTINGS: 'gs_intel_settings'
 };
 
-function readItem<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch (err) {
-    console.error(`[StorageService] Error reading key ${key}:`, err);
-    return fallback;
-  }
-}
-
-function writeItem<T>(key: string, data: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (err) {
-    console.error(`[StorageService] Error writing key ${key}:`, err);
-  }
-}
+const DEFAULT_SETTINGS: AppSettings = {
+  instagramApiConfigured: false,
+  aiApiConfigured: true,
+  storageType: 'localStorage',
+  agencyName: 'Gabriel Speratti | Social Intelligence',
+  ownerName: 'Gabriel Speratti',
+  appMode: 'PRODUCTION'
+};
 
 export const storageService = {
-  // CLIENTS REPOSITORY
+  // CLIENTS
   clients: {
     getAll(): Client[] {
-      return readItem<Client[]>(KEYS.CLIENTS, []);
+      return defaultStorageAdapter.getCollection<Client>(KEYS.CLIENTS);
     },
+
     getById(id: string): Client | undefined {
-      const all = storageService.clients.getAll();
-      return all.find(c => c.id === id);
+      return this.getAll().find(c => c.id === id);
     },
-    create(data: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): Client {
-      const all = storageService.clients.getAll();
+
+    create(clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Client {
+      const now = new Date().toISOString();
       const newClient: Client = {
-        ...data,
-        id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        ...clientData,
+        id: clientData.id || `client-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        status: clientData.status || 'active',
+        onboardingStep: clientData.onboardingStep || 1,
+        healthStatus: clientData.healthStatus || 'not_connected',
+        createdAt: now,
+        updatedAt: now
       };
-      writeItem(KEYS.CLIENTS, [newClient, ...all]);
-      return newClient;
+
+      const validated = ClientSchema.parse(newClient);
+      const all = this.getAll();
+      defaultStorageAdapter.setCollection(KEYS.CLIENTS, [validated, ...all]);
+      logger.info(`Client created: ${validated.name}`, { id: validated.id });
+      return validated;
     },
+
     update(id: string, updates: Partial<Client>): Client | null {
-      const all = storageService.clients.getAll();
-      const idx = all.findIndex(c => c.id === id);
-      if (idx === -1) return null;
-      const updated: Client = {
-        ...all[idx],
+      const all = this.getAll();
+      const index = all.findIndex(c => c.id === id);
+      if (index === -1) return null;
+
+      const merged = {
+        ...all[index],
         ...updates,
         updatedAt: new Date().toISOString()
       };
-      all[idx] = updated;
-      writeItem(KEYS.CLIENTS, all);
-      return updated;
+
+      const validated = ClientSchema.parse(merged);
+      all[index] = validated;
+      defaultStorageAdapter.setCollection(KEYS.CLIENTS, all);
+      logger.info(`Client updated: ${validated.name}`, { id });
+      return validated;
     },
-    duplicate(id: string): Client | null {
-      const client = storageService.clients.getById(id);
-      if (!client) return null;
-      const duplicated: Client = {
-        ...client,
-        id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        name: `${client.name} (Cópia)`,
-        company: `${client.company} (Cópia)`,
-        instagram: `${client.instagram}_copia`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      const all = storageService.clients.getAll();
-      writeItem(KEYS.CLIENTS, [duplicated, ...all]);
-      return duplicated;
-    },
+
     delete(id: string): boolean {
-      const all = storageService.clients.getAll();
+      const all = this.getAll();
       const filtered = all.filter(c => c.id !== id);
-      writeItem(KEYS.CLIENTS, filtered);
-      // Clean up linked data
-      const contents = storageService.contents.getAll().filter(c => c.clientId !== id);
-      writeItem(KEYS.CONTENTS, contents);
-      const competitors = storageService.competitors.getAll().filter(c => c.clientId !== id);
-      writeItem(KEYS.COMPETITORS, competitors);
-      const ideas = storageService.ideas.getAll().filter(i => i.clientId !== id);
-      writeItem(KEYS.IDEAS, ideas);
-      const calendar = storageService.calendar.getAll().filter(i => i.clientId !== id);
-      writeItem(KEYS.CALENDAR, calendar);
-      const snapshots = storageService.history.getAll().filter(s => s.clientId !== id);
-      writeItem(KEYS.SNAPSHOTS, snapshots);
-      const audience = storageService.audience.getAll().filter(a => a.clientId !== id);
-      writeItem(KEYS.AUDIENCE, audience);
+      if (filtered.length === all.length) return false;
+
+      defaultStorageAdapter.setCollection(KEYS.CLIENTS, filtered);
+      logger.info(`Client deleted`, { id });
       return true;
     }
   },
 
   // INSTAGRAM ACCOUNTS
   instagram: {
-    getByClient(clientId: string): InstagramAccount | null {
-      const all = readItem<Record<string, InstagramAccount>>(KEYS.INSTAGRAM, {});
-      return all[clientId] || null;
+    getAll(): InstagramAccount[] {
+      return defaultStorageAdapter.getCollection<InstagramAccount>(KEYS.INSTAGRAM);
     },
-    save(account: InstagramAccount): void {
-      const all = readItem<Record<string, InstagramAccount>>(KEYS.INSTAGRAM, {});
-      all[account.clientId] = account;
-      writeItem(KEYS.INSTAGRAM, all);
-    },
-    disconnect(clientId: string): void {
-      const all = readItem<Record<string, InstagramAccount>>(KEYS.INSTAGRAM, {});
-      if (all[clientId]) {
-        all[clientId] = {
-          ...all[clientId],
-          isConnected: false,
-          errorStatus: null
-        };
-        writeItem(KEYS.INSTAGRAM, all);
-      }
-    }
-  },
 
-  // METRICS SNAPSHOTS (HISTÓRICO DIÁRIO NÃO-SOBREESCRITO)
-  history: {
-    getAll(): MetricSnapshot[] {
-      return readItem<MetricSnapshot[]>(KEYS.SNAPSHOTS, []);
+    getAccount(clientId: string): InstagramAccount | null {
+      const accounts = this.getAll();
+      return accounts.find(a => a.clientId === clientId) || null;
     },
-    getByClient(clientId: string): MetricSnapshot[] {
-      const all = storageService.history.getAll();
-      return all
-        .filter(s => s.clientId === clientId)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    },
-    addSnapshot(snapshot: Omit<MetricSnapshot, 'id'>): MetricSnapshot {
-      const all = storageService.history.getAll();
-      // Check if a snapshot for this client and date already exists
-      const existingIdx = all.findIndex(s => s.clientId === snapshot.clientId && s.timestamp === snapshot.timestamp);
-      const newSnapshot: MetricSnapshot = {
-        ...snapshot,
-        id: `snap-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`
-      };
-      if (existingIdx >= 0) {
-        // Update snapshot of today with latest sync values without erasing historical dates
-        all[existingIdx] = newSnapshot;
+
+    saveAccount(account: InstagramAccount): void {
+      const validated = InstagramAccountSchema.parse(account);
+      const accounts = this.getAll();
+      const index = accounts.findIndex(a => a.clientId === account.clientId);
+
+      if (index >= 0) {
+        accounts[index] = validated;
       } else {
-        all.push(newSnapshot);
+        accounts.push(validated);
       }
-      writeItem(KEYS.SNAPSHOTS, all);
-      return newSnapshot;
+
+      defaultStorageAdapter.setCollection(KEYS.INSTAGRAM, accounts);
+      logger.info(`Instagram account saved for client ${account.clientId}`, { status: account.status });
     }
   },
 
-  // CONTENTS
+  // SNAPSHOTS (ACCOUNT METRICS OVER TIME)
+  history: {
+    getAll(): AccountSnapshot[] {
+      return defaultStorageAdapter.getCollection<AccountSnapshot>(KEYS.SNAPSHOTS);
+    },
+
+    getByClient(clientId: string): AccountSnapshot[] {
+      return this.getAll()
+        .filter(s => s.clientId === clientId)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    },
+
+    /**
+     * Prevents duplicate snapshots for the same clientId + date.
+     * If snapshot exists for this day, update it. Never overwrite past days.
+     */
+    saveSnapshot(snapshotData: Omit<AccountSnapshot, 'id'> & { id?: string }): AccountSnapshot {
+      const all = this.getAll();
+      const existingIndex = all.findIndex(
+        s => s.clientId === snapshotData.clientId && s.date === snapshotData.date
+      );
+
+      let finalSnapshot: AccountSnapshot;
+
+      if (existingIndex >= 0) {
+        // Update snapshot for today
+        finalSnapshot = {
+          ...all[existingIndex],
+          ...snapshotData,
+          sourceTimestamp: new Date().toISOString()
+        };
+        const validated = AccountSnapshotSchema.parse(finalSnapshot);
+        all[existingIndex] = validated;
+        defaultStorageAdapter.setCollection(KEYS.SNAPSHOTS, all);
+        logger.info(`Updated existing snapshot for ${snapshotData.clientId} on date ${snapshotData.date}`);
+        return validated;
+      } else {
+        // Create new snapshot
+        finalSnapshot = {
+          ...snapshotData,
+          id: snapshotData.id || `snap-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          sourceTimestamp: new Date().toISOString()
+        };
+        const validated = AccountSnapshotSchema.parse(finalSnapshot);
+        defaultStorageAdapter.setCollection(KEYS.SNAPSHOTS, [...all, validated]);
+        logger.info(`Recorded new snapshot for ${snapshotData.clientId} on date ${snapshotData.date}`);
+        return validated;
+      }
+    }
+  },
+
+  // CONTENTS & CONTENT METRICS
   contents: {
     getAll(): Content[] {
-      return readItem<Content[]>(KEYS.CONTENTS, []);
+      return defaultStorageAdapter.getCollection<Content>(KEYS.CONTENTS);
     },
+
     getByClient(clientId: string): Content[] {
-      const all = storageService.contents.getAll();
-      return all
+      return this.getAll()
         .filter(c => c.clientId === clientId)
         .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
     },
-    create(data: Omit<Content, 'id'>): Content {
-      const all = storageService.contents.getAll();
-      const newContent: Content = {
-        ...data,
-        id: `cnt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+
+    create(contentData: Omit<Content, 'id'> & { id?: string }): Content {
+      const newItem: Content = {
+        ...contentData,
+        id: contentData.id || `content-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
       };
-      writeItem(KEYS.CONTENTS, [newContent, ...all]);
-      return newContent;
+
+      const validated = ContentSchema.parse(newItem);
+      const all = this.getAll();
+      defaultStorageAdapter.setCollection(KEYS.CONTENTS, [validated, ...all]);
+      return validated;
     },
+
     update(id: string, updates: Partial<Content>): Content | null {
-      const all = storageService.contents.getAll();
-      const idx = all.findIndex(c => c.id === id);
-      if (idx === -1) return null;
-      all[idx] = { ...all[idx], ...updates };
-      writeItem(KEYS.CONTENTS, all);
-      return all[idx];
+      const all = this.getAll();
+      const index = all.findIndex(c => c.id === id);
+      if (index === -1) return null;
+
+      const merged = { ...all[index], ...updates };
+      const validated = ContentSchema.parse(merged);
+      all[index] = validated;
+      defaultStorageAdapter.setCollection(KEYS.CONTENTS, all);
+      return validated;
     },
+
     delete(id: string): boolean {
-      const all = storageService.contents.getAll();
-      writeItem(KEYS.CONTENTS, all.filter(c => c.id !== id));
+      const all = this.getAll();
+      const filtered = all.filter(c => c.id !== id);
+      if (filtered.length === all.length) return false;
+
+      defaultStorageAdapter.setCollection(KEYS.CONTENTS, filtered);
       return true;
+    },
+
+    recordMetricSnapshot(contentId: string, metrics: Content['metrics'], source: AccountSnapshot['source']): void {
+      const snapshot: ContentMetricSnapshot = {
+        id: `cms-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        contentId,
+        timestamp: new Date().toISOString(),
+        views: metrics.views,
+        reach: metrics.reach,
+        likes: metrics.likes,
+        comments: metrics.comments,
+        shares: metrics.shares,
+        saves: metrics.saves,
+        profileActivity: 0,
+        engagementRate: metrics.engagementRate,
+        source
+      };
+
+      const all = defaultStorageAdapter.getCollection<ContentMetricSnapshot>(KEYS.CONTENT_METRIC_SNAPSHOTS);
+      defaultStorageAdapter.setCollection(KEYS.CONTENT_METRIC_SNAPSHOTS, [snapshot, ...all]);
     }
   },
 
   // COMPETITORS
   competitors: {
     getAll(): Competitor[] {
-      return readItem<Competitor[]>(KEYS.COMPETITORS, []);
+      return defaultStorageAdapter.getCollection<Competitor>(KEYS.COMPETITORS);
     },
+
     getByClient(clientId: string): Competitor[] {
-      return storageService.competitors.getAll().filter(c => c.clientId === clientId);
+      return this.getAll().filter(c => c.clientId === clientId);
     },
-    create(data: Omit<Competitor, 'id' | 'createdAt' | 'updatedAt'>): Competitor {
-      const all = storageService.competitors.getAll();
-      const newComp: Competitor = {
-        ...data,
-        id: `comp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+
+    create(compData: Omit<Competitor, 'id' | 'createdAt' | 'updatedAt'>): Competitor {
+      const now = new Date().toISOString();
+      const newItem: Competitor = {
+        ...compData,
+        id: `comp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        createdAt: now,
+        updatedAt: now
       };
-      writeItem(KEYS.COMPETITORS, [newComp, ...all]);
-      return newComp;
+
+      const validated = CompetitorSchema.parse(newItem);
+      const all = this.getAll();
+      defaultStorageAdapter.setCollection(KEYS.COMPETITORS, [validated, ...all]);
+      return validated;
     },
+
     update(id: string, updates: Partial<Competitor>): Competitor | null {
-      const all = storageService.competitors.getAll();
-      const idx = all.findIndex(c => c.id === id);
-      if (idx === -1) return null;
-      all[idx] = { ...all[idx], ...updates, updatedAt: new Date().toISOString() };
-      writeItem(KEYS.COMPETITORS, all);
-      return all[idx];
+      const all = this.getAll();
+      const index = all.findIndex(c => c.id === id);
+      if (index === -1) return null;
+
+      const merged = { ...all[index], ...updates, updatedAt: new Date().toISOString() };
+      const validated = CompetitorSchema.parse(merged);
+      all[index] = validated;
+      defaultStorageAdapter.setCollection(KEYS.COMPETITORS, all);
+      return validated;
     },
+
     delete(id: string): boolean {
-      const all = storageService.competitors.getAll();
-      writeItem(KEYS.COMPETITORS, all.filter(c => c.id !== id));
+      const all = this.getAll();
+      const filtered = all.filter(c => c.id !== id);
+      if (filtered.length === all.length) return false;
+
+      defaultStorageAdapter.setCollection(KEYS.COMPETITORS, filtered);
       return true;
     }
   },
 
-  // AUDIENCE INTELLIGENCE
+  // AUDIENCE RESEARCH
   audience: {
     getAll(): AudienceInsight[] {
-      return readItem<AudienceInsight[]>(KEYS.AUDIENCE, []);
+      return defaultStorageAdapter.getCollection<AudienceInsight>(KEYS.AUDIENCE);
     },
+
     getByClient(clientId: string): AudienceInsight[] {
-      return storageService.audience.getAll().filter(a => a.clientId === clientId);
+      return this.getAll().filter(a => a.clientId === clientId);
     },
-    create(data: Omit<AudienceInsight, 'id' | 'createdAt'>): AudienceInsight {
-      const all = storageService.audience.getAll();
-      const newInsight: AudienceInsight = {
-        ...data,
-        id: `aud-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+
+    create(insightData: Omit<AudienceInsight, 'id' | 'createdAt'>): AudienceInsight {
+      const newItem: AudienceInsight = {
+        ...insightData,
+        id: `aud-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         createdAt: new Date().toISOString()
       };
-      writeItem(KEYS.AUDIENCE, [newInsight, ...all]);
-      return newInsight;
+
+      const validated = AudienceInsightSchema.parse(newItem);
+      const all = this.getAll();
+      defaultStorageAdapter.setCollection(KEYS.AUDIENCE, [validated, ...all]);
+      return validated;
     },
+
     delete(id: string): boolean {
-      const all = storageService.audience.getAll();
-      writeItem(KEYS.AUDIENCE, all.filter(a => a.id !== id));
+      const all = this.getAll();
+      const filtered = all.filter(a => a.id !== id);
+      if (filtered.length === all.length) return false;
+
+      defaultStorageAdapter.setCollection(KEYS.AUDIENCE, filtered);
       return true;
     }
   },
 
-  // CONTENT IDEAS BANK
+  // IDEAS
   ideas: {
     getAll(): ContentIdea[] {
-      return readItem<ContentIdea[]>(KEYS.IDEAS, []);
+      return defaultStorageAdapter.getCollection<ContentIdea>(KEYS.IDEAS);
     },
+
     getByClient(clientId: string): ContentIdea[] {
-      return storageService.ideas.getAll().filter(i => i.clientId === clientId);
+      return this.getAll().filter(i => i.clientId === clientId);
     },
-    create(data: Omit<ContentIdea, 'id' | 'createdAt' | 'updatedAt'>): ContentIdea {
-      const all = storageService.ideas.getAll();
-      const newIdea: ContentIdea = {
-        ...data,
-        id: `idea-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+
+    create(ideaData: Omit<ContentIdea, 'id' | 'createdAt' | 'updatedAt'>): ContentIdea {
+      const now = new Date().toISOString();
+      const newItem: ContentIdea = {
+        ...ideaData,
+        id: `idea-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        createdAt: now,
+        updatedAt: now
       };
-      writeItem(KEYS.IDEAS, [newIdea, ...all]);
-      return newIdea;
+
+      const validated = ContentIdeaSchema.parse(newItem);
+      const all = this.getAll();
+      defaultStorageAdapter.setCollection(KEYS.IDEAS, [validated, ...all]);
+      return validated;
     },
+
     update(id: string, updates: Partial<ContentIdea>): ContentIdea | null {
-      const all = storageService.ideas.getAll();
-      const idx = all.findIndex(i => i.id === id);
-      if (idx === -1) return null;
-      all[idx] = { ...all[idx], ...updates, updatedAt: new Date().toISOString() };
-      writeItem(KEYS.IDEAS, all);
-      return all[idx];
+      const all = this.getAll();
+      const index = all.findIndex(i => i.id === id);
+      if (index === -1) return null;
+
+      const merged = { ...all[index], ...updates, updatedAt: new Date().toISOString() };
+      const validated = ContentIdeaSchema.parse(merged);
+      all[index] = validated;
+      defaultStorageAdapter.setCollection(KEYS.IDEAS, all);
+      return validated;
     },
+
     delete(id: string): boolean {
-      const all = storageService.ideas.getAll();
-      writeItem(KEYS.IDEAS, all.filter(i => i.id !== id));
+      const all = this.getAll();
+      const filtered = all.filter(i => i.id !== id);
+      if (filtered.length === all.length) return false;
+
+      defaultStorageAdapter.setCollection(KEYS.IDEAS, filtered);
       return true;
     }
   },
 
-  // WEEKLY CALENDAR
+  // CALENDAR
   calendar: {
     getAll(): CalendarItem[] {
-      return readItem<CalendarItem[]>(KEYS.CALENDAR, []);
+      return defaultStorageAdapter.getCollection<CalendarItem>(KEYS.CALENDAR);
     },
+
     getByClient(clientId: string): CalendarItem[] {
-      return storageService.calendar.getAll().filter(c => c.clientId === clientId);
+      return this.getAll()
+        .filter(c => c.clientId === clientId)
+        .sort((a, b) => a.orderIndex - b.orderIndex);
     },
-    saveAll(clientId: string, items: CalendarItem[]): void {
-      const others = storageService.calendar.getAll().filter(c => c.clientId !== clientId);
-      writeItem(KEYS.CALENDAR, [...others, ...items]);
-    },
-    addItem(data: Omit<CalendarItem, 'id'>): CalendarItem {
-      const all = storageService.calendar.getAll();
-      const newItem: CalendarItem = {
-        ...data,
-        id: `cal-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+
+    saveItem(itemData: Omit<CalendarItem, 'id' | 'orderIndex'> & { id?: string; orderIndex?: number }): CalendarItem {
+      const all = this.getAll();
+      const id = itemData.id || `cal-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+      const existingIndex = all.findIndex(c => c.id === id);
+
+      const item: CalendarItem = {
+        ...itemData,
+        id,
+        orderIndex: itemData.orderIndex ?? (existingIndex >= 0 ? all[existingIndex].orderIndex : all.length)
       };
-      writeItem(KEYS.CALENDAR, [...all, newItem]);
-      return newItem;
+
+      const validated = CalendarItemSchema.parse(item);
+
+      if (existingIndex >= 0) {
+        all[existingIndex] = validated;
+      } else {
+        all.push(validated);
+      }
+
+      defaultStorageAdapter.setCollection(KEYS.CALENDAR, all);
+      return validated;
     },
-    updateItem(id: string, updates: Partial<CalendarItem>): CalendarItem | null {
-      const all = storageService.calendar.getAll();
-      const idx = all.findIndex(c => c.id === id);
-      if (idx === -1) return null;
-      all[idx] = { ...all[idx], ...updates };
-      writeItem(KEYS.CALENDAR, all);
-      return all[idx];
-    },
+
     deleteItem(id: string): boolean {
-      const all = storageService.calendar.getAll();
-      writeItem(KEYS.CALENDAR, all.filter(c => c.id !== id));
+      const all = this.getAll();
+      const filtered = all.filter(c => c.id !== id);
+      if (filtered.length === all.length) return false;
+
+      defaultStorageAdapter.setCollection(KEYS.CALENDAR, filtered);
       return true;
+    },
+
+    reorderItems(clientId: string, items: CalendarItem[]): void {
+      const otherItems = this.getAll().filter(c => c.clientId !== clientId);
+      const reindexed = items.map((item, idx) => ({
+        ...item,
+        orderIndex: idx
+      }));
+
+      defaultStorageAdapter.setCollection(KEYS.CALENDAR, [...otherItems, ...reindexed]);
     }
   },
 
   // ALERTS
   alerts: {
     getAll(): Alert[] {
-      return readItem<Alert[]>(KEYS.ALERTS, []);
+      return defaultStorageAdapter.getCollection<Alert>(KEYS.ALERTS);
     },
-    getByClient(clientId?: string): Alert[] {
-      const all = storageService.alerts.getAll();
-      if (!clientId) return all;
-      return all.filter(a => a.clientId === clientId);
+
+    getByClient(clientId: string): Alert[] {
+      return this.getAll().filter(a => a.clientId === clientId);
     },
-    create(data: Omit<Alert, 'id' | 'createdAt'>): Alert {
-      const all = storageService.alerts.getAll();
-      const newAlert: Alert = {
-        ...data,
-        id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+
+    create(alertData: Omit<Alert, 'id' | 'createdAt'>): Alert {
+      const newItem: Alert = {
+        ...alertData,
+        id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        status: alertData.status || 'NEW',
         createdAt: new Date().toISOString()
       };
-      writeItem(KEYS.ALERTS, [newAlert, ...all]);
-      return newAlert;
+
+      const validated = AlertSchema.parse(newItem);
+      const all = this.getAll();
+      defaultStorageAdapter.setCollection(KEYS.ALERTS, [validated, ...all]);
+      return validated;
     },
-    updateStatus(id: string, status: Alert['status']): void {
-      const all = storageService.alerts.getAll();
-      const idx = all.findIndex(a => a.id === id);
-      if (idx >= 0) {
-        all[idx].status = status;
-        writeItem(KEYS.ALERTS, all);
-      }
+
+    update(id: string, updates: Partial<Alert>): Alert | null {
+      const all = this.getAll();
+      const index = all.findIndex(a => a.id === id);
+      if (index === -1) return null;
+
+      const merged = { ...all[index], ...updates };
+      const validated = AlertSchema.parse(merged);
+      all[index] = validated;
+      defaultStorageAdapter.setCollection(KEYS.ALERTS, all);
+      return validated;
     },
+
     delete(id: string): boolean {
-      const all = storageService.alerts.getAll();
-      writeItem(KEYS.ALERTS, all.filter(a => a.id !== id));
+      const all = this.getAll();
+      const filtered = all.filter(a => a.id !== id);
+      if (filtered.length === all.length) return false;
+
+      defaultStorageAdapter.setCollection(KEYS.ALERTS, filtered);
       return true;
     }
   },
@@ -389,130 +495,139 @@ export const storageService = {
   // REPORTS
   reports: {
     getAll(): Report[] {
-      return readItem<Report[]>(KEYS.REPORTS, []);
+      return defaultStorageAdapter.getCollection<Report>(KEYS.REPORTS);
     },
+
     getByClient(clientId: string): Report[] {
-      return storageService.reports.getAll().filter(r => r.clientId === clientId);
+      return this.getAll().filter(r => r.clientId === clientId);
     },
-    create(report: Omit<Report, 'id' | 'generatedAt'>): Report {
-      const all = storageService.reports.getAll();
-      const newReport: Report = {
-        ...report,
-        id: `rep-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+
+    create(reportData: Omit<Report, 'id' | 'generatedAt'>): Report {
+      const newItem: Report = {
+        ...reportData,
+        id: `rep-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         generatedAt: new Date().toISOString()
       };
-      writeItem(KEYS.REPORTS, [newReport, ...all]);
-      return newReport;
+
+      const validated = ReportSchema.parse(newItem);
+      const all = this.getAll();
+      defaultStorageAdapter.setCollection(KEYS.REPORTS, [validated, ...all]);
+      return validated;
+    },
+
+    delete(id: string): boolean {
+      const all = this.getAll();
+      const filtered = all.filter(r => r.id !== id);
+      if (filtered.length === all.length) return false;
+
+      defaultStorageAdapter.setCollection(KEYS.REPORTS, filtered);
+      return true;
     }
   },
 
-  // SETTINGS
+  // APP SETTINGS
   settings: {
     get(): AppSettings {
-      return readItem<AppSettings>(KEYS.SETTINGS, {
-        instagramApiConfigured: false,
-        aiApiConfigured: true,
-        storageType: 'localStorage',
-        agencyName: 'Gabriel Speratti',
-        ownerName: 'Gabriel Speratti'
-      });
+      return defaultStorageAdapter.get<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
     },
+
     update(updates: Partial<AppSettings>): AppSettings {
-      const current = storageService.settings.get();
+      const current = this.get();
       const updated = { ...current, ...updates };
-      writeItem(KEYS.SETTINGS, updated);
+      defaultStorageAdapter.set(KEYS.SETTINGS, updated);
       return updated;
     }
   },
 
-  // DEMO DATA SEED & RESET
+  // DEMO DATA SEEDING / CLEARING (Only via DemoProvider)
   isDemoLoaded(): boolean {
-    return localStorage.getItem(KEYS.DEMO_FLAG) === 'true';
+    return DemoProvider.isDemoActive();
   },
 
   seedDemoData(): void {
-    console.info('[StorageService] Seeding demo mock data for client RAVI...');
-    // Add client
-    const existingClients = storageService.clients.getAll().filter(c => c.id !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.CLIENTS, [DEMO_CLIENT_RAVI, ...existingClients]);
+    logger.info('Activating DEMO mode and seeding mock data via DemoProvider...');
+    DemoProvider.enableDemoMode();
 
-    // Add instagram account
-    storageService.instagram.save(DEMO_INSTAGRAM_ACCOUNT);
+    // Check if demo client already exists
+    const existing = this.clients.getById(DemoProvider.getDemoClientId());
+    if (!existing) {
+      this.clients.create(DemoProvider.getDemoClient());
+    }
 
-    // Add metric snapshots
-    const snapshots = generateDemoSnapshots();
-    const existingSnapshots = storageService.history.getAll().filter(s => s.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.SNAPSHOTS, [...existingSnapshots, ...snapshots]);
+    this.instagram.saveAccount(DemoProvider.getDemoInstagram());
 
-    // Add contents
-    const existingContents = storageService.contents.getAll().filter(c => c.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.CONTENTS, [...DEMO_CONTENTS, ...existingContents]);
+    // Seed snapshots
+    const snapshots = DemoProvider.getDemoSnapshots();
+    snapshots.forEach(s => this.history.saveSnapshot(s));
 
-    // Add competitors
-    const existingCompetitors = storageService.competitors.getAll().filter(c => c.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.COMPETITORS, [...DEMO_COMPETITORS, ...existingCompetitors]);
+    // Seed contents
+    const contents = DemoProvider.getDemoContents();
+    contents.forEach(c => {
+      if (!this.contents.getAll().some(item => item.id === c.id)) {
+        this.contents.create(c);
+      }
+    });
 
-    // Add audience insights
-    const existingAudience = storageService.audience.getAll().filter(a => a.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.AUDIENCE, [...DEMO_AUDIENCE_INSIGHTS, ...existingAudience]);
+    // Seed competitors
+    const competitors = DemoProvider.getDemoCompetitors();
+    competitors.forEach(comp => {
+      if (!this.competitors.getAll().some(c => c.id === comp.id)) {
+        this.competitors.create(comp);
+      }
+    });
 
-    // Add ideas
-    const existingIdeas = storageService.ideas.getAll().filter(i => i.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.IDEAS, [...DEMO_IDEAS, ...existingIdeas]);
+    // Seed audience
+    const audience = DemoProvider.getDemoAudience();
+    audience.forEach(aud => {
+      if (!this.audience.getAll().some(a => a.id === aud.id)) {
+        this.audience.create(aud);
+      }
+    });
 
-    // Add calendar
-    const existingCalendar = storageService.calendar.getAll().filter(c => c.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.CALENDAR, [...DEMO_CALENDAR_ITEMS, ...existingCalendar]);
+    // Seed ideas
+    const ideas = DemoProvider.getDemoIdeas();
+    ideas.forEach(i => {
+      if (!this.ideas.getAll().some(item => item.id === i.id)) {
+        this.ideas.create(i);
+      }
+    });
 
-    // Add alerts
-    const existingAlerts = storageService.alerts.getAll().filter(a => a.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.ALERTS, [...DEMO_ALERTS, ...existingAlerts]);
+    // Seed calendar
+    const calendar = DemoProvider.getDemoCalendar();
+    calendar.forEach(cal => {
+      this.calendar.saveItem(cal);
+    });
 
-    localStorage.setItem(KEYS.DEMO_FLAG, 'true');
+    // Seed alerts
+    const alerts = DemoProvider.getDemoAlerts();
+    alerts.forEach(al => {
+      if (!this.alerts.getAll().some(a => a.id === al.id)) {
+        this.alerts.create(al);
+      }
+    });
+
+    this.settings.update({ appMode: 'DEMO' });
   },
 
   clearDemoData(): void {
-    console.info('[StorageService] Clearing demo mock data...');
-    const clients = storageService.clients.getAll().filter(c => c.id !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.CLIENTS, clients);
+    logger.info('Deactivating DEMO mode and isolating production state...');
+    const demoId = DemoProvider.getDemoClientId();
 
-    const snapshots = storageService.history.getAll().filter(s => s.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.SNAPSHOTS, snapshots);
+    defaultStorageAdapter.setCollection(KEYS.CLIENTS, this.clients.getAll().filter(c => c.id !== demoId));
+    defaultStorageAdapter.setCollection(KEYS.SNAPSHOTS, this.history.getAll().filter(s => s.clientId !== demoId));
+    defaultStorageAdapter.setCollection(KEYS.CONTENTS, this.contents.getAll().filter(c => c.clientId !== demoId));
+    defaultStorageAdapter.setCollection(KEYS.COMPETITORS, this.competitors.getAll().filter(c => c.clientId !== demoId));
+    defaultStorageAdapter.setCollection(KEYS.AUDIENCE, this.audience.getAll().filter(a => a.clientId !== demoId));
+    defaultStorageAdapter.setCollection(KEYS.IDEAS, this.ideas.getAll().filter(i => i.clientId !== demoId));
+    defaultStorageAdapter.setCollection(KEYS.CALENDAR, this.calendar.getAll().filter(c => c.clientId !== demoId));
+    defaultStorageAdapter.setCollection(KEYS.ALERTS, this.alerts.getAll().filter(a => a.clientId !== demoId));
 
-    const contents = storageService.contents.getAll().filter(c => c.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.CONTENTS, contents);
-
-    const competitors = storageService.competitors.getAll().filter(c => c.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.COMPETITORS, competitors);
-
-    const audience = storageService.audience.getAll().filter(a => a.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.AUDIENCE, audience);
-
-    const ideas = storageService.ideas.getAll().filter(i => i.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.IDEAS, ideas);
-
-    const calendar = storageService.calendar.getAll().filter(c => c.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.CALENDAR, calendar);
-
-    const alerts = storageService.alerts.getAll().filter(a => a.clientId !== DEMO_CLIENT_RAVI.id);
-    writeItem(KEYS.ALERTS, alerts);
-
-    localStorage.removeItem(KEYS.DEMO_FLAG);
+    DemoProvider.disableDemoMode();
+    this.settings.update({ appMode: 'PRODUCTION' });
   },
 
   clearAllData(): void {
-    console.info('[StorageService] Clearing all application data...');
-    writeItem(KEYS.CLIENTS, []);
-    writeItem(KEYS.INSTAGRAM, []);
-    writeItem(KEYS.SNAPSHOTS, []);
-    writeItem(KEYS.CONTENTS, []);
-    writeItem(KEYS.COMPETITORS, []);
-    writeItem(KEYS.AUDIENCE, []);
-    writeItem(KEYS.IDEAS, []);
-    writeItem(KEYS.CALENDAR, []);
-    writeItem(KEYS.ALERTS, []);
-    writeItem(KEYS.REPORTS, []);
-    localStorage.removeItem(KEYS.DEMO_FLAG);
-    localStorage.setItem('gs_intel_initialized_clean', 'true');
+    logger.warn('Explicit reset requested by user: wiping all local storage records.');
+    defaultStorageAdapter.clear();
   }
 };

@@ -10,7 +10,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Client,
   InstagramAccount,
-  MetricSnapshot,
+  AccountSnapshot,
   Content,
   Competitor,
   AudienceInsight,
@@ -22,12 +22,18 @@ import {
 import { storageService } from './services/storageService';
 import { instagramService } from './services/instagramService';
 import { aiService, ProfileDiagnosticResult } from './services/aiService';
-import { notificationService } from './services/notificationService';
+import { notificationService, notificationStore } from './services/notifications/NotificationStore';
+import { alertEngine } from './services/alerts/alertEngine';
+import { migrationEngine } from './services/storage/migration';
+import { logger } from './utils/logger';
 
-// Layout Components
+// Layout & Common Components
 import { Sidebar, MainNavSection } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
+import { BootLoader } from './components/common/BootLoader';
+import { DemoBanner } from './components/common/DemoBanner';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Agency Views & Modals
 import { AgencyDashboardView } from './components/agency/AgencyDashboardView';
@@ -51,6 +57,10 @@ import { ReportsTab } from './components/workspace/ReportsTab';
 import { HistoryTab } from './components/workspace/HistoryTab';
 
 export default function App() {
+  // Boot & System Lifecycle State
+  const [isBooting, setIsBooting] = useState(true);
+  const [bootError, setBootError] = useState<string | null>(null);
+
   // Navigation & Workspace State
   const [currentSection, setCurrentSection] = useState<MainNavSection>('dashboard');
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceSubTab>('overview');
@@ -60,7 +70,7 @@ export default function App() {
   const [clients, setClients] = useState<Client[]>([]);
   const [activeClient, setActiveClient] = useState<Client | null>(null);
   const [instagramAccount, setInstagramAccount] = useState<InstagramAccount | null>(null);
-  const [snapshots, setSnapshots] = useState<MetricSnapshot[]>([]);
+  const [snapshots, setSnapshots] = useState<AccountSnapshot[]>([]);
   const [contents, setContents] = useState<Content[]>([]);
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [audienceInsights, setAudienceInsights] = useState<AudienceInsight[]>([]);
@@ -83,30 +93,8 @@ export default function App() {
   const [alertsModalOpen, setAlertsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
-  // Load or Seed Initial State
-  const reloadAllData = useCallback(() => {
-    const allClients = storageService.clients.getAll();
-    setClients(allClients);
-
-    const isDemo = storageService.isDemoLoaded();
-    setIsDemoLoaded(isDemo);
-
-    const allAlerts = storageService.alerts.getAll();
-    setAlerts(allAlerts);
-
-    // Pick active client
-    if (allClients.length > 0) {
-      const current = activeClient
-        ? allClients.find(c => c.id === activeClient.id) || allClients[0]
-        : allClients[0];
-      setActiveClient(current);
-      loadClientData(current);
-    } else {
-      setActiveClient(null);
-    }
-  }, [activeClient]);
-
-  const loadClientData = (client: Client) => {
+  // Load Client Domain Data
+  const loadClientData = useCallback((client: Client) => {
     const acc = instagramService.getAccount(client.id);
     setInstagramAccount(acc);
 
@@ -131,19 +119,81 @@ export default function App() {
     const clientReports = storageService.reports.getByClient(client.id);
     setReports(clientReports);
 
-    // Generate initial actions
+    // Rule evaluation
+    alertEngine.evaluateClientRules(client, clientSnaps, clientContents, acc);
+    setAlerts(alertEngine.getAll());
+
+    // Generate deterministic next actions
     const actions = aiService.generateNextActions(client, clientContents, clientSnaps);
     setNextActions(actions);
-  };
-
-  useEffect(() => {
-    // Clear all previous data so the user starts completely from scratch
-    storageService.clearAllData();
-    reloadAllData();
-    notificationService.showToast('Sistema limpo. Pronto para cadastrar do zero!', 'info');
   }, []);
 
-  // Update client data when activeClient changes
+  // Reload all agency data
+  const reloadAllData = useCallback(() => {
+    const allClients = storageService.clients.getAll();
+    setClients(allClients);
+
+    const isDemo = storageService.isDemoLoaded();
+    setIsDemoLoaded(isDemo);
+
+    const allAlerts = alertEngine.getAll();
+    setAlerts(allAlerts);
+
+    if (allClients.length > 0) {
+      setActiveClient(prev => {
+        const found = prev ? allClients.find(c => c.id === prev.id) : allClients[0];
+        const next = found || allClients[0];
+        loadClientData(next);
+        return next;
+      });
+    } else {
+      setActiveClient(null);
+    }
+  }, [loadClientData]);
+
+  // Safe Application Initialization
+  const initializeApplication = useCallback(async () => {
+    setIsBooting(true);
+    setBootError(null);
+    try {
+      logger.info('Starting system boot sequence...');
+      
+      // Step 1: Run storage migrations
+      migrationEngine.runMigrations();
+
+      // Step 2: Read settings and determine mode
+      const isDemo = storageService.isDemoLoaded();
+      setIsDemoLoaded(isDemo);
+
+      // Step 3: Load clients
+      const existingClients = storageService.clients.getAll();
+      setClients(existingClients);
+
+      // Step 4: Load alerts
+      setAlerts(alertEngine.getAll());
+
+      if (existingClients.length > 0) {
+        const initial = existingClients[0];
+        setActiveClient(initial);
+        loadClientData(initial);
+      } else {
+        setActiveClient(null);
+      }
+
+      logger.info('System boot completed successfully.');
+      setIsBooting(false);
+    } catch (err: any) {
+      logger.error('System boot failed', { error: err.message });
+      setBootError(err.message || 'Falha na inicialização do sistema');
+      setIsBooting(false);
+    }
+  }, [loadClientData]);
+
+  useEffect(() => {
+    initializeApplication();
+  }, [initializeApplication]);
+
+  // Handle client selection
   const handleSelectClient = (client: Client | null) => {
     setActiveClient(client);
     if (client) {
@@ -152,23 +202,23 @@ export default function App() {
     }
   };
 
-  // Sync handler
+  // Sync Instagram handler
   const handleSyncActiveClient = async () => {
     if (!activeClient) return;
     setIsSyncing(true);
     try {
       const res = await instagramService.syncNow(activeClient.id);
       if (res.success) {
-        notificationService.addNotification(
+        notificationStore.notify(
           'Sincronização Concluída',
-          `Dados atualizados para ${activeClient.name}. Snapshot diário registrado.`,
+          `Dados atualizados para ${activeClient.name}. Snapshot registrado com sucesso.`,
           'success'
         );
         loadClientData(activeClient);
       } else {
-        notificationService.addNotification(
+        notificationStore.notify(
           'Falha na Sincronização',
-          res.error || 'Erro desconhecido ao conectar com a API Meta.',
+          res.error || 'Não foi possível conectar com a API Meta.',
           'error'
         );
       }
@@ -187,14 +237,14 @@ export default function App() {
       const diag = await aiService.analyzeProfile(activeClient, contents, snapshots);
       setProfileDiagnostic(diag);
       setNextActions(diag.nextActions || nextActions);
-      notificationService.addNotification(
+      notificationStore.notify(
         'Diagnóstico Gerado',
         `Auditoria estratégica concluída para ${activeClient.name}.`,
         'success'
       );
       setWorkspaceTab('diagnostic');
     } catch {
-      notificationService.showToast('Erro ao realizar diagnóstico.', 'error');
+      notificationService.showToast('Erro ao realizar diagnóstico com IA.', 'error');
     } finally {
       setIsAnalyzing(false);
     }
@@ -204,11 +254,13 @@ export default function App() {
   const handleSaveClient = (data: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (editingClient) {
       const updated = storageService.clients.update(editingClient.id, data);
-      notificationService.showToast(`Cliente ${data.name} atualizado.`, 'success');
-      setEditingClient(null);
+      if (updated) {
+        notificationService.showToast(`Cliente ${data.name} atualizado.`, 'success');
+        setEditingClient(null);
+      }
     } else {
       const created = storageService.clients.create(data);
-      notificationService.addNotification(
+      notificationStore.notify(
         'Novo Cliente Cadastrado',
         `Workspace criado para ${created.name} (${created.instagram}).`,
         'success'
@@ -216,19 +268,12 @@ export default function App() {
       setActiveClient(created);
       loadClientData(created);
     }
+    setClientFormModalOpen(false);
     reloadAllData();
   };
 
-  const handleDuplicateClient = (client: Client) => {
-    const dup = storageService.clients.duplicate(client.id);
-    if (dup) {
-      notificationService.showToast(`Cliente duplicado como "${dup.name}".`, 'info');
-      reloadAllData();
-    }
-  };
-
   const handleDeleteClient = (client: Client) => {
-    if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Todos os conteúdos e históricos associados serão removidos.`)) {
+    if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Todos os dados associados serão removidos.`)) {
       storageService.clients.delete(client.id);
       notificationService.showToast(`Cliente ${client.name} excluído.`, 'warning');
       setActiveClient(null);
@@ -236,17 +281,19 @@ export default function App() {
     }
   };
 
-  // Demo toggle
+  // Demo Mode Switch
   const handleToggleDemoData = () => {
     if (isDemoLoaded) {
-      if (window.confirm('Deseja limpar os dados de demonstração do Dr. Ravi Alencar?')) {
+      if (window.confirm('Deseja desativar o modo demonstração e retornar à base de produção limpa?')) {
         storageService.clearDemoData();
-        notificationService.showToast('Dados de demonstração removidos.', 'info');
+        setIsDemoLoaded(false);
+        notificationService.showToast('Modo demonstração encerrado.', 'info');
         reloadAllData();
       }
     } else {
       storageService.seedDemoData();
-      notificationService.showToast('Base de demonstração do Dr. Ravi Alencar carregada!', 'success');
+      setIsDemoLoaded(true);
+      notificationService.showToast('Modo demonstração ativado (Dr. Ravi Alencar).', 'success');
       reloadAllData();
     }
   };
@@ -271,202 +318,226 @@ export default function App() {
     return titles[currentSection] || 'Social Intelligence';
   };
 
-  const unreadAlertsCount = alerts.filter(a => a.status === 'new').length;
+  const unreadAlertsCount = alerts.filter(a => a.status === 'NEW').length;
+
+  if (isBooting || bootError) {
+    return <BootLoader error={bootError} onRetry={initializeApplication} />;
+  }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex font-sans antialiased selection:bg-amber-500 selection:text-neutral-950">
-      {/* Fixed Left Sidebar */}
-      <Sidebar
-        currentSection={currentSection}
-        onNavigate={(sec) => {
-          if (sec === 'settings') {
-            setSettingsModalOpen(true);
-          } else if (sec === 'alerts') {
-            setAlertsModalOpen(true);
-          } else {
-            setCurrentSection(sec);
-            // If navigating to workspace-specific sections without active client, pick first
-            if (!activeClient && clients.length > 0 && sec !== 'dashboard' && sec !== 'clients') {
-              setActiveClient(clients[0]);
-              loadClientData(clients[0]);
-            }
-          }
-        }}
-        clients={clients}
-        activeClient={activeClient}
-        onSelectClient={handleSelectClient}
-        unreadAlertsCount={unreadAlertsCount}
-        isDemoLoaded={isDemoLoaded}
-        onToggleDemoData={handleToggleDemoData}
-        isOpenMobile={mobileMenuOpen}
-        onCloseMobile={() => setMobileMenuOpen(false)}
-      />
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans antialiased selection:bg-amber-500 selection:text-neutral-950">
+      {/* Demo Banner */}
+      {isDemoLoaded && (
+        <DemoBanner onExitDemo={handleToggleDemoData} />
+      )}
 
-      {/* Main App Container */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
-        {/* Top Bar Header */}
-        <Header
-          activeClient={activeClient}
-          clients={clients}
-          currentSectionTitle={getSectionTitle()}
-          onOpenSearch={() => setGlobalSearchOpen(true)}
-          onOpenNewClient={() => {
-            setEditingClient(null);
-            setClientFormModalOpen(true);
+      <div className="flex-1 flex min-w-0">
+        {/* Fixed Left Sidebar */}
+        <Sidebar
+          currentSection={currentSection}
+          onNavigate={(sec) => {
+            if (sec === 'settings') {
+              setSettingsModalOpen(true);
+            } else if (sec === 'alerts') {
+              setAlertsModalOpen(true);
+            } else {
+              setCurrentSection(sec);
+              if (!activeClient && clients.length > 0 && sec !== 'dashboard' && sec !== 'clients') {
+                setActiveClient(clients[0]);
+                loadClientData(clients[0]);
+              }
+            }
           }}
-          onSyncCurrentClient={activeClient ? handleSyncActiveClient : undefined}
-          isSyncing={isSyncing}
-          unreadAlertsCount={unreadAlertsCount}
-          onOpenAlerts={() => setAlertsModalOpen(true)}
-          onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
+          clients={clients}
+          activeClient={activeClient}
           onSelectClient={handleSelectClient}
+          unreadAlertsCount={unreadAlertsCount}
+          isDemoLoaded={isDemoLoaded}
+          onToggleDemoData={handleToggleDemoData}
+          isOpenMobile={mobileMenuOpen}
+          onCloseMobile={() => setMobileMenuOpen(false)}
         />
 
-        {/* Dynamic Page Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-          {/* If an active client workspace is open and user isn't on agency dashboard */}
-          {activeClient && currentSection !== 'dashboard' && currentSection !== 'clients' ? (
-            <div>
-              {/* Workspace Navigation Subheader */}
-              <WorkspaceHeader
-                client={activeClient}
-                account={instagramAccount}
-                activeTab={workspaceTab}
-                onTabChange={setWorkspaceTab}
-                onBackToClients={() => {
-                  setActiveClient(null);
-                  setCurrentSection('dashboard');
-                }}
-                onSync={handleSyncActiveClient}
-                isSyncing={isSyncing}
-                onAnalyzeProfile={handleAnalyzeProfile}
-                isAnalyzing={isAnalyzing}
-              />
+        {/* Main App Container */}
+        <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
+          {/* Top Bar Header */}
+          <Header
+            activeClient={activeClient}
+            clients={clients}
+            currentSectionTitle={getSectionTitle()}
+            onOpenSearch={() => setGlobalSearchOpen(true)}
+            onOpenNewClient={() => {
+              setEditingClient(null);
+              setClientFormModalOpen(true);
+            }}
+            onSyncCurrentClient={activeClient ? handleSyncActiveClient : undefined}
+            isSyncing={isSyncing}
+            unreadAlertsCount={unreadAlertsCount}
+            onOpenAlerts={() => setAlertsModalOpen(true)}
+            onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onSelectClient={handleSelectClient}
+          />
 
-              {/* Subtab Views */}
-              {workspaceTab === 'overview' && (
-                <ClientOverviewTab
-                  client={activeClient}
-                  snapshots={snapshots}
-                  contents={contents}
-                  alerts={alerts.filter(a => a.clientId === activeClient.id)}
-                  onNavigateTab={setWorkspaceTab}
-                  nextActions={nextActions}
+          {/* Dynamic Page Content */}
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            <ErrorBoundary>
+              {/* Workspace Tab View */}
+              {activeClient && currentSection !== 'dashboard' && currentSection !== 'clients' ? (
+                <div>
+                  <WorkspaceHeader
+                    client={activeClient}
+                    account={instagramAccount}
+                    activeTab={workspaceTab}
+                    onTabChange={setWorkspaceTab}
+                    onBackToClients={() => {
+                      setActiveClient(null);
+                      setCurrentSection('dashboard');
+                    }}
+                    onSync={handleSyncActiveClient}
+                    isSyncing={isSyncing}
+                    onAnalyzeProfile={handleAnalyzeProfile}
+                    isAnalyzing={isAnalyzing}
+                  />
+
+                  {/* Subtab Views */}
+                  {workspaceTab === 'overview' && (
+                    <ClientOverviewTab
+                      client={activeClient}
+                      snapshots={snapshots}
+                      contents={contents}
+                      alerts={alerts.filter(a => a.clientId === activeClient.id)}
+                      onNavigateTab={setWorkspaceTab}
+                      nextActions={nextActions}
+                    />
+                  )}
+
+                  {workspaceTab === 'instagram' && instagramAccount && (
+                    <InstagramConnectTab
+                      client={activeClient}
+                      account={instagramAccount}
+                      onRefreshAccount={() => loadClientData(activeClient)}
+                      onSync={handleSyncActiveClient}
+                      isSyncing={isSyncing}
+                    />
+                  )}
+
+                  {workspaceTab === 'diagnostic' && (
+                    <DiagnosticTab
+                      client={activeClient}
+                      contents={contents}
+                      snapshots={snapshots}
+                      diagnostic={profileDiagnostic}
+                      onRunDiagnostic={handleAnalyzeProfile}
+                      isAnalyzing={isAnalyzing}
+                    />
+                  )}
+
+                  {workspaceTab === 'performance' && (
+                    <PerformanceTab
+                      client={activeClient}
+                      contents={contents}
+                      snapshots={snapshots}
+                    />
+                  )}
+
+                  {workspaceTab === 'content' && (
+                    <ContentTab
+                      client={activeClient}
+                      contents={contents}
+                    />
+                  )}
+
+                  {workspaceTab === 'competitors' && (
+                    <CompetitorTab
+                      client={activeClient}
+                      competitors={competitors}
+                      onRefresh={() => loadClientData(activeClient)}
+                    />
+                  )}
+
+                  {workspaceTab === 'research' && (
+                    <AudienceTab
+                      client={activeClient}
+                      insights={audienceInsights}
+                      onRefresh={() => loadClientData(activeClient)}
+                    />
+                  )}
+
+                  {workspaceTab === 'ideas' && (
+                    <IdeasTab
+                      client={activeClient}
+                      ideas={ideas}
+                      contents={contents}
+                      onRefresh={() => loadClientData(activeClient)}
+                    />
+                  )}
+
+                  {workspaceTab === 'calendar' && (
+                    <CalendarTab
+                      client={activeClient}
+                      calendarItems={calendarItems}
+                      onRefresh={() => loadClientData(activeClient)}
+                    />
+                  )}
+
+                  {workspaceTab === 'reports' && (
+                    <ReportsTab
+                      client={activeClient}
+                      contents={contents}
+                      snapshots={snapshots}
+                      reports={reports}
+                      onRefresh={() => loadClientData(activeClient)}
+                    />
+                  )}
+
+                  {workspaceTab === 'history' && (
+                    <HistoryTab
+                      client={activeClient}
+                      snapshots={snapshots}
+                    />
+                  )}
+                </div>
+              ) : (
+                /* Agency Dashboard / All Clients */
+                <AgencyDashboardView
+                  clients={clients}
+                  snapshots={storageService.history.getAll()}
+                  alerts={alerts}
+                  onOpenWorkspace={(client) => {
+                    setActiveClient(client);
+                    loadClientData(client);
+                    setCurrentSection('performance');
+                    setWorkspaceTab('overview');
+                  }}
+                  onOpenNewClient={() => {
+                    setEditingClient(null);
+                    setClientFormModalOpen(true);
+                  }}
+                  onEditClient={(client) => {
+                    setEditingClient(client);
+                    setClientFormModalOpen(true);
+                  }}
+                  onDuplicateClient={(client) => {
+                    const dup = storageService.clients.create({
+                      ...client,
+                      name: `${client.name} (Cópia)`,
+                      instagram: `${client.instagram}_copy`
+                    });
+                    notificationService.showToast(`Cliente duplicado como "${dup.name}".`, 'info');
+                    reloadAllData();
+                  }}
+                  onDeleteClient={handleDeleteClient}
+                  onOpenAlerts={() => setAlertsModalOpen(true)}
+                  onSeedDemoData={() => {
+                    storageService.seedDemoData();
+                    setIsDemoLoaded(true);
+                    reloadAllData();
+                  }}
                 />
               )}
-
-              {workspaceTab === 'instagram' && instagramAccount && (
-                <InstagramConnectTab
-                  client={activeClient}
-                  account={instagramAccount}
-                  onRefreshAccount={() => loadClientData(activeClient)}
-                  onSync={handleSyncActiveClient}
-                  isSyncing={isSyncing}
-                />
-              )}
-
-              {workspaceTab === 'diagnostic' && (
-                <DiagnosticTab
-                  client={activeClient}
-                  contents={contents}
-                  snapshots={snapshots}
-                  diagnostic={profileDiagnostic}
-                  onRunDiagnostic={handleAnalyzeProfile}
-                  isAnalyzing={isAnalyzing}
-                />
-              )}
-
-              {workspaceTab === 'performance' && (
-                <PerformanceTab
-                  client={activeClient}
-                  contents={contents}
-                  snapshots={snapshots}
-                />
-              )}
-
-              {workspaceTab === 'content' && (
-                <ContentTab
-                  client={activeClient}
-                  contents={contents}
-                />
-              )}
-
-              {workspaceTab === 'competitors' && (
-                <CompetitorTab
-                  client={activeClient}
-                  competitors={competitors}
-                  onRefresh={() => loadClientData(activeClient)}
-                />
-              )}
-
-              {workspaceTab === 'research' && (
-                <AudienceTab
-                  client={activeClient}
-                  insights={audienceInsights}
-                  onRefresh={() => loadClientData(activeClient)}
-                />
-              )}
-
-              {workspaceTab === 'ideas' && (
-                <IdeasTab
-                  client={activeClient}
-                  ideas={ideas}
-                  contents={contents}
-                  onRefresh={() => loadClientData(activeClient)}
-                />
-              )}
-
-              {workspaceTab === 'calendar' && (
-                <CalendarTab
-                  client={activeClient}
-                  calendarItems={calendarItems}
-                  onRefresh={() => loadClientData(activeClient)}
-                />
-              )}
-
-              {workspaceTab === 'reports' && (
-                <ReportsTab
-                  client={activeClient}
-                  contents={contents}
-                  snapshots={snapshots}
-                  reports={reports}
-                  onRefresh={() => loadClientData(activeClient)}
-                />
-              )}
-
-              {workspaceTab === 'history' && (
-                <HistoryTab
-                  client={activeClient}
-                  snapshots={snapshots}
-                />
-              )}
-            </div>
-          ) : (
-            /* Agency-wide Views (Dashboard & Clients) */
-            <AgencyDashboardView
-              clients={clients}
-              snapshots={storageService.history.getAll()}
-              alerts={alerts}
-              onOpenWorkspace={(client) => {
-                setActiveClient(client);
-                loadClientData(client);
-                setCurrentSection('performance');
-                setWorkspaceTab('overview');
-              }}
-              onOpenNewClient={() => {
-                setEditingClient(null);
-                setClientFormModalOpen(true);
-              }}
-              onEditClient={(client) => {
-                setEditingClient(client);
-                setClientFormModalOpen(true);
-              }}
-              onDuplicateClient={handleDuplicateClient}
-              onDeleteClient={handleDeleteClient}
-              onOpenAlerts={() => setAlertsModalOpen(true)}
-            />
-          )}
-        </main>
+            </ErrorBoundary>
+          </main>
+        </div>
       </div>
 
       {/* Global Modals */}
@@ -521,7 +592,7 @@ export default function App() {
         isDemoLoaded={isDemoLoaded}
       />
 
-      {/* Toast Notifications */}
+      {/* Persistent Toast Notifications */}
       <ToastContainer />
     </div>
   );

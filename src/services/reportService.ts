@@ -1,65 +1,89 @@
 /**
  * GABRIEL SPERATTI | SOCIAL INTELLIGENCE
- * Report Service - Geração Executiva de Relatórios e Exportação CSV / PDF
+ * Report Service - Executive Strategic Reports & Structured CSV / PDF Export
+ * 
+ * Strict rule: All text and KPIs derive strictly from the given client's real data.
+ * Zero hardcoded names or medical assumptions.
  */
 
-import { Client, Report, Content } from '../types';
+import { Client, Report, Content, AccountSnapshot } from '../types';
 import { storageService } from './storageService';
 import { analyticsService } from './analyticsService';
 import { aiService } from './aiService';
 
 export const reportService = {
   /**
-   * Gera um relatório executivo completo para o cliente no período especificado
+   * Generate an executive performance report based purely on client metrics
    */
-  async generateReport(client: Client, periodDays: number = 30): Promise<Report> {
+  async generateReport(client: Client, periodDays: 7 | 14 | 30 | 90 = 30): Promise<Report> {
     const snapshots = storageService.history.getByClient(client.id);
     const contents = storageService.contents.getByClient(client.id);
-    const periodSummary = analyticsService.calculatePeriodSummary(snapshots, periodDays);
+    const period = analyticsService.calculatePeriod(snapshots, periodDays);
 
-    const sortedByViews = analyticsService.rankContents(contents, 'views', 'desc');
-    const topContents = sortedByViews.slice(0, 3);
-    const worstContents = sortedByViews.slice(-2);
+    const ranked = analyticsService.rankContents(contents, 'score', false);
+    const topContents = ranked.slice(0, 3);
+    const worstContents = ranked.slice(-2);
 
-    const periodLabel = `${periodSummary.startDate} até ${periodSummary.endDate} (${periodDays} dias)`;
+    const periodLabel = `${period.startDate} até ${period.endDate} (${periodDays} dias)`;
+
+    // Construct honest executive summary
+    const curFollowers = period.followersGrowth.current.toLocaleString('pt-BR');
+    const followersDiff = period.followersGrowth.percentDiff !== null
+      ? `${period.followersGrowth.percentDiff >= 0 ? '+' : ''}${period.followersGrowth.percentDiff}%`
+      : 'sem base comparativa anterior';
+
+    const totalViews = period.totalViews.current.toLocaleString('pt-BR');
+    const viewsDiff = period.totalViews.percentDiff !== null
+      ? `${period.totalViews.percentDiff >= 0 ? '+' : ''}${period.totalViews.percentDiff}%`
+      : 'sem base anterior';
+
+    const executiveSummary = snapshots.length === 0
+      ? `Relatório inicial para o cliente ${client.name} (${client.instagram}) no segmento ${client.segment}. Dados históricos ainda em coleta para comparação de períodos.`
+      : `No período analisado de ${periodDays} dias (${periodLabel}), a conta ${client.instagram} atingiu ${curFollowers} seguidores (${followersDiff}). O volume total de visualizações somou ${totalViews} (${viewsDiff}), com ${contents.length} publicações catalogadas no workspace.`;
+
+    const analysisText = contents.length === 0
+      ? 'Ainda não existem conteúdos catalogados para avaliar distribuição por pilares e retenção.'
+      : `O catálogo de publicações ativas no segmento de ${client.segment} destaca os formatos ${client.formats.join(', ')} nos pilares ${client.pillars.join(', ')}. Os conteúdos com maior índice de salvamentos e compartilhamentos demonstram maior valor percebido pela persona (${client.persona || 'Geral'}).`;
 
     const reportData: Omit<Report, 'id' | 'generatedAt'> = {
       clientId: client.id,
       clientName: client.name,
       clientInstagram: client.instagram,
-      title: `Relatório de Performance Estratégica`,
+      title: `Relatório de Inteligência Estratégica - ${client.name}`,
       periodLabel,
-      startDate: periodSummary.startDate,
-      endDate: periodSummary.endDate,
-      executiveSummary: `No período analisado de ${periodDays} dias, a conta ${client.instagram} registrou um crescimento líquido de ${periodSummary.followers.diffAbsolute >= 0 ? '+' : ''}${periodSummary.followers.diffAbsolute} seguidores (${periodSummary.followers.diffPercent >= 0 ? '+' : ''}${periodSummary.followers.diffPercent}%), alcançando um total de ${periodSummary.followers.current.toLocaleString('pt-BR')} seguidores. O volume total de visualizações somou ${periodSummary.views.current.toLocaleString('pt-BR')} (${periodSummary.views.diffPercent >= 0 ? '+' : ''}${periodSummary.views.diffPercent}% em relação ao período anterior), impulsionado principalmente pelo conteúdo de Deep Plane Facelift com taxa de salvamento recorde.`,
+      startDate: period.startDate,
+      endDate: period.endDate,
+      executiveSummary,
       kpis: {
-        followers: periodSummary.followers.current,
-        followersDiffPct: periodSummary.followers.diffPercent,
-        views: periodSummary.views.current,
-        viewsDiffPct: periodSummary.views.diffPercent,
-        reach: periodSummary.reach.current,
-        reachDiffPct: periodSummary.reach.diffPercent,
-        engagementRate: periodSummary.engagementRate.current,
-        engagementDiffPct: periodSummary.engagementRate.diffPercent,
-        postsCount: periodSummary.totalPosts
+        followers: period.followersGrowth.current,
+        followersDiffPct: period.followersGrowth.percentDiff,
+        views: period.totalViews.current,
+        viewsDiffPct: period.totalViews.percentDiff,
+        reach: period.totalReach.current,
+        reachDiffPct: period.totalReach.percentDiff,
+        engagementRate: period.avgEngagementRate.current,
+        engagementDiffPct: period.avgEngagementRate.percentDiff,
+        postsCount: period.postsPublished.current
       },
       topContents,
       worstContents,
-      analysisText: `A audiência do Dr. Ravi Alencar demonstra clara preferência por conteúdos técnicos desmistificadores que desconstroem o receio de estigmas cirúrgicos. Carrosséis de anatomia e Reels didáticos com explicação anatômica direta apresentaram retenção até 78% superior à média. Em contrapartida, publicações estáticas e institucionais puras sem gancho de curiosidade tiveram menor entrega orgânica pelo algoritmo do Instagram.`,
+      analysisText,
       aiInsights: [
-        'A taxa de salvamento representou 1,4% do alcance total em posts didáticos, posicionando o perfil como biblioteca de consulta.',
-        'Vídeos com gancho de "Curiosidade Anatômica" retêm 44% mais atenção nos primeiros 3 segundos do que apresentações de rotina.',
-        'Comentários qualificados no Direct aumentaram 35% com o uso de CTAs por palavra-chave direta.'
+        `Público-alvo principal: ${client.targetAudience || 'Segmento ' + client.segment}.`,
+        topContents.length > 0 
+          ? `Publicação de maior tração: "${topContents[0].title}" no formato ${topContents[0].format}.`
+          : 'Recomenda-se catalogar as primeiras publicações para análise de retenção.',
+        `Foco estratégico configurado em ${client.objectives.join(', ') || 'Autoridade'}.`
       ],
       opportunities: [
-        'Produzir série de 3 episódios sobre "Recuperação Invisível e Protocolo de Pós-Operatório Rápido".',
-        'Abordar rejuvenescimento cervical (pescoço), tema com alta carência entre os concorrentes diretos no Jardins.',
-        'Explorar o formato Carrossel de Comparação Anatômica para os casos de terço médio facial.'
+        `Intensificar produções no formato prioritário (${client.formats[0] || 'Reels'}).`,
+        `Explorar as dores identificadas na pesquisa de público do nicho de ${client.segment}.`,
+        'Testar novos ganchos nas aberturas para retenção de 3 segundos.'
       ],
       recommendations: [
-        'Concentrar 70% da produção semanal nos formatos Reels e Carrossel.',
-        'Manter cadência de 3 publicações semanais no feed combinadas com stories interativos às quartas-feiras.',
-        'Testar chamadas para ação exclusivas via Direct Message com envio de material clínico complementar.'
+        `Manter consistência editorial nos pilares acordados: ${client.pillars.join(', ') || 'Pilares Estratégicos'}.`,
+        'Garantir CTAs claros orientados ao objetivo da publicação.',
+        'Acompanhar os relatórios de sincronização para detecção de variações de alcance.'
       ],
       nextSteps: aiService.generateNextActions(client, contents, snapshots)
     };
@@ -68,15 +92,18 @@ export const reportService = {
   },
 
   /**
-   * Exporta dados em formato CSV para download instantâneo no navegador
+   * Universal CSV Exporter with UTF-8 BOM, semicolon delimiter, and strict escaping
    */
-  exportToCsv(filename: string, rows: Record<string, string | number | boolean>[]): void {
-    if (!rows || rows.length === 0) return;
+  exportToCsv(filename: string, rows: Record<string, string | number | boolean | null | undefined>[]): void {
+    if (!rows || rows.length === 0) {
+      alert('Não há dados para exportar nesta tabela.');
+      return;
+    }
 
     const headers = Object.keys(rows[0]);
     const csvContent = [
       headers.join(';'),
-      ...rows.map(row => 
+      ...rows.map(row =>
         headers.map(fieldName => {
           const val = row[fieldName];
           if (val === null || val === undefined) return '""';
@@ -94,15 +121,30 @@ export const reportService = {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   },
 
-  /**
-   * Exporta Histórico de Métricas
-   */
+  exportClientsCsv(): void {
+    const clients = storageService.clients.getAll();
+    const rows = clients.map(c => ({
+      Nome: c.name,
+      Empresa: c.company,
+      Instagram: c.instagram,
+      WhatsApp: c.whatsapp,
+      Cidade: c.city,
+      Segmento: c.segment,
+      TicketMedio: c.averageTicket,
+      Status: c.status,
+      EtapaOnboarding: c.onboardingStep,
+      CriadoEm: c.createdAt
+    }));
+    this.exportToCsv('clientes_gs_intelligence', rows);
+  },
+
   exportHistoryCsv(clientId: string): void {
     const snapshots = storageService.history.getByClient(clientId);
     const rows = snapshots.map(s => ({
-      Data: s.timestamp,
+      Data: s.date,
       Seguidores: s.followers,
       Visualizacoes: s.views,
       Alcance: s.reach,
@@ -110,16 +152,15 @@ export const reportService = {
       Comentarios: s.comments,
       Compartilhamentos: s.shares,
       Salvamentos: s.saves,
-      VisitasPerfil: s.profileVisits,
-      PostsNoDia: s.postsCount,
-      EngajamentoPercentual: `${s.engagementRate}%`
+      VisitasAoPerfil: s.profileVisits,
+      CliquesNoSite: s.websiteClicks,
+      PublicacoesNoDia: s.postsPublished,
+      TaxaEngajamento: `${s.engagementRate}%`,
+      Fonte: s.source
     }));
     this.exportToCsv(`historico_metricas_${clientId}`, rows);
   },
 
-  /**
-   * Exporta Catálogo de Conteúdos
-   */
   exportContentsCsv(clientId: string): void {
     const contents = storageService.contents.getByClient(clientId);
     const rows = contents.map(c => ({
@@ -141,29 +182,6 @@ export const reportService = {
     this.exportToCsv(`conteudos_${clientId}`, rows);
   },
 
-  /**
-   * Exporta Banco de Ideias
-   */
-  exportIdeasCsv(clientId: string): void {
-    const ideas = storageService.ideas.getByClient(clientId);
-    const rows = ideas.map(i => ({
-      Titulo: i.title,
-      Status: i.status,
-      Pilar: i.pillar,
-      Objetivo: i.objective,
-      Formato: i.format,
-      Potencial: i.potential,
-      Gancho: i.hook,
-      CTA: i.cta,
-      PorQueFazer: i.whyDoThis,
-      DiaSugerido: i.calendarDay || 'Nao agendado'
-    }));
-    this.exportToCsv(`banco_ideias_${clientId}`, rows);
-  },
-
-  /**
-   * Exporta Concorrentes Mapeados
-   */
   exportCompetitorsCsv(clientId: string): void {
     const comps = storageService.competitors.getByClient(clientId);
     const rows = comps.map(c => ({
@@ -175,15 +193,73 @@ export const reportService = {
       VisualizacoesMedias: c.avgViews,
       EngajamentoMedio: `${c.avgEngagementRate}%`,
       Formatos: c.topFormats.join(', '),
-      TemasRecentes: c.recentThemes.join(', '),
-      Similaridade: `${c.similarityScore}%`
+      Similaridade: `${c.similarityScore}%`,
+      Criterios: (c.similarityCriteria || []).join(' | ')
     }));
     this.exportToCsv(`concorrentes_${clientId}`, rows);
   },
 
-  /**
-   * Aciona visualização de impressão/PDF do navegador para salvar como PDF limpo
-   */
+  exportAudienceCsv(clientId: string): void {
+    const aud = storageService.audience.getByClient(clientId);
+    const rows = aud.map(a => ({
+      Categoria: a.category,
+      Titulo: a.title,
+      Descricao: a.description,
+      Fonte: a.source,
+      UrlFonte: a.sourceUrl || '',
+      Interpretacao: a.interpretation,
+      E_Hipotese: a.isHypothesis ? 'Sim' : 'Nao',
+      Confianca: a.confidence
+    }));
+    this.exportToCsv(`pesquisa_publico_${clientId}`, rows);
+  },
+
+  exportIdeasCsv(clientId: string): void {
+    const ideas = storageService.ideas.getByClient(clientId);
+    const rows = ideas.map(i => ({
+      Titulo: i.title,
+      Status: i.status,
+      Pilar: i.pillar,
+      Objetivo: i.objective,
+      Formato: i.format,
+      Potencial: i.potential,
+      Gancho: i.hook,
+      CategoriaGancho: i.hookCategory,
+      CTA: i.cta,
+      PorQueFazer: i.whyDoThis,
+      DiaSugerido: i.calendarDay || ''
+    }));
+    this.exportToCsv(`banco_ideias_${clientId}`, rows);
+  },
+
+  exportCalendarCsv(clientId: string): void {
+    const calendar = storageService.calendar.getByClient(clientId);
+    const rows = calendar.map(c => ({
+      DiaDaSemana: c.dayOfWeek,
+      Horario: c.timeSlot || '',
+      Titulo: c.title,
+      Formato: c.format,
+      Pilar: c.pillar,
+      Objetivo: c.objective || '',
+      Status: c.status || 'PLANEJADO'
+    }));
+    this.exportToCsv(`calendario_editorial_${clientId}`, rows);
+  },
+
+  exportAlertsCsv(clientId?: string): void {
+    const alerts = clientId ? storageService.alerts.getByClient(clientId) : storageService.alerts.getAll();
+    const rows = alerts.map(a => ({
+      Tipo: a.type,
+      Severidade: a.severity,
+      Status: a.status,
+      Titulo: a.title,
+      Mensagem: a.message,
+      Evidencia: a.evidence || '',
+      DataCriacao: a.createdAt
+    }));
+    this.exportToCsv(`alertas_${clientId || 'agencia'}`, rows);
+  },
+
   triggerPdfPrint(): void {
     window.print();
   }

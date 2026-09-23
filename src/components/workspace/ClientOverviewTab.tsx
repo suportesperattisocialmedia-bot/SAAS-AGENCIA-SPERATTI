@@ -31,18 +31,18 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
   onNavigateTab,
   nextActions
 }) => {
-  const periodSummary = analyticsService.calculatePeriodSummary(snapshots, 30);
-  const sortedContents = analyticsService.rankContents(contents, 'views', 'desc');
+  const periodSummary = analyticsService.calculatePeriod(snapshots, 30);
+  const sortedContents = analyticsService.rankContents(contents, 'views', false);
   const topContent = sortedContents[0];
 
   // Chart data points
   const chartData = snapshots.map(s => ({
-    date: s.timestamp,
-    label: s.timestamp.split('-').slice(1).reverse().join('/'),
+    date: s.date,
+    label: s.date.split('-').slice(1).reverse().join('/'),
     value: s.followers
   }));
 
-  const unhandledAlerts = alerts.filter(a => a.status === 'new');
+  const unhandledAlerts = alerts.filter(a => a.status === 'NEW');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -61,10 +61,10 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
             </div>
           </div>
           <button
-            onClick={() => onNavigateTab('alerts')}
+            onClick={() => onNavigateTab('performance')}
             className="text-xs text-amber-400 hover:text-amber-300 font-mono font-medium shrink-0"
           >
-            Ver Alertas →
+            Ver Detalhes →
           </button>
         </div>
       )}
@@ -73,25 +73,25 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Seguidores Atuais"
-          value={periodSummary.followers.current.toLocaleString('pt-BR')}
+          value={periodSummary.followersGrowth.current.toLocaleString('pt-BR')}
           typeTag="DADO REAL"
-          diffPercent={periodSummary.followers.diffPercent}
+          diffPercent={periodSummary.followersGrowth.percentDiff ?? undefined}
           periodLabel="Últimos 30 dias"
         />
 
         <StatCard
           label="Visualizações Totais"
-          value={periodSummary.views.current.toLocaleString('pt-BR')}
+          value={periodSummary.totalViews.current.toLocaleString('pt-BR')}
           typeTag="DADO REAL"
-          diffPercent={periodSummary.views.diffPercent}
+          diffPercent={periodSummary.totalViews.percentDiff ?? undefined}
           periodLabel="Últimos 30 dias"
         />
 
         <StatCard
           label="Taxa Média de Engajamento"
-          value={`${periodSummary.engagementRate.current}%`}
+          value={`${periodSummary.avgEngagementRate.current}%`}
           typeTag="DADO CALCULADO"
-          diffPercent={periodSummary.engagementRate.diffPercent}
+          diffPercent={periodSummary.avgEngagementRate.percentDiff ?? undefined}
           periodLabel="Base: Alcance real"
         />
 
