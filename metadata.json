@@ -1,0 +1,6 @@
+{
+  "name": "Gabriel Speratti | Social Intelligence",
+  "description": "Sistema interno de inteligência, análise, estratégia e operação de marketing digital da agência Gabriel Speratti.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
