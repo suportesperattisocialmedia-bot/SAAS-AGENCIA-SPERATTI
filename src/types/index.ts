@@ -9,6 +9,7 @@ export type HealthStatus = 'healthy' | 'attention' | 'critical' | 'not_connected
 
 export interface Client {
   id: string;
+  agencyId?: string;
   name: string;
   company: string;
   instagram: string;
@@ -115,9 +116,15 @@ export interface Content {
   id: string;
   clientId: string;
   instagramMediaId?: string;
+  mediaType?: string;
+  permalink?: string;
+  mediaUrl?: string;
+  thumbnailUrl?: string;
   title: string;
   caption: string;
   publishedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   format: ContentFormat;
   pillar: string;
   objective: string;
@@ -145,7 +152,7 @@ export interface ContentMetricSnapshot {
   source: SnapshotSource;
 }
 
-export type CompetitorStatus = 'approved' | 'candidate' | 'ignored';
+export type CompetitorStatus = 'approved' | 'candidate' | 'ignored' | 'discovered' | 'rejected' | 'archived';
 
 export interface Competitor {
   id: string;
@@ -154,13 +161,14 @@ export interface Competitor {
   instagram: string;
   website: string;
   segment: string;
-  similarityScore: number; // 0 to 100 based on verified criteria
+  similarityScore: number | null; // 0 to 100 based on verified criteria, or null if insufficient data
   similarityCriteria?: string[];
-  followers: number;
-  postingFrequencyWeekly: number;
+  similarityMethod?: string;
+  followers: number | null;
+  postingFrequencyWeekly: number | null;
   topFormats: ContentFormat[];
-  avgViews: number;
-  avgEngagementRate: number;
+  avgViews: number | null;
+  avgEngagementRate: number | null;
   recentThemes: string[];
   notes: string;
   status: CompetitorStatus;
@@ -168,6 +176,65 @@ export interface Competitor {
   evidenceUrl?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type SyncTrigger = 'MANUAL' | 'AUTO_OPEN' | 'SCHEDULED';
+export type SyncStatus = 'SUCCESS' | 'PARTIAL' | 'ERROR';
+
+export interface SyncLog {
+  id: string;
+  clientId: string;
+  startedAt: string;
+  finishedAt: string;
+  status: SyncStatus;
+  trigger: SyncTrigger;
+  recordsFetched: number;
+  recordsCreated: number;
+  recordsUpdated: number;
+  errors: string[];
+  provider: string;
+  requestId: string;
+}
+
+export interface AIAnalysis {
+  id: string;
+  clientId: string;
+  analysisType: 'PROFILE_DIAGNOSTIC' | 'CONTENT_CLASSIFICATION' | 'IDEA_GENERATION' | 'AUDIENCE_ANALYSIS' | 'STRATEGY_RECOMMENDATION';
+  createdAt: string;
+  model: string;
+  promptVersion: string;
+  inputDataHash: string;
+  output: unknown;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  sourceDataIds: string[];
+}
+
+export interface ResearchInsight {
+  id: string;
+  clientId: string;
+  query: string;
+  sourceType: 'search_engine' | 'industry_report' | 'scientific_article' | 'social_media' | 'verified_web';
+  sourceName: string;
+  sourceUrl?: string;
+  title: string;
+  snippet: string;
+  evidence?: string;
+  publishedAt?: string;
+  retrievedAt: string;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  category: AudienceInsightCategory;
+  isHypothesis: boolean;
+}
+
+export interface ResearchRun {
+  id: string;
+  clientId: string;
+  query: string;
+  provider: string;
+  status: 'SUCCESS' | 'ERROR' | 'NOT_CONFIGURED';
+  insightsFound: number;
+  executedAt: string;
+  errorMessage?: string;
 }
 
 export interface CompetitorSnapshot {

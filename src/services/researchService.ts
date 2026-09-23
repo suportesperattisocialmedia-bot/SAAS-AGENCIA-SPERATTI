@@ -3,12 +3,15 @@
  * Research Service & Audience Intelligence Provider
  * 
  * Strict rule: Never pretend verification. Only mark isHypothesis: false when
- * real URL / evidence snippet is attached.
+ * real URL / evidence snippet is attached. If external search is unconfigured,
+ * state it explicitly instead of fabricating results.
  */
 
 import { AudienceInsight, AudienceInsightCategory, Client } from '../types';
-import { defaultStorageAdapter } from './storage/LocalStorageAdapter';
+import { storageService } from './storageService';
+import { apiClient } from './api/apiClient';
 import { logger } from '../utils/logger';
+import { generateUUID } from '../utils/uuid';
 
 export const AUDIENCE_CATEGORIES: AudienceInsightCategory[] = [
   'Dores',
@@ -29,42 +32,34 @@ export interface ResearchResultItem {
   source: string;
   sourceType: 'search_engine' | 'social_media' | 'scientific_article' | 'industry_report' | 'user_feedback';
   publishedAt: string;
-  accessedAt: string;
+  retrievedAt: string;
   snippet: string;
   evidence: string;
   query: string;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
 export interface ResearchProvider {
-  search(query: string, category: AudienceInsightCategory): Promise<ResearchResultItem[]>;
+  search(query: string, category: AudienceInsightCategory): Promise<{
+    configured: boolean;
+    message?: string;
+    items: ResearchResultItem[];
+  }>;
 }
 
 export const researchService = {
-  getStorageKey(): string {
-    return 'gs_intel_audience';
-  },
-
   getAll(): AudienceInsight[] {
-    return defaultStorageAdapter.getCollection<AudienceInsight>(this.getStorageKey());
+    return storageService.audience.getAll();
   },
 
   getByClient(clientId: string, categoryFilter?: AudienceInsightCategory): AudienceInsight[] {
-    const all = this.getAll().filter(i => i.clientId === clientId);
+    const all = storageService.audience.getByClient(clientId);
     if (!categoryFilter) return all;
     return all.filter(item => item.category === categoryFilter);
   },
 
   addInsight(insight: Omit<AudienceInsight, 'id' | 'createdAt'>): AudienceInsight {
-    const newItem: AudienceInsight = {
-      ...insight,
-      id: `aud-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      createdAt: new Date().toISOString()
-    };
-
-    const all = this.getAll();
-    defaultStorageAdapter.setCollection(this.getStorageKey(), [newItem, ...all]);
-    logger.info(`Audience insight added for client ${insight.clientId}`, { id: newItem.id });
-    return newItem;
+    return storageService.audience.create(insight);
   },
 
   updateInsight(id: string, updates: Partial<AudienceInsight>): AudienceInsight | null {
@@ -72,47 +67,94 @@ export const researchService = {
     const index = all.findIndex(i => i.id === id);
     if (index === -1) return null;
 
-    all[index] = { ...all[index], ...updates };
-    defaultStorageAdapter.setCollection(this.getStorageKey(), all);
-    return all[index];
+    const merged = { ...all[index], ...updates };
+    // update through storage
+    storageService.audience.delete(id);
+    return storageService.audience.create(merged);
   },
 
   removeInsight(id: string): boolean {
-    const all = this.getAll();
-    const filtered = all.filter(i => i.id !== id);
-    if (filtered.length === all.length) return false;
-
-    defaultStorageAdapter.setCollection(this.getStorageKey(), filtered);
-    return true;
+    return storageService.audience.delete(id);
   },
 
   /**
-   * Discovers audience insights based on client profile, segment, and verified public queries
+   * Runs audience research against backend provider (honest verification check)
    */
-  async runAudienceDiscovery(client: Client, targetCategory: AudienceInsightCategory = 'Dores'): Promise<AudienceInsight[]> {
+  async runAudienceDiscovery(client: Client, targetCategory: AudienceInsightCategory = 'Dores'): Promise<{
+    success: boolean;
+    configured: boolean;
+    message?: string;
+    newInsights: AudienceInsight[];
+  }> {
     logger.info(`Running audience discovery for ${client.name} in category ${targetCategory}...`);
-
-    // In a production deployment with configured search API, this invokes Google/Bing Custom Search
-    // Here we generate grounded, segment-tailored insights without hallucinating metrics
     const query = `${client.segment} ${client.subsegment || ''} ${targetCategory} Brasil`;
-    const today = new Date().toISOString().split('T')[0];
 
-    const generatedTitle = `Dúvida recorrente sobre ${client.segment.toLowerCase()}: expectativas e segurança`;
-    const generatedDesc = `Público interessado em ${client.segment.toLowerCase()} (${client.targetAudience || 'consumidores qualificados'}) pesquisa ativamente por comprovação técnica e prazos de retorno.`;
+    try {
+      const res = await apiClient.post<{
+        configured: boolean;
+        message?: string;
+        insights?: any[];
+      }>('/api/research/query', {
+        clientId: client.id,
+        segment: client.segment,
+        category: targetCategory,
+        query
+      });
 
-    const insight = this.addInsight({
+      if (!res.configured) {
+        return {
+          success: true,
+          configured: false,
+          message: res.message || 'Pesquisa externa não configurada no servidor (.env sem chaves de busca).',
+          newInsights: []
+        };
+      }
+
+      return {
+        success: true,
+        configured: true,
+        newInsights: []
+      };
+    } catch (err: any) {
+      logger.warn('Audience discovery API query failed', { error: err.message });
+      return {
+        success: false,
+        configured: false,
+        message: err.message || 'Falha ao consultar mecanismo de pesquisa.',
+        newInsights: []
+      };
+    }
+  },
+
+  /**
+   * Registers a verified fact or hypothesis from internal strategist analysis
+   */
+  registerInsight(
+    client: Client,
+    data: {
+      category: AudienceInsightCategory;
+      title: string;
+      description: string;
+      interpretation: string;
+      isHypothesis: boolean;
+      confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+      source: string;
+      sourceUrl?: string;
+      evidence?: string;
+    }
+  ): AudienceInsight {
+    return this.addInsight({
       clientId: client.id,
-      category: targetCategory,
-      title: generatedTitle,
-      description: generatedDesc,
-      source: `Pesquisa pública de mercado: "${query}"`,
-      sourceDate: today,
-      context: `Segmento: ${client.segment} | Persona: ${client.persona || 'Geral'}`,
-      interpretation: 'Demonstra a necessidade de conteúdos com foco em autoridade técnica e clareza de processo.',
-      isHypothesis: true,
-      confidence: 'MEDIUM'
+      category: data.category,
+      title: data.title,
+      description: data.description,
+      interpretation: data.interpretation,
+      isHypothesis: data.isHypothesis,
+      confidence: data.confidence,
+      source: data.source,
+      sourceUrl: data.sourceUrl,
+      sourceDate: new Date().toISOString(),
+      evidence: data.evidence
     });
-
-    return [insight];
   }
 };

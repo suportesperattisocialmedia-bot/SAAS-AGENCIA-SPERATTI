@@ -109,9 +109,15 @@ export const ContentSchema = z.object({
   id: z.string().min(1),
   clientId: z.string().min(1),
   instagramMediaId: z.string().optional(),
+  mediaType: z.string().optional(),
+  permalink: z.string().optional(),
+  mediaUrl: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
   title: z.string().min(1),
   caption: z.string().default(''),
   publishedAt: z.string(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
   format: ContentFormatSchema,
   pillar: z.string().default('Geral'),
   objective: z.string().default('Engajamento'),
@@ -150,20 +156,76 @@ export const CompetitorSchema = z.object({
   instagram: z.string().min(1),
   website: z.string().default(''),
   segment: z.string().default(''),
-  similarityScore: z.number().min(0).max(100).default(0),
+  similarityScore: z.number().min(0).max(100).nullable().default(null),
   similarityCriteria: z.array(z.string()).optional(),
-  followers: z.number().nonnegative().default(0),
-  postingFrequencyWeekly: z.number().nonnegative().default(0),
+  similarityMethod: z.string().optional(),
+  followers: z.number().nonnegative().nullable().default(null),
+  postingFrequencyWeekly: z.number().nonnegative().nullable().default(null),
   topFormats: z.array(ContentFormatSchema).default([]),
-  avgViews: z.number().nonnegative().default(0),
-  avgEngagementRate: z.number().nonnegative().default(0),
+  avgViews: z.number().nonnegative().nullable().default(null),
+  avgEngagementRate: z.number().nonnegative().nullable().default(null),
   recentThemes: z.array(z.string()).default([]),
   notes: z.string().default(''),
-  status: z.enum(['approved', 'candidate', 'ignored']).default('candidate'),
+  status: z.enum(['approved', 'candidate', 'ignored', 'discovered', 'rejected', 'archived']).default('candidate'),
   candidateReason: z.string().optional(),
   evidenceUrl: z.string().optional(),
   createdAt: z.string().default(() => new Date().toISOString()),
   updatedAt: z.string().default(() => new Date().toISOString())
+});
+
+export const SyncLogSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1),
+  startedAt: z.string(),
+  finishedAt: z.string(),
+  status: z.enum(['SUCCESS', 'PARTIAL', 'ERROR']),
+  trigger: z.enum(['MANUAL', 'AUTO_OPEN', 'SCHEDULED']),
+  recordsFetched: z.number().nonnegative().default(0),
+  recordsCreated: z.number().nonnegative().default(0),
+  recordsUpdated: z.number().nonnegative().default(0),
+  errors: z.array(z.string()).default([]),
+  provider: z.string().default('meta_instagram'),
+  requestId: z.string().default('')
+});
+
+export const AIAnalysisRecordSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1),
+  analysisType: z.enum(['PROFILE_DIAGNOSTIC', 'CONTENT_CLASSIFICATION', 'IDEA_GENERATION', 'AUDIENCE_ANALYSIS', 'STRATEGY_RECOMMENDATION']),
+  createdAt: z.string(),
+  model: z.string(),
+  promptVersion: z.string(),
+  inputDataHash: z.string(),
+  output: z.unknown(),
+  confidence: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+  sourceDataIds: z.array(z.string()).default([])
+});
+
+export const ResearchInsightSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1),
+  query: z.string(),
+  sourceType: z.enum(['search_engine', 'industry_report', 'scientific_article', 'social_media', 'verified_web']),
+  sourceName: z.string(),
+  sourceUrl: z.string().optional(),
+  title: z.string(),
+  snippet: z.string(),
+  evidence: z.string().optional(),
+  publishedAt: z.string().optional(),
+  retrievedAt: z.string(),
+  confidence: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+  category: z.enum([
+    'Dores',
+    'Desejos',
+    'Medos',
+    'Objeções',
+    'Dúvidas',
+    'Perguntas Frequentes',
+    'Interesses',
+    'Tendências',
+    'Oportunidades'
+  ]),
+  isHypothesis: z.boolean().default(false)
 });
 
 export const AudienceInsightSchema = z.object({

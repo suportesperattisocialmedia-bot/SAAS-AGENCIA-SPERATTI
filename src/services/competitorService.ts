@@ -2,22 +2,24 @@
  * GABRIEL SPERATTI | SOCIAL INTELLIGENCE
  * Competitor Service - Market Intelligence, Discovery & Objective Benchmarking
  * 
- * Strict rule: NEVER hardcode fake competitors (e.g. Thiago Esteves, L'Atelier).
+ * Strict rule: NEVER hardcode fake competitors.
  * Candidates require explicit discovery, criteria-based similarity, and manual approval.
+ * Similarity score and metrics default to null until real evidence is verified.
  */
 
 import { Client, Competitor, CompetitorStatus, ContentFormat } from '../types';
-import { defaultStorageAdapter } from './storage/LocalStorageAdapter';
+import { storageService } from './storageService';
 import { logger } from '../utils/logger';
+import { generateUUID } from '../utils/uuid';
 
 export interface CompetitorBenchmarkRow {
   name: string;
   instagram: string;
   isClient: boolean;
-  followers: number;
-  weeklyFrequency: number;
-  avgViews: number;
-  avgEngagementRate: number;
+  followers: number | null;
+  weeklyFrequency: number | null;
+  avgViews: number | null;
+  avgEngagementRate: number | null;
   topFormats: ContentFormat[];
   mainThemes: string[];
 }
@@ -31,16 +33,12 @@ export interface CompetitorPatternInsight {
 }
 
 export const competitorService = {
-  getStorageKey(): string {
-    return 'gs_intel_competitors';
-  },
-
   getAll(): Competitor[] {
-    return defaultStorageAdapter.getCollection<Competitor>(this.getStorageKey());
+    return storageService.competitors.getAll();
   },
 
   getByClient(clientId: string): Competitor[] {
-    return this.getAll().filter(c => c.clientId === clientId);
+    return storageService.competitors.getByClient(clientId);
   },
 
   getApprovedCompetitors(clientId: string): Competitor[] {
@@ -48,59 +46,38 @@ export const competitorService = {
   },
 
   getCandidateCompetitors(clientId: string): Competitor[] {
-    return this.getByClient(clientId).filter(c => c.status === 'candidate');
+    return this.getByClient(clientId).filter(c => c.status === 'candidate' || c.status === 'discovered');
   },
 
   addCompetitor(competitor: Omit<Competitor, 'id' | 'createdAt' | 'updatedAt'>): Competitor {
-    const newItem: Competitor = {
-      ...competitor,
-      id: `comp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    const all = this.getAll();
-    defaultStorageAdapter.setCollection(this.getStorageKey(), [newItem, ...all]);
-    logger.info(`Competitor added for client ${competitor.clientId}`, { id: newItem.id, name: newItem.name });
-    return newItem;
+    return storageService.competitors.create(competitor);
   },
 
   updateCompetitor(id: string, updates: Partial<Competitor>): Competitor | null {
-    const all = this.getAll();
-    const index = all.findIndex(c => c.id === id);
-    if (index === -1) return null;
-
-    all[index] = {
-      ...all[index],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-
-    defaultStorageAdapter.setCollection(this.getStorageKey(), all);
-    return all[index];
+    return storageService.competitors.update(id, updates);
   },
 
   deleteCompetitor(id: string): boolean {
-    const all = this.getAll();
-    const filtered = all.filter(c => c.id !== id);
-    if (filtered.length === all.length) return false;
-
-    defaultStorageAdapter.setCollection(this.getStorageKey(), filtered);
-    return true;
+    return storageService.competitors.delete(id);
   },
 
   approveCandidate(id: string): void {
     this.updateCompetitor(id, { status: 'approved' });
   },
 
+  rejectCandidate(id: string): void {
+    this.updateCompetitor(id, { status: 'rejected' });
+  },
+
   ignoreCandidate(id: string): void {
     this.updateCompetitor(id, { status: 'ignored' });
   },
 
-  /**
-   * Objective comparison without declaring subjective winners
-   */
-  generateBenchmarkTable(client: Client, clientFollowers = 0, clientWeeklyFreq = 0): CompetitorBenchmarkRow[] {
+  archiveCompetitor(id: string): void {
+    this.updateCompetitor(id, { status: 'archived' });
+  },
+
+  generateBenchmarkTable(client: Client, clientFollowers: number | null = null, clientWeeklyFreq: number | null = null): CompetitorBenchmarkRow[] {
     const approved = this.getApprovedCompetitors(client.id);
 
     const clientRow: CompetitorBenchmarkRow = {
@@ -109,8 +86,8 @@ export const competitorService = {
       isClient: true,
       followers: clientFollowers,
       weeklyFrequency: clientWeeklyFreq,
-      avgViews: 0,
-      avgEngagementRate: 0,
+      avgViews: null,
+      avgEngagementRate: null,
       topFormats: client.formats,
       mainThemes: client.pillars
     };
@@ -130,10 +107,6 @@ export const competitorService = {
     return [clientRow, ...competitorRows];
   },
 
-  generateBenchmarkMatrix(client: Client, approvedCompetitors: Competitor[]): CompetitorBenchmarkRow[] {
-    return this.generateBenchmarkTable(client);
-  },
-
   detectCompetitorPatterns(competitors: Competitor[]): CompetitorPatternInsight[] {
     if (competitors.length === 0) return [];
     const insights: CompetitorPatternInsight[] = [];
@@ -147,7 +120,7 @@ export const competitorService = {
     const dominantFormat = Object.entries(formatsCount).sort((a, b) => b[1] - a[1])[0];
     if (dominantFormat) {
       insights.push({
-        id: 'pat-1',
+        id: `pat-${generateUUID()}`,
         type: 'FORMATO PREDOMINANTE',
         title: `Predomínio de ${dominantFormat[0]} no Nicho`,
         description: `${dominantFormat[1]} de ${competitors.length} concorrentes utilizam ${dominantFormat[0]} como principal alavanca de alcance.`,
@@ -155,83 +128,98 @@ export const competitorService = {
       });
     }
 
-    const avgFreq = competitors.reduce((sum, c) => sum + c.postingFrequencyWeekly, 0) / competitors.length;
-    insights.push({
-      id: 'pat-2',
-      type: 'CADÊNCIA EDITORIAL',
-      title: `Ritmo Médio de ${avgFreq.toFixed(1)} posts/semana`,
-      description: `Os concorrentes mantêm publicação regular para sustentar relevância perante o algoritmo.`,
-      strategicImplication: `Manter frequência mínima de 3 a 5 posts semanais com calendário estruturado.`
-    });
+    const freqList = competitors.map(c => c.postingFrequencyWeekly).filter((f): f is number => typeof f === 'number' && f > 0);
+    if (freqList.length > 0) {
+      const avgFreq = freqList.reduce((sum, f) => sum + f, 0) / freqList.length;
+      insights.push({
+        id: `pat-${generateUUID()}`,
+        type: 'CADÊNCIA EDITORIAL',
+        title: `Ritmo Médio de ${avgFreq.toFixed(1)} posts/semana`,
+        description: 'Os concorrentes monitorados mantêm publicação regular para sustentar relevância perante o algoritmo.',
+        strategicImplication: 'Manter frequência mínima com calendário estruturado e consistente.'
+      });
+    }
 
     const allThemes = competitors.flatMap(c => c.recentThemes);
     if (allThemes.length > 0) {
       insights.push({
-        id: 'pat-3',
+        id: `pat-${generateUUID()}`,
         type: 'TEMAS EM ALTA',
         title: 'Foco em Solução de Dores e Prova Social',
         description: `Pautas frequentes observadas: ${allThemes.slice(0, 3).join(', ')}.`,
-        strategicImplication: `Abordar estes temas com ângulo mais técnico e autoral para se diferenciar.`
+        strategicImplication: 'Abordar estes temas com ângulo mais técnico e autoral para se diferenciar.'
       });
     }
 
     return insights;
   },
 
-  async discoverCandidateCompetitors(client: Client): Promise<Competitor[]> {
-    return this.getCandidateCompetitors(client.id);
-  },
-
   /**
-   * Calculate similarity score based on verifiable criteria (Segment, Geography, Persona, Formats)
+   * Calculate similarity score based on explicit verified criteria
+   * If insufficient data: returns null
    */
-  calculateSimilarity(client: Client, candidate: Partial<Competitor>): { score: number; criteria: string[] } {
+  calculateSimilarity(client: Client, candidate: Partial<Competitor>): { score: number | null; criteria: string[]; method: string } {
     const criteria: string[] = [];
     let score = 0;
+    let criteriaCount = 0;
 
     if (candidate.segment && candidate.segment.toLowerCase() === client.segment.toLowerCase()) {
       score += 40;
-      criteria.push(`Mesmo segmento de atuação (${client.segment})`);
+      criteriaCount++;
+      criteria.push(`Mesmo segmento de atuação (${client.segment}) [peso: 40%]`);
     }
 
     if (candidate.notes && client.city && candidate.notes.toLowerCase().includes(client.city.toLowerCase())) {
-      score += 30;
-      criteria.push(`Mesma praça geográfica (${client.city})`);
+      score += 25;
+      criteriaCount++;
+      criteria.push(`Mesma praça geográfica (${client.city}) [peso: 25%]`);
     }
 
     if (candidate.topFormats && client.formats && candidate.topFormats.some(f => client.formats.includes(f))) {
-      score += 15;
-      criteria.push('Formatos prioritários coincidentes');
+      score += 20;
+      criteriaCount++;
+      criteria.push('Formatos prioritários coincidentes [peso: 20%]');
     }
 
-    if (candidate.followers && candidate.followers > 0) {
+    if (typeof candidate.followers === 'number' && candidate.followers > 0) {
       score += 15;
-      criteria.push('Presença ativa no Instagram comprovada');
+      criteriaCount++;
+      criteria.push('Presença ativa no Instagram comprovada [peso: 15%]');
     }
 
-    return { score, criteria };
+    // If no verifiable criteria matched, similarity is null
+    if (criteriaCount === 0) {
+      return {
+        score: null,
+        criteria: ['Dados insuficientes para cálculo de similaridade'],
+        method: 'INSUFFICIENT_DATA'
+      };
+    }
+
+    return {
+      score: Math.min(100, score),
+      criteria,
+      method: 'WEIGHTED_MULTI_CRITERIA_V1'
+    };
   },
 
-  /**
-   * Candidate discovery from user input or verified market search
-   */
   async registerCandidate(
     client: Client,
     data: {
       name: string;
       instagram: string;
       website?: string;
-      followers?: number;
-      weeklyFrequency?: number;
+      followers?: number | null;
+      weeklyFrequency?: number | null;
       topFormats?: ContentFormat[];
       notes?: string;
       evidenceUrl?: string;
     }
   ): Promise<Competitor> {
-    const { score, criteria } = this.calculateSimilarity(client, {
+    const { score, criteria, method } = this.calculateSimilarity(client, {
       segment: client.segment,
       topFormats: data.topFormats,
-      followers: data.followers || 0,
+      followers: data.followers,
       notes: data.notes
     });
 
@@ -243,11 +231,12 @@ export const competitorService = {
       segment: client.segment,
       similarityScore: score,
       similarityCriteria: criteria,
-      followers: data.followers || 0,
-      postingFrequencyWeekly: data.weeklyFrequency || 0,
+      similarityMethod: method,
+      followers: data.followers ?? null,
+      postingFrequencyWeekly: data.weeklyFrequency ?? null,
       topFormats: data.topFormats || ['Reels', 'Carrossel'],
-      avgViews: 0,
-      avgEngagementRate: 0,
+      avgViews: null,
+      avgEngagementRate: null,
       recentThemes: [],
       notes: data.notes || '',
       status: 'candidate',

@@ -1,12 +1,14 @@
 /**
  * GABRIEL SPERATTI | SOCIAL INTELLIGENCE
- * Report Service - Executive Strategic Reports & Structured CSV / PDF Export
+ * Report Service - Executive Strategic Reports, Real PDF Generation & Universal CSV Export
  * 
  * Strict rule: All text and KPIs derive strictly from the given client's real data.
  * Zero hardcoded names or medical assumptions.
+ * Real PDF generation with jsPDF (no window.print dependency).
  */
 
-import { Client, Report, Content, AccountSnapshot } from '../types';
+import { jsPDF } from 'jspdf';
+import { Client, Report, Content } from '../types';
 import { storageService } from './storageService';
 import { analyticsService } from './analyticsService';
 import { aiService } from './aiService';
@@ -22,7 +24,7 @@ export const reportService = {
 
     const ranked = analyticsService.rankContents(contents, 'score', false);
     const topContents = ranked.slice(0, 3);
-    const worstContents = ranked.slice(-2);
+    const worstContents = ranked.length > 3 ? ranked.slice(-2) : [];
 
     const periodLabel = `${period.startDate} até ${period.endDate} (${periodDays} dias)`;
 
@@ -39,7 +41,7 @@ export const reportService = {
 
     const executiveSummary = snapshots.length === 0
       ? `Relatório inicial para o cliente ${client.name} (${client.instagram}) no segmento ${client.segment}. Dados históricos ainda em coleta para comparação de períodos.`
-      : `No período analisado de ${periodDays} dias (${periodLabel}), a conta ${client.instagram} atingiu ${curFollowers} seguidores (${followersDiff}). O volume total de visualizações somou ${totalViews} (${viewsDiff}), com ${contents.length} publicações catalogadas no workspace.`;
+      : `No período analisado de ${periodDays} dias (${periodLabel}), a conta ${client.instagram} registrou ${curFollowers} seguidores (${followersDiff}). O volume total de visualizações somou ${totalViews} (${viewsDiff}), com ${contents.length} publicações catalogadas no workspace.`;
 
     const analysisText = contents.length === 0
       ? 'Ainda não existem conteúdos catalogados para avaliar distribuição por pilares e retenção.'
@@ -70,7 +72,7 @@ export const reportService = {
       analysisText,
       aiInsights: [
         `Público-alvo principal: ${client.targetAudience || 'Segmento ' + client.segment}.`,
-        topContents.length > 0 
+        topContents.length > 0
           ? `Publicação de maior tração: "${topContents[0].title}" no formato ${topContents[0].format}.`
           : 'Recomenda-se catalogar as primeiras publicações para análise de retenção.',
         `Foco estratégico configurado em ${client.objectives.join(', ') || 'Autoridade'}.`
@@ -85,10 +87,193 @@ export const reportService = {
         'Garantir CTAs claros orientados ao objetivo da publicação.',
         'Acompanhar os relatórios de sincronização para detecção de variações de alcance.'
       ],
-      nextSteps: aiService.generateNextActions(client, contents, snapshots)
+      nextSteps: aiService.generateNextActions(client, contents)
     };
 
     return storageService.reports.create(reportData);
+  },
+
+  /**
+   * Generates and downloads a real, multi-page branded PDF report
+   */
+  exportToPdf(report: Report, client: Client): void {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 16;
+    let y = 20;
+
+    // Header Background Accent
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, pageWidth, 42, 'F');
+
+    // Brand Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(245, 158, 11); // amber-500
+    doc.text('GABRIEL SPERATTI | SOCIAL INTELLIGENCE', margin, 15);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text('Sistema Interno de Inteligência, Estratégia e Operação', margin, 21);
+
+    // Report Title & Metadata
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(255, 255, 255);
+    doc.text(report.title, margin, 32);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(203, 213, 225);
+    doc.text(`Cliente: ${client.name} (${client.instagram}) | Segmento: ${client.segment} | Período: ${report.periodLabel}`, margin, 38);
+
+    y = 52;
+
+    // Executive Summary
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('1. Sumário Executivo', margin, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    const summaryLines = doc.splitTextToSize(report.executiveSummary, pageWidth - (margin * 2));
+    doc.text(summaryLines, margin, y);
+    y += (summaryLines.length * 4.5) + 6;
+
+    // KPIs Table Box
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('2. Indicadores Chave de Performance (KPIs)', margin, y);
+    y += 6;
+
+    const kpiBoxWidth = (pageWidth - (margin * 2) - 12) / 4;
+    const kpisList = [
+      {
+        label: 'Seguidores',
+        val: report.kpis.followers > 0 ? report.kpis.followers.toLocaleString('pt-BR') : '—',
+        diff: report.kpis.followersDiffPct !== null ? `${report.kpis.followersDiffPct >= 0 ? '+' : ''}${report.kpis.followersDiffPct}%` : 'N/D'
+      },
+      {
+        label: 'Visualizações',
+        val: report.kpis.views > 0 ? report.kpis.views.toLocaleString('pt-BR') : '—',
+        diff: report.kpis.viewsDiffPct !== null ? `${report.kpis.viewsDiffPct >= 0 ? '+' : ''}${report.kpis.viewsDiffPct}%` : 'N/D'
+      },
+      {
+        label: 'Alcance Total',
+        val: report.kpis.reach > 0 ? report.kpis.reach.toLocaleString('pt-BR') : '—',
+        diff: report.kpis.reachDiffPct !== null ? `${report.kpis.reachDiffPct >= 0 ? '+' : ''}${report.kpis.reachDiffPct}%` : 'N/D'
+      },
+      {
+        label: 'Engajamento',
+        val: report.kpis.engagementRate > 0 ? `${report.kpis.engagementRate}%` : '—',
+        diff: report.kpis.engagementDiffPct !== null ? `${report.kpis.engagementDiffPct >= 0 ? '+' : ''}${report.kpis.engagementDiffPct}%` : 'N/D'
+      }
+    ];
+
+    kpisList.forEach((kpi, idx) => {
+      const bx = margin + (idx * (kpiBoxWidth + 4));
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(bx, y, kpiBoxWidth, 20, 'FD');
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(kpi.label, bx + 3, y + 5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(kpi.val, bx + 3, y + 11);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(kpi.diff.startsWith('+') ? 16 : 100, kpi.diff.startsWith('+') ? 149 : 116, kpi.diff.startsWith('+') ? 193 : 139);
+      doc.text(kpi.diff, bx + 3, y + 16);
+    });
+
+    y += 28;
+
+    // Top Contents
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('3. Conteúdos de Maior Destaque', margin, y);
+    y += 6;
+
+    if (report.topContents.length === 0) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Nenhum conteúdo catalogado no período analisado.', margin, y);
+      y += 8;
+    } else {
+      report.topContents.forEach((c, i) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(30, 41, 59);
+        doc.text(`${i + 1}. [${c.format}] ${c.title.slice(0, 60)}`, margin, y);
+        y += 4;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Pilar: ${c.pillar} | Views: ${c.metrics.views.toLocaleString('pt-BR')} | Salvamentos: ${c.metrics.saves} | Compartilhamentos: ${c.metrics.shares}`, margin + 4, y);
+        y += 5.5;
+      });
+    }
+
+    y += 4;
+
+    // Strategy & Next Steps
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('4. Recomendações Estratégicas & Próximos Passos', margin, y);
+    y += 6;
+
+    const recommendations = [...report.recommendations, ...report.nextSteps].slice(0, 4);
+    recommendations.forEach(rec => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(51, 65, 85);
+      const recLines = doc.splitTextToSize(`• ${rec}`, pageWidth - (margin * 2) - 4);
+      doc.text(recLines, margin + 2, y);
+      y += (recLines.length * 4) + 1.5;
+    });
+
+    y += 6;
+
+    // Provenance & Audit Footer Box
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, pageWidth - (margin * 2), 22, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(51, 65, 85);
+    doc.text('Metodologia & Proveniência dos Dados:', margin + 4, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text('• Métricas de conta e publicações: extraídas via Meta Graph API oficial (REAL_DATA).', margin + 4, y + 11);
+    doc.text('• Comparações percentuais: cálculo matemático auditável sobre snapshots cronológicos (CALCULATED_DATA).', margin + 4, y + 15);
+    doc.text('• Recomendações estratégicas: direcionadas por inteligência de marketing sem métricas simuladas.', margin + 4, y + 19);
+
+    // Save and download
+    const cleanHandle = client.instagram.replace('@', '').replace(/[^a-zA-Z0-9_]/g, '');
+    const cleanDate = report.endDate || new Date().toISOString().split('T')[0];
+    doc.save(`relatorio_${cleanHandle}_${cleanDate}.pdf`);
   },
 
   /**
@@ -101,19 +286,20 @@ export const reportService = {
     }
 
     const headers = Object.keys(rows[0]);
-    const csvContent = [
-      headers.join(';'),
-      ...rows.map(row =>
-        headers.map(fieldName => {
-          const val = row[fieldName];
-          if (val === null || val === undefined) return '""';
-          const escaped = String(val).replace(/"/g, '""');
-          return `"${escaped}"`;
-        }).join(';')
-      )
-    ].join('\r\n');
+    const escapeCsv = (val: unknown): string => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      if (str.includes(';') || str.includes('\n') || str.includes('"') || str.includes(',')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
 
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const headerLine = headers.map(escapeCsv).join(';');
+    const dataLines = rows.map(row => headers.map(h => escapeCsv(row[h])).join(';'));
+    const csvContent = '\uFEFF' + [headerLine, ...dataLines].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -124,21 +310,24 @@ export const reportService = {
     URL.revokeObjectURL(url);
   },
 
-  exportClientsCsv(): void {
-    const clients = storageService.clients.getAll();
-    const rows = clients.map(c => ({
-      Nome: c.name,
-      Empresa: c.company,
-      Instagram: c.instagram,
-      WhatsApp: c.whatsapp,
-      Cidade: c.city,
-      Segmento: c.segment,
-      TicketMedio: c.averageTicket,
-      Status: c.status,
-      EtapaOnboarding: c.onboardingStep,
-      CriadoEm: c.createdAt
+  exportContentsCsv(clientId: string): void {
+    const contents = storageService.contents.getByClient(clientId);
+    const rows = contents.map(c => ({
+      ID: c.id,
+      Titulo: c.title,
+      Formato: c.format,
+      Pilar: c.pillar,
+      Objetivo: c.objective,
+      Visualizacoes: c.metrics.views,
+      Alcance: c.metrics.reach,
+      Curtidas: c.metrics.likes,
+      Comentarios: c.metrics.comments,
+      Salvamentos: c.metrics.saves,
+      Compartilhamentos: c.metrics.shares,
+      TaxaEngajamento: `${c.metrics.engagementRate}%`,
+      DataPublicacao: c.publishedAt
     }));
-    this.exportToCsv('clientes_gs_intelligence', rows);
+    this.exportToCsv(`conteudos_${clientId}`, rows);
   },
 
   exportHistoryCsv(clientId: string): void {
@@ -146,55 +335,31 @@ export const reportService = {
     const rows = snapshots.map(s => ({
       Data: s.date,
       Seguidores: s.followers,
-      Visualizacoes: s.views,
       Alcance: s.reach,
+      Visualizacoes: s.views,
       Curtidas: s.likes,
       Comentarios: s.comments,
-      Compartilhamentos: s.shares,
       Salvamentos: s.saves,
-      VisitasAoPerfil: s.profileVisits,
-      CliquesNoSite: s.websiteClicks,
-      PublicacoesNoDia: s.postsPublished,
+      Compartilhamentos: s.shares,
+      VisitasPerfil: s.profileVisits,
+      PostsNoDia: s.postsPublished,
       TaxaEngajamento: `${s.engagementRate}%`,
       Fonte: s.source
     }));
-    this.exportToCsv(`historico_metricas_${clientId}`, rows);
-  },
-
-  exportContentsCsv(clientId: string): void {
-    const contents = storageService.contents.getByClient(clientId);
-    const rows = contents.map(c => ({
-      Titulo: c.title,
-      Formato: c.format,
-      Pilar: c.pillar,
-      Objetivo: c.objective,
-      PublicadoEm: c.publishedAt,
-      Visualizacoes: c.metrics.views,
-      Curtidas: c.metrics.likes,
-      Comentarios: c.metrics.comments,
-      Compartilhamentos: c.metrics.shares,
-      Salvamentos: c.metrics.saves,
-      Alcance: c.metrics.reach,
-      Engajamento: `${c.metrics.engagementRate}%`,
-      Gancho: c.hook,
-      CTA: c.cta
-    }));
-    this.exportToCsv(`conteudos_${clientId}`, rows);
+    this.exportToCsv(`historico_${clientId}`, rows);
   },
 
   exportCompetitorsCsv(clientId: string): void {
-    const comps = storageService.competitors.getByClient(clientId);
-    const rows = comps.map(c => ({
+    const competitors = storageService.competitors.getByClient(clientId);
+    const rows = competitors.map(c => ({
       Nome: c.name,
       Instagram: c.instagram,
       Status: c.status,
-      Seguidores: c.followers,
-      FrequenciaSemanal: c.postingFrequencyWeekly,
-      VisualizacoesMedias: c.avgViews,
-      EngajamentoMedio: `${c.avgEngagementRate}%`,
+      Similaridade: c.similarityScore !== null ? `${c.similarityScore}%` : 'Sem dados',
+      Seguidores: c.followers !== null ? c.followers : 'Sem dados',
+      FrequenciaSemanal: c.postingFrequencyWeekly !== null ? c.postingFrequencyWeekly : 'Sem dados',
       Formatos: c.topFormats.join(', '),
-      Similaridade: `${c.similarityScore}%`,
-      Criterios: (c.similarityCriteria || []).join(' | ')
+      Site: c.website
     }));
     this.exportToCsv(`concorrentes_${clientId}`, rows);
   },
@@ -258,9 +423,5 @@ export const reportService = {
       DataCriacao: a.createdAt
     }));
     this.exportToCsv(`alertas_${clientId || 'agencia'}`, rows);
-  },
-
-  triggerPdfPrint(): void {
-    window.print();
   }
 };
