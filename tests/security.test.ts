@@ -51,6 +51,7 @@ describe('logs', () => {
     expect(JSON.stringify(out)).not.toContain('EAAxyz');
     expect(JSON.stringify(out)).not.toContain('u:p@h');
     expect(redactString('postgresql://user:pass@host:5432/db')).toBe('[REDACTED]');
+    expect(redactString('key AQ.Ab8RN6Ixxxxxxxxxxxxxxxxxxxxxxxx end')).toBe('key [REDACTED] end');
   });
 });
 
