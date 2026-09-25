@@ -6,7 +6,8 @@
  * Never fabricate previous periods, never use array slice as days, never invent numbers.
  */
 
-import { AccountSnapshot, Content, ContentFormat, PeriodComparison, PeriodAnalytics } from '../types';
+import { AccountSnapshot, Content, ContentFormat, Metric, PeriodComparison, PeriodAnalytics } from '../types';
+import { avgMetric, isMetric, sortValue, sumMetric } from '../utils/metrics';
 
 export interface DateRange {
   startDate: string; // YYYY-MM-DD
@@ -31,8 +32,8 @@ export const analyticsService = {
    * Helper to build a comparison between current and previous numbers.
    * If previous is null or zero with no data, comparison is honest.
    */
-  createComparison(current: number, previous: number | null): PeriodComparison {
-    if (previous === null || isNaN(previous)) {
+  createComparison(current: Metric, previous: Metric): PeriodComparison {
+    if (current === null || previous === null || isNaN(previous)) {
       return {
         current,
         previous: null,
@@ -126,58 +127,36 @@ export const analyticsService = {
 
     const hasPrevious = previousSnaps.length > 0;
 
-    // 1. Followers: VALOR FINAL do período atual vs VALOR FINAL do período anterior
-    const curFollowerFinal = currentSnaps.length > 0 ? currentSnaps[currentSnaps.length - 1].followers : 0;
-    const prevFollowerFinal = hasPrevious ? previousSnaps[previousSnaps.length - 1].followers : null;
-    const followersGrowth = this.createComparison(curFollowerFinal, prevFollowerFinal);
+    // 1. Seguidores: valor final real de cada período (null se não houver dado).
+    const lastFollowers = (list: AccountSnapshot[]): Metric => {
+      for (let i = list.length - 1; i >= 0; i--) if (isMetric(list[i].followers)) return list[i].followers;
+      return null;
+    };
+    const followersGrowth = this.createComparison(lastFollowers(currentSnaps), hasPrevious ? lastFollowers(previousSnaps) : null);
 
-    // 2. Totais do período
-    const curViews = currentSnaps.reduce((acc, s) => acc + s.views, 0);
-    const prevViews = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.views, 0) : null;
-    const totalViews = this.createComparison(curViews, prevViews);
+    // 2. Totais do período: soma apenas de valores disponíveis; null se nenhum.
+    const total = (list: AccountSnapshot[], key: 'views' | 'reach' | 'likes' | 'comments' | 'shares' | 'saves' | 'postsPublished'): Metric =>
+      sumMetric(list.map((snap) => snap[key]));
+    const compare = (key: 'views' | 'reach' | 'likes' | 'comments' | 'shares' | 'saves' | 'postsPublished') =>
+      this.createComparison(total(currentSnaps, key), hasPrevious ? total(previousSnaps, key) : null);
 
-    const curReach = currentSnaps.reduce((acc, s) => acc + s.reach, 0);
-    const prevReach = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.reach, 0) : null;
-    const totalReach = this.createComparison(curReach, prevReach);
+    const totalViews = compare('views');
+    const totalReach = compare('reach');
+    const totalLikes = compare('likes');
+    const totalComments = compare('comments');
+    const totalShares = compare('shares');
+    const totalSaves = compare('saves');
+    const postsPublished = compare('postsPublished');
 
-    const curLikes = currentSnaps.reduce((acc, s) => acc + s.likes, 0);
-    const prevLikes = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.likes, 0) : null;
-    const totalLikes = this.createComparison(curLikes, prevLikes);
-
-    const curComments = currentSnaps.reduce((acc, s) => acc + s.comments, 0);
-    const prevComments = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.comments, 0) : null;
-    const totalComments = this.createComparison(curComments, prevComments);
-
-    const curShares = currentSnaps.reduce((acc, s) => acc + s.shares, 0);
-    const prevShares = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.shares, 0) : null;
-    const totalShares = this.createComparison(curShares, prevShares);
-
-    const curSaves = currentSnaps.reduce((acc, s) => acc + s.saves, 0);
-    const prevSaves = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.saves, 0) : null;
-    const totalSaves = this.createComparison(curSaves, prevSaves);
-
-    const curPosts = currentSnaps.reduce((acc, s) => acc + s.postsPublished, 0);
-    const prevPosts = hasPrevious ? previousSnaps.reduce((acc, s) => acc + s.postsPublished, 0) : null;
-    const postsPublished = this.createComparison(curPosts, prevPosts);
-
-    // 3. Taxa média de engajamento: MÉDIA ponderada por alcance
-    let curAvgEng = 0;
-    if (curReach > 0) {
-      const curInteractions = curLikes + curComments + curShares + curSaves;
-      curAvgEng = Number(((curInteractions / curReach) * 100).toFixed(2));
-    } else if (currentSnaps.length > 0) {
-      curAvgEng = Number((currentSnaps.reduce((acc, s) => acc + s.engagementRate, 0) / currentSnaps.length).toFixed(2));
-    }
-
-    let prevAvgEng: number | null = null;
-    if (hasPrevious && prevReach !== null) {
-      if (prevReach > 0 && prevLikes !== null && prevComments !== null && prevShares !== null && prevSaves !== null) {
-        const prevInteractions = prevLikes + prevComments + prevShares + prevSaves;
-        prevAvgEng = Number(((prevInteractions / prevReach) * 100).toFixed(2));
-      } else if (previousSnaps.length > 0) {
-        prevAvgEng = Number((previousSnaps.reduce((acc, s) => acc + s.engagementRate, 0) / previousSnaps.length).toFixed(2));
-      }
-    }
+    // 3. Engajamento médio: interações / alcance (ponderado); senão média das taxas reais.
+    const engagementOf = (list: AccountSnapshot[]): Metric => {
+      const reach = total(list, 'reach');
+      const interactions = sumMetric([total(list, 'likes'), total(list, 'comments'), total(list, 'shares'), total(list, 'saves')]);
+      if (isMetric(reach) && reach > 0 && isMetric(interactions)) return Number(((interactions / reach) * 100).toFixed(2));
+      return avgMetric(list.map((snap) => snap.engagementRate), 2);
+    };
+    const curAvgEng = engagementOf(currentSnaps);
+    const prevAvgEng = hasPrevious ? engagementOf(previousSnaps) : null;
 
     const avgEngagementRate = this.createComparison(curAvgEng, prevAvgEng);
 
@@ -204,15 +183,15 @@ export const analyticsService = {
       periodDays,
       startDate: today,
       endDate: today,
-      followersGrowth: this.createComparison(0, null),
-      totalViews: this.createComparison(0, null),
-      totalReach: this.createComparison(0, null),
-      avgEngagementRate: this.createComparison(0, null),
-      totalLikes: this.createComparison(0, null),
-      totalComments: this.createComparison(0, null),
-      totalShares: this.createComparison(0, null),
-      totalSaves: this.createComparison(0, null),
-      postsPublished: this.createComparison(0, null),
+      followersGrowth: this.createComparison(null, null),
+      totalViews: this.createComparison(null, null),
+      totalReach: this.createComparison(null, null),
+      avgEngagementRate: this.createComparison(null, null),
+      totalLikes: this.createComparison(null, null),
+      totalComments: this.createComparison(null, null),
+      totalShares: this.createComparison(null, null),
+      totalSaves: this.createComparison(null, null),
+      postsPublished: this.createComparison(null, null),
       hasPreviousPeriod: false
     };
   },
@@ -220,83 +199,57 @@ export const analyticsService = {
   /**
    * Strategic content score calculation with weighted parameters
    */
-  calculateContentScore(content: Content): number {
+  calculateContentScore(content: Content): Metric {
     const m = content.metrics;
-    if (!m) return 0;
-
-    // Weights: Saves (35%), Shares (25%), Comments (20%), Reach (10%), Views (10%)
-    const savesScore = m.saves * 3.5;
-    const sharesScore = m.shares * 2.5;
-    const commentsScore = m.comments * 2.0;
-    const reachScore = (m.reach / 100) * 1.0;
-    const viewsScore = (m.views / 200) * 1.0;
-
-    return Math.round(savesScore + sharesScore + commentsScore + reachScore + viewsScore);
+    if (!m) return null;
+    const parts: Array<[Metric, number]> = [
+      [m.saves, 3.5],
+      [m.shares, 2.5],
+      [m.comments, 2.0],
+      [isMetric(m.reach) ? m.reach / 100 : null, 1.0],
+      [isMetric(m.views) ? m.views / 200 : null, 1.0]
+    ];
+    const available = parts.filter((p): p is [number, number] => isMetric(p[0]));
+    if (available.length === 0) return null;
+    // Score calculado apenas com as métricas disponíveis (fórmula determinística).
+    return Math.round(available.reduce((acc, [value, weight]) => acc + value * weight, 0));
   },
 
   /**
-   * Sort contents by actual ranking criteria
+   * Ordena conteúdos; métricas indisponíveis ficam por último.
    */
   rankContents(contents: Content[], sortBy: 'score' | 'views' | 'reach' | 'saves' | 'engagement' = 'score', ascending = false): Content[] {
     if (!contents || contents.length === 0) return [];
-    const list = [...contents];
-
-    list.sort((a, b) => {
-      let valA = 0;
-      let valB = 0;
-
-      if (sortBy === 'score') {
-        valA = this.calculateContentScore(a);
-        valB = this.calculateContentScore(b);
-      } else if (sortBy === 'views') {
-        valA = a.metrics.views;
-        valB = b.metrics.views;
-      } else if (sortBy === 'reach') {
-        valA = a.metrics.reach;
-        valB = b.metrics.reach;
-      } else if (sortBy === 'saves') {
-        valA = a.metrics.saves;
-        valB = b.metrics.saves;
-      } else if (sortBy === 'engagement') {
-        valA = a.metrics.engagementRate;
-        valB = b.metrics.engagementRate;
-      }
-
-      return ascending ? valA - valB : valB - valA;
+    const pick = (c: Content): Metric => {
+      if (sortBy === 'score') return this.calculateContentScore(c);
+      if (sortBy === 'views') return c.metrics.views;
+      if (sortBy === 'reach') return c.metrics.reach;
+      if (sortBy === 'saves') return c.metrics.saves;
+      return c.metrics.engagementRate;
+    };
+    return [...contents].sort((a, b) => {
+      const va = sortValue(pick(a));
+      const vb = sortValue(pick(b));
+      if (va === vb) return 0;
+      return ascending ? va - vb : vb - va;
     });
-
-    return list;
   },
 
   /**
    * Breakdown metrics by format
    */
-  breakdownByFormat(contents: Content[]): Record<ContentFormat, { count: number; avgViews: number; avgEngagement: number; totalSaves: number }> {
+  breakdownByFormat(contents: Content[]): Record<ContentFormat, { count: number; avgViews: Metric; avgEngagement: Metric; totalSaves: Metric }> {
     const formats: ContentFormat[] = ['Reels', 'Carrossel', 'Foto', 'Stories', 'Live'];
-    const result: Record<ContentFormat, { count: number; avgViews: number; avgEngagement: number; totalSaves: number }> = {
-      Reels: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 },
-      Carrossel: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 },
-      Foto: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 },
-      Stories: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 },
-      Live: { count: 0, avgViews: 0, avgEngagement: 0, totalSaves: 0 }
-    };
-
-    formats.forEach(fmt => {
-      const items = (contents || []).filter(c => c.format === fmt);
-      if (items.length > 0) {
-        const totalViews = items.reduce((acc, c) => acc + c.metrics.views, 0);
-        const totalEng = items.reduce((acc, c) => acc + c.metrics.engagementRate, 0);
-        const totalSaves = items.reduce((acc, c) => acc + c.metrics.saves, 0);
-
-        result[fmt] = {
-          count: items.length,
-          avgViews: Math.round(totalViews / items.length),
-          avgEngagement: Number((totalEng / items.length).toFixed(2)),
-          totalSaves
-        };
-      }
+    const result = {} as Record<ContentFormat, { count: number; avgViews: Metric; avgEngagement: Metric; totalSaves: Metric }>;
+    formats.forEach((fmt) => {
+      const items = (contents || []).filter((c) => c.format === fmt);
+      result[fmt] = {
+        count: items.length,
+        avgViews: avgMetric(items.map((c) => c.metrics.views)),
+        avgEngagement: avgMetric(items.map((c) => c.metrics.engagementRate), 2),
+        totalSaves: sumMetric(items.map((c) => c.metrics.saves))
+      };
     });
-
     return result;
   }
 };

@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
+import { formatMetric } from '../../utils/metrics';
 
 interface HistoryTabProps {
   client: Client;
@@ -80,7 +81,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
 
           <button
             onClick={() => reportService.exportHistoryCsv(client.id)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-mono transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             <span>CSV</span>
@@ -152,25 +153,25 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
                     {snap.date}
                   </td>
                   <td className="py-2.5 text-right font-bold text-amber-300 tabular-nums">
-                    {snap.followers.toLocaleString('pt-BR')}
+                    {formatMetric(snap.followers)}
                   </td>
                   <td className="py-2.5 text-right tabular-nums">
-                    {snap.views.toLocaleString('pt-BR')}
+                    {formatMetric(snap.views)}
                   </td>
                   <td className="py-2.5 text-right tabular-nums">
-                    {snap.reach.toLocaleString('pt-BR')}
+                    {formatMetric(snap.reach)}
                   </td>
                   <td className="py-2.5 text-right tabular-nums">
-                    {snap.likes.toLocaleString('pt-BR')}
+                    {formatMetric(snap.likes)}
                   </td>
                   <td className="py-2.5 text-right tabular-nums">
-                    {snap.comments.toLocaleString('pt-BR')}
+                    {formatMetric(snap.comments)}
                   </td>
                   <td className="py-2.5 text-right tabular-nums">
-                    {snap.shares.toLocaleString('pt-BR')}
+                    {formatMetric(snap.shares)}
                   </td>
                   <td className="py-2.5 text-right text-emerald-400 font-semibold tabular-nums">
-                    {snap.saves.toLocaleString('pt-BR')}
+                    {formatMetric(snap.saves)}
                   </td>
                   <td className="py-2.5 text-right text-emerald-400 font-bold tabular-nums">
                     {snap.engagementRate}%

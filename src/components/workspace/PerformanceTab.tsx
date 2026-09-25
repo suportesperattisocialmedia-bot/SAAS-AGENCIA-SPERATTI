@@ -17,6 +17,7 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
+import { formatMetric } from '../../utils/metrics';
 
 interface PerformanceTabProps {
   client: Client;
@@ -165,7 +166,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-2">
           <span className="text-[10px] font-mono uppercase text-neutral-500">Seguidores (Final)</span>
           <div className="text-2xl font-bold text-neutral-100 font-mono">
-            {periodData.followersGrowth.current.toLocaleString('pt-BR')}
+            {formatMetric(periodData.followersGrowth.current)}
           </div>
           {renderComparison(periodData.followersGrowth)}
         </div>
@@ -174,7 +175,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-2">
           <span className="text-[10px] font-mono uppercase text-neutral-500">Visualizações (Total)</span>
           <div className="text-2xl font-bold text-neutral-100 font-mono">
-            {periodData.totalViews.current.toLocaleString('pt-BR')}
+            {formatMetric(periodData.totalViews.current)}
           </div>
           {renderComparison(periodData.totalViews)}
         </div>
@@ -183,7 +184,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-2">
           <span className="text-[10px] font-mono uppercase text-neutral-500">Alcance (Total)</span>
           <div className="text-2xl font-bold text-neutral-100 font-mono">
-            {periodData.totalReach.current.toLocaleString('pt-BR')}
+            {formatMetric(periodData.totalReach.current)}
           </div>
           {renderComparison(periodData.totalReach)}
         </div>
@@ -311,7 +312,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-neutral-800 text-center font-mono">
                       <div className="bg-neutral-950 p-1.5 rounded-lg">
                         <span className="text-[10px] text-neutral-500 block">Views</span>
-                        <span className="text-xs text-neutral-200">{c.metrics.views.toLocaleString('pt-BR')}</span>
+                        <span className="text-xs text-neutral-200">{formatMetric(c.metrics.views)}</span>
                       </div>
                       <div className="bg-neutral-950 p-1.5 rounded-lg">
                         <span className="text-[10px] text-neutral-500 block">Saves</span>

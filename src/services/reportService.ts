@@ -7,11 +7,11 @@
  * Real PDF generation with jsPDF (no window.print dependency).
  */
 
-import { jsPDF } from 'jspdf';
 import { Client, Report, Content } from '../types';
 import { storageService } from './storageService';
 import { analyticsService } from './analyticsService';
 import { aiService } from './aiService';
+import { formatMetric } from '../utils/metrics';
 
 export const reportService = {
   /**
@@ -29,12 +29,12 @@ export const reportService = {
     const periodLabel = `${period.startDate} até ${period.endDate} (${periodDays} dias)`;
 
     // Construct honest executive summary
-    const curFollowers = period.followersGrowth.current.toLocaleString('pt-BR');
+    const curFollowers = formatMetric(period.followersGrowth.current, { fallback: 'número não disponível de' });
     const followersDiff = period.followersGrowth.percentDiff !== null
       ? `${period.followersGrowth.percentDiff >= 0 ? '+' : ''}${period.followersGrowth.percentDiff}%`
       : 'sem base comparativa anterior';
 
-    const totalViews = period.totalViews.current.toLocaleString('pt-BR');
+    const totalViews = formatMetric(period.totalViews.current, { fallback: 'valor não disponível' });
     const viewsDiff = period.totalViews.percentDiff !== null
       ? `${period.totalViews.percentDiff >= 0 ? '+' : ''}${period.totalViews.percentDiff}%`
       : 'sem base anterior';
@@ -65,7 +65,7 @@ export const reportService = {
         reachDiffPct: period.totalReach.percentDiff,
         engagementRate: period.avgEngagementRate.current,
         engagementDiffPct: period.avgEngagementRate.percentDiff,
-        postsCount: period.postsPublished.current
+        postsCount: contents.filter((c) => c.publishedAt.slice(0, 10) >= period.startDate && c.publishedAt.slice(0, 10) <= period.endDate).length
       },
       topContents,
       worstContents,
@@ -96,7 +96,9 @@ export const reportService = {
   /**
    * Generates and downloads a real, multi-page branded PDF report
    */
-  exportToPdf(report: Report, client: Client): void {
+  async exportToPdf(report: Report, client: Client): Promise<void> {
+    // Carregado sob demanda: jsPDF é pesado e só é necessário na exportação.
+    const { jsPDF } = await import('jspdf');
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -160,22 +162,22 @@ export const reportService = {
     const kpisList = [
       {
         label: 'Seguidores',
-        val: report.kpis.followers > 0 ? report.kpis.followers.toLocaleString('pt-BR') : '—',
+        val: formatMetric(report.kpis.followers),
         diff: report.kpis.followersDiffPct !== null ? `${report.kpis.followersDiffPct >= 0 ? '+' : ''}${report.kpis.followersDiffPct}%` : 'N/D'
       },
       {
         label: 'Visualizações',
-        val: report.kpis.views > 0 ? report.kpis.views.toLocaleString('pt-BR') : '—',
+        val: formatMetric(report.kpis.views),
         diff: report.kpis.viewsDiffPct !== null ? `${report.kpis.viewsDiffPct >= 0 ? '+' : ''}${report.kpis.viewsDiffPct}%` : 'N/D'
       },
       {
         label: 'Alcance Total',
-        val: report.kpis.reach > 0 ? report.kpis.reach.toLocaleString('pt-BR') : '—',
+        val: formatMetric(report.kpis.reach),
         diff: report.kpis.reachDiffPct !== null ? `${report.kpis.reachDiffPct >= 0 ? '+' : ''}${report.kpis.reachDiffPct}%` : 'N/D'
       },
       {
         label: 'Engajamento',
-        val: report.kpis.engagementRate > 0 ? `${report.kpis.engagementRate}%` : '—',
+        val: formatMetric(report.kpis.engagementRate, { suffix: '%' }),
         diff: report.kpis.engagementDiffPct !== null ? `${report.kpis.engagementDiffPct >= 0 ? '+' : ''}${report.kpis.engagementDiffPct}%` : 'N/D'
       }
     ];
@@ -228,7 +230,7 @@ export const reportService = {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.5);
         doc.setTextColor(100, 116, 139);
-        doc.text(`Pilar: ${c.pillar} | Views: ${c.metrics.views.toLocaleString('pt-BR')} | Salvamentos: ${c.metrics.saves} | Compartilhamentos: ${c.metrics.shares}`, margin + 4, y);
+        doc.text(`Pilar: ${c.pillar} | Views: ${formatMetric(c.metrics.views)} | Salvamentos: ${formatMetric(c.metrics.saves)} | Compartilhamentos: ${formatMetric(c.metrics.shares)}`, margin + 4, y);
         y += 5.5;
       });
     }

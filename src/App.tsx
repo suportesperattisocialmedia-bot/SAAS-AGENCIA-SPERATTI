@@ -26,6 +26,10 @@ import { notificationService, notificationStore } from './services/notifications
 import { alertEngine } from './services/alerts/alertEngine';
 import { migrationEngine } from './services/storage/migration';
 import { logger } from './utils/logger';
+import { sessionService, type BackendStatus, type SessionUser } from './services/sessionService';
+import { describeApiError } from './services/api/apiClient';
+import { DemoProvider } from './services/demo/DemoProvider';
+import { LoginScreen } from './components/auth/LoginScreen';
 
 // Layout & Common Components
 import { Sidebar, MainNavSection } from './components/layout/Sidebar';
@@ -60,6 +64,8 @@ export default function App() {
   // Boot & System Lifecycle State
   const [isBooting, setIsBooting] = useState(true);
   const [bootError, setBootError] = useState<string | null>(null);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [backendStatus, setBackendStatus] = useState<BackendStatus | null>(null);
 
   // Navigation & Workspace State
   const [currentSection, setCurrentSection] = useState<MainNavSection>('dashboard');
@@ -92,6 +98,13 @@ export default function App() {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [alertsModalOpen, setAlertsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+
+  /** Demo e produção nunca se misturam: cada modo enxerga apenas os próprios clientes. */
+  const visibleClients = useCallback((): Client[] => {
+    const demoId = DemoProvider.getDemoClientId();
+    const all = storageService.clients.getAll();
+    return storageService.isDemoLoaded() ? all.filter((c) => c.id === demoId) : all.filter((c) => c.id !== demoId);
+  }, []);
 
   // Load Client Domain Data
   const loadClientData = useCallback((client: Client) => {
@@ -130,7 +143,7 @@ export default function App() {
 
   // Reload all agency data
   const reloadAllData = useCallback(() => {
-    const allClients = storageService.clients.getAll();
+    const allClients = visibleClients();
     setClients(allClients);
 
     const isDemo = storageService.isDemoLoaded();
@@ -149,6 +162,86 @@ export default function App() {
     } else {
       setActiveClient(null);
     }
+  }, [loadClientData, visibleClients]);
+
+  /** Sincroniza o cadastro local de clientes com o servidor (necessário para OAuth, sync e IA). */
+  const syncClientsWithServer = useCallback(async () => {
+    const demoId = DemoProvider.getDemoClientId();
+    const local = storageService.clients.getAll().filter((c) => c.id !== demoId);
+    await Promise.allSettled(local.map((c) => sessionService.registerClient(c)));
+    try {
+      const remote = await sessionService.listClients();
+      const localIds = new Set(local.map((c) => c.id));
+      remote
+        .filter((r) => !localIds.has(r.id))
+        .forEach((r) => {
+          const p = r.profile as Partial<Client>;
+          storageService.clients.create({
+            id: r.id,
+            name: r.name,
+            company: p.company ?? '',
+            instagram: r.instagramHandle || p.instagram || '@',
+            website: '',
+            whatsapp: '',
+            city: '',
+            segment: r.segment || p.segment || 'Não informado',
+            subsegment: p.subsegment ?? '',
+            targetAudience: p.targetAudience ?? '',
+            persona: p.persona ?? '',
+            averageTicket: p.averageTicket ?? '',
+            products: '',
+            services: '',
+            objectives: p.objectives ?? [],
+            pillars: p.pillars ?? [],
+            formats: p.formats ?? ['Reels', 'Carrossel'],
+            toneOfVoice: p.toneOfVoice ?? '',
+            differentiators: p.differentiators ?? '',
+            notes: '',
+            status: 'active',
+            onboardingStep: 1,
+            healthStatus: 'not_connected'
+          });
+        });
+    } catch (err) {
+      logger.warn('Falha ao listar clientes do servidor', { error: describeApiError(err) });
+    }
+  }, []);
+
+  /** Trata o retorno do OAuth (?instagram=connected|error&clientId=...&reason=...). */
+  const handleOAuthReturn = useCallback(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get('instagram');
+    if (!outcome) return;
+    const clientId = params.get('clientId');
+    const reason = params.get('reason');
+    window.history.replaceState({}, '', window.location.pathname);
+
+    const client = clientId ? storageService.clients.getById(clientId) : undefined;
+    if (client) {
+      setActiveClient(client);
+      setCurrentSection('performance');
+      setWorkspaceTab('instagram');
+    }
+    if (outcome === 'connected' && clientId) {
+      await instagramService.checkStatus(clientId);
+      notificationStore.notify('Instagram conectado', 'Autorização concluída. Iniciando a primeira sincronização.', 'success');
+      const res = await instagramService.syncNow(clientId, 'AUTO_OPEN');
+      if (!res.success && res.error) notificationService.showToast(res.error, 'warning');
+    } else {
+      const messages: Record<string, string> = {
+        ACCESS_DENIED: 'A autorização foi cancelada na Meta.',
+        STATE_EXPIRED: 'O link de autorização expirou. Tente conectar novamente.',
+        STATE_ALREADY_USED: 'Este retorno de autorização já foi utilizado.',
+        STATE_NOT_FOUND: 'Retorno de autorização inválido. Inicie a conexão novamente.',
+        STATE_MISSING: 'Retorno de autorização inválido. Inicie a conexão novamente.',
+        NO_BUSINESS_ACCOUNT: 'Nenhuma conta profissional do Instagram vinculada a uma Página foi encontrada.',
+        TOKEN_EXCHANGE_FAILED: 'A Meta recusou a troca do código de autorização. Tente novamente.',
+        META_NOT_CONFIGURED: 'Instagram API não configurada no servidor.'
+      };
+      if (clientId) await instagramService.checkStatus(clientId);
+      notificationService.showToast(messages[reason ?? ''] ?? 'Não foi possível concluir a conexão com o Instagram.', 'error');
+    }
+    if (client) loadClientData(client);
   }, [loadClientData]);
 
   // Safe Application Initialization
@@ -161,15 +254,26 @@ export default function App() {
       // Step 1: Run storage migrations
       migrationEngine.runMigrations();
 
-      // Step 2: Read settings and determine mode
+      // Step 2: remove o cliente demo legado (versões anteriores) para não contaminar produção.
+      if (storageService.clients.getById('client-ravi-demo')) storageService.deleteClientCascade('client-ravi-demo');
+
+      // Step 3: estado do backend + sessão (modo demo não depende do servidor).
       const isDemo = storageService.isDemoLoaded();
       setIsDemoLoaded(isDemo);
+      const [status, session] = await Promise.all([
+        sessionService.getStatus(),
+        sessionService.getSession().catch(() => ({ authenticated: false, user: null, configured: false }))
+      ]);
+      setBackendStatus(status);
+      setSessionUser(session.user);
 
-      // Step 3: Load clients
-      const existingClients = storageService.clients.getAll();
+      if (session.user && !isDemo) {
+        await syncClientsWithServer();
+      }
+
+      // Step 4: clientes visíveis no modo atual
+      const existingClients = visibleClients();
       setClients(existingClients);
-
-      // Step 4: Load alerts
       setAlerts(alertEngine.getAll());
 
       if (existingClients.length > 0) {
@@ -187,7 +291,12 @@ export default function App() {
       setBootError(err.message || 'Falha na inicialização do sistema');
       setIsBooting(false);
     }
-  }, [loadClientData]);
+  }, [loadClientData, visibleClients, syncClientsWithServer]);
+
+  // Retorno do OAuth tratado após o boot, com a interface (e os toasts) já montada.
+  useEffect(() => {
+    if (!isBooting && sessionUser && !isDemoLoaded) void handleOAuthReturn();
+  }, [isBooting, sessionUser, isDemoLoaded, handleOAuthReturn]);
 
   useEffect(() => {
     initializeApplication();
@@ -243,23 +352,32 @@ export default function App() {
         'success'
       );
       setWorkspaceTab('diagnostic');
-    } catch {
-      notificationService.showToast('Erro ao realizar diagnóstico com IA.', 'error');
+    } catch (err) {
+      notificationService.showToast(describeApiError(err, 'Erro ao realizar diagnóstico com IA.'), 'error');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   // Client CRUD Handlers
+  const registerOnServer = (client: Client) => {
+    if (isDemoLoaded || !sessionUser) return;
+    sessionService.registerClient(client).catch((err) => {
+      notificationService.showToast(`Cliente salvo localmente, mas não foi registrado no servidor: ${describeApiError(err)}`, 'warning');
+    });
+  };
+
   const handleSaveClient = (data: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (editingClient) {
       const updated = storageService.clients.update(editingClient.id, data);
       if (updated) {
+        registerOnServer(updated);
         notificationService.showToast(`Cliente ${data.name} atualizado.`, 'success');
         setEditingClient(null);
       }
     } else {
       const created = storageService.clients.create(data);
+      registerOnServer(created);
       notificationStore.notify(
         'Novo Cliente Cadastrado',
         `Workspace criado para ${created.name} (${created.instagram}).`,
@@ -275,6 +393,11 @@ export default function App() {
   const handleDeleteClient = (client: Client) => {
     if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Todos os dados associados serão removidos.`)) {
       storageService.clients.delete(client.id);
+      if (!isDemoLoaded && sessionUser) {
+        sessionService.removeClient(client.id).catch((err) =>
+          notificationService.showToast(`Removido localmente; falha ao remover no servidor: ${describeApiError(err)}`, 'warning')
+        );
+      }
       notificationService.showToast(`Cliente ${client.name} excluído.`, 'warning');
       setActiveClient(null);
       reloadAllData();
@@ -293,7 +416,7 @@ export default function App() {
     } else {
       storageService.seedDemoData();
       setIsDemoLoaded(true);
-      notificationService.showToast('Modo demonstração ativado (Dr. Ravi Alencar).', 'success');
+      notificationService.showToast('Modo demonstração ativado com dados fictícios.', 'success');
       reloadAllData();
     }
   };
@@ -323,6 +446,40 @@ export default function App() {
   if (isBooting || bootError) {
     return <BootLoader error={bootError} onRetry={initializeApplication} />;
   }
+
+  if (!sessionUser && !isDemoLoaded) {
+    return (
+      <>
+        <LoginScreen
+          status={backendStatus}
+          onLogin={async (email, password) => {
+            try {
+              await sessionService.login(email, password);
+            } catch (err) {
+              throw new Error(describeApiError(err, 'Não foi possível entrar.'));
+            }
+            await initializeApplication();
+          }}
+          onExploreDemo={() => {
+            storageService.seedDemoData();
+            setIsDemoLoaded(true);
+            reloadAllData();
+          }}
+        />
+        <ToastContainer />
+      </>
+    );
+  }
+
+  const handleLogout = async () => {
+    try {
+      await sessionService.logout();
+    } finally {
+      setSessionUser(null);
+      setActiveClient(null);
+      setClients([]);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans antialiased selection:bg-amber-500 selection:text-neutral-950">
@@ -356,6 +513,9 @@ export default function App() {
           onToggleDemoData={handleToggleDemoData}
           isOpenMobile={mobileMenuOpen}
           onCloseMobile={() => setMobileMenuOpen(false)}
+          userName={sessionUser?.name ?? null}
+          userRole={sessionUser?.role ?? null}
+          onLogout={sessionUser ? handleLogout : undefined}
         />
 
         {/* Main App Container */}
@@ -370,7 +530,7 @@ export default function App() {
               setEditingClient(null);
               setClientFormModalOpen(true);
             }}
-            onSyncCurrentClient={activeClient ? handleSyncActiveClient : undefined}
+            onSyncCurrentClient={activeClient && instagramAccount?.isConnected ? handleSyncActiveClient : undefined}
             isSyncing={isSyncing}
             unreadAlertsCount={unreadAlertsCount}
             onOpenAlerts={() => setAlertsModalOpen(true)}

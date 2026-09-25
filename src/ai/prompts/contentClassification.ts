@@ -9,16 +9,18 @@ export interface ContentClassificationInput {
   caption: string;
   format: string;
   metrics: {
-    views: number;
-    reach: number;
-    likes: number;
-    comments: number;
-    shares: number;
-    saves: number;
-    engagementRate: number;
+    views: number | null;
+    reach: number | null;
+    likes: number | null;
+    comments: number | null;
+    shares: number | null;
+    saves: number | null;
+    engagementRate: number | null;
   };
   clientPillars: string[];
 }
+
+const show = (value: number | null, suffix = ''): string => (value === null ? 'indisponível' : `${value}${suffix}`);
 
 export function buildContentClassificationPrompt(input: ContentClassificationInput): string {
   return `Você é um analista de performance e semiótica da agência Gabriel Speratti.
@@ -31,13 +33,13 @@ ${input.caption.slice(0, 800)}
 
 FORMATO: ${input.format}
 MÉTRICAS:
-- Visualizações: ${input.metrics.views}
-- Alcance: ${input.metrics.reach}
-- Curtidas: ${input.metrics.likes}
-- Comentários: ${input.metrics.comments}
-- Compartilhamentos: ${input.metrics.shares}
-- Salvamentos: ${input.metrics.saves}
-- Taxa de Engajamento: ${input.metrics.engagementRate}%
+- Visualizações: ${show(input.metrics.views)}
+- Alcance: ${show(input.metrics.reach)}
+- Curtidas: ${show(input.metrics.likes)}
+- Comentários: ${show(input.metrics.comments)}
+- Compartilhamentos: ${show(input.metrics.shares)}
+- Salvamentos: ${show(input.metrics.saves)}
+- Taxa de Engajamento: ${show(input.metrics.engagementRate, '%')}
 
 PILARES ESTRATÉGICOS DISPONÍVEIS:
 ${input.clientPillars.join(', ') || 'Autoridade, Conexão, Conversão, Educativo'}

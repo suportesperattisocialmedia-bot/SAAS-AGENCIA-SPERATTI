@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Plus
 } from 'lucide-react';
+import { formatMetric } from '../../utils/metrics';
 
 interface ContentTabProps {
   client: Client;
@@ -135,7 +136,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
                     <Eye className="w-2.5 h-2.5" /> Views
                   </div>
                   <div className="text-neutral-200 font-semibold tabular-nums text-[11px]">
-                    {content.metrics.views.toLocaleString('pt-BR')}
+                    {formatMetric(content.metrics.views)}
                   </div>
                 </div>
 
@@ -144,7 +145,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
                     <Bookmark className="w-2.5 h-2.5" /> Salvos
                   </div>
                   <div className="text-neutral-200 font-semibold tabular-nums text-[11px]">
-                    {content.metrics.saves.toLocaleString('pt-BR')}
+                    {formatMetric(content.metrics.saves)}
                   </div>
                 </div>
 
@@ -153,7 +154,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
                     <Share2 className="w-2.5 h-2.5" /> Shares
                   </div>
                   <div className="text-neutral-200 font-semibold tabular-nums text-[11px]">
-                    {content.metrics.shares.toLocaleString('pt-BR')}
+                    {formatMetric(content.metrics.shares)}
                   </div>
                 </div>
 
@@ -196,23 +197,23 @@ export const ContentTab: React.FC<ContentTabProps> = ({
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center font-mono pt-1">
                 <div className="p-2 bg-neutral-900 rounded border border-neutral-800">
                   <div className="text-[10px] text-neutral-500">Views</div>
-                  <div className="text-xs font-bold text-neutral-100">{activeContent.metrics.views.toLocaleString('pt-BR')}</div>
+                  <div className="text-xs font-bold text-neutral-100">{formatMetric(activeContent.metrics.views)}</div>
                 </div>
                 <div className="p-2 bg-neutral-900 rounded border border-neutral-800">
                   <div className="text-[10px] text-neutral-500">Alcance</div>
-                  <div className="text-xs font-bold text-neutral-100">{activeContent.metrics.reach.toLocaleString('pt-BR')}</div>
+                  <div className="text-xs font-bold text-neutral-100">{formatMetric(activeContent.metrics.reach)}</div>
                 </div>
                 <div className="p-2 bg-neutral-900 rounded border border-neutral-800">
                   <div className="text-[10px] text-neutral-500">Salvos</div>
-                  <div className="text-xs font-bold text-neutral-100">{activeContent.metrics.saves.toLocaleString('pt-BR')}</div>
+                  <div className="text-xs font-bold text-neutral-100">{formatMetric(activeContent.metrics.saves)}</div>
                 </div>
                 <div className="p-2 bg-neutral-900 rounded border border-neutral-800">
                   <div className="text-[10px] text-neutral-500">Shares</div>
-                  <div className="text-xs font-bold text-neutral-100">{activeContent.metrics.shares.toLocaleString('pt-BR')}</div>
+                  <div className="text-xs font-bold text-neutral-100">{formatMetric(activeContent.metrics.shares)}</div>
                 </div>
                 <div className="p-2 bg-neutral-900 rounded border border-neutral-800">
                   <div className="text-[10px] text-neutral-500">Curtidas</div>
-                  <div className="text-xs font-bold text-neutral-100">{activeContent.metrics.likes.toLocaleString('pt-BR')}</div>
+                  <div className="text-xs font-bold text-neutral-100">{formatMetric(activeContent.metrics.likes)}</div>
                 </div>
                 <div className="p-2 bg-neutral-900 rounded border border-neutral-800">
                   <div className="text-[10px] text-neutral-500">Engajamento</div>

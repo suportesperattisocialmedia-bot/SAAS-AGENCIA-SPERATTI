@@ -35,7 +35,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
     category: 'Dores' as AudienceInsightCategory,
     title: '',
     description: '',
-    source: 'Google Search & YouTube',
+    source: 'Observação da equipe',
     context: '',
     interpretation: '',
     isHypothesis: false
@@ -48,12 +48,19 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
   const handleRunSearch = async () => {
     setIsSearching(true);
     try {
-      const newItems = await researchService.runAudienceDiscovery(client);
-      notificationService.addNotification(
-        'Pesquisa de Público Concluída',
-        `${newItems.length} novos insights identificados nas buscas públicas.`,
-        'success'
-      );
+      const category = selectedCategory === 'all' ? 'Dores' : (selectedCategory as AudienceInsightCategory);
+      const result = await researchService.runAudienceDiscovery(client, category);
+      if (!result.configured) {
+        notificationService.showToast(result.message || 'Pesquisa externa não configurada.', 'info');
+      } else if (!result.success) {
+        notificationService.showToast(result.message || 'Falha na pesquisa externa.', 'error');
+      } else {
+        notificationService.addNotification(
+          'Pesquisa de público concluída',
+          `${result.newInsights.length} fonte(s) nova(s) salva(s) como hipótese para validação.`,
+          'success'
+        );
+      }
       onRefresh();
     } catch {
       notificationService.showToast('Erro ao realizar pesquisa de público.', 'error');
@@ -72,7 +79,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
       title: form.title,
       description: form.description,
       source: form.source,
-      sourceDate: new Date().toLocaleDateString('pt-BR'),
+      sourceDate: new Date().toISOString(),
       context: form.context,
       interpretation: form.interpretation,
       confidence: form.isHypothesis ? 'LOW' : 'HIGH',
@@ -109,7 +116,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
           <button
             onClick={handleRunSearch}
             disabled={isSearching}
-            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-mono transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs transition-colors disabled:opacity-50"
           >
             <Search className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-amber-400' : ''}`} />
             <span>{isSearching ? 'Pesquisando Fontes...' : 'Pesquisar Público'}</span>

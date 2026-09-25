@@ -1,19 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Client, InstagramAccount } from '../../types';
 import { instagramService } from '../../services/instagramService';
 import { notificationService } from '../../services/notificationService';
-import {
-  Link2,
-  RefreshCw,
-  Unlink,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  Shield,
-  KeyRound,
-  ExternalLink,
-  Layers
-} from 'lucide-react';
+import { storageService } from '../../services/storageService';
+import { DemoProvider } from '../../services/demo/DemoProvider';
+import { describeApiError } from '../../services/api/apiClient';
+import { ConnectionBadge, CONNECTION_STATE } from '../common/ConnectionBadge';
+import { Instagram, KeyRound, Link2, Loader2, RefreshCw, ShieldCheck, Unlink } from 'lucide-react';
 
 interface InstagramConnectTabProps {
   client: Client;
@@ -23,214 +16,199 @@ interface InstagramConnectTabProps {
   isSyncing: boolean;
 }
 
-export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({
-  client,
-  account,
-  onRefreshAccount,
-  onSync,
-  isSyncing
-}) => {
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [appId, setAppId] = useState(account.appId || '');
-  const [accountId, setAccountId] = useState(account.accountId || '');
-  const [serverTokenConfigured, setServerTokenConfigured] = useState(true);
+const SCOPE_LABELS: Record<string, string> = {
+  instagram_basic: 'Perfil e mídia',
+  instagram_manage_insights: 'Métricas (insights)',
+  pages_show_list: 'Lista de páginas',
+  pages_read_engagement: 'Engajamento da página',
+  business_management: 'Gerenciador de negócios'
+};
 
-  const isConnected = account.isConnected;
+function formatDateTime(value?: string | null): string {
+  if (!value) return 'Nunca';
+  return new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client, account, onRefreshAccount, onSync, isSyncing }) => {
+  const [busy, setBusy] = useState<'connect' | 'disconnect' | 'refresh' | null>(null);
+  const isDemo = client.id === DemoProvider.getDemoClientId();
+  const status = isSyncing ? 'SYNCING' : account.status;
+  const state = CONNECTION_STATE[status];
+  const syncLogs = storageService.syncLogs.getByClient(client.id).slice(0, 5);
+  const canConnect = !isDemo && status !== 'NOT_CONFIGURED' && status !== 'CONNECTING';
+  const needsReconnect = status === 'EXPIRED' || status === 'REAUTH_REQUIRED';
+
+  useEffect(() => {
+    if (isDemo) return;
+    let active = true;
+    setBusy('refresh');
+    instagramService.checkStatus(client.id).finally(() => {
+      if (!active) return;
+      setBusy(null);
+      onRefreshAccount();
+    });
+    return () => {
+      active = false;
+    };
+    // Revalida o estado real sempre que o cliente muda.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id, isDemo]);
 
   const handleConnect = async () => {
-    await instagramService.connectAccount(client.id, client.instagram, { appId, accountId });
-    notificationService.addNotification(
-      'Conta Conectada',
-      `Conta ${client.instagram} conectada com sucesso ao workspace.`,
-      'success'
-    );
-    onRefreshAccount();
+    setBusy('connect');
+    try {
+      await instagramService.beginOAuth(client.id);
+      // O navegador será redirecionado para a Meta; o estado final chega pelo callback.
+    } catch (err) {
+      notificationService.showToast(describeApiError(err, 'Não foi possível iniciar a conexão.'), 'error');
+      setBusy(null);
+      onRefreshAccount();
+    }
   };
 
-  const handleDisconnect = () => {
-    if (window.confirm(`Deseja realmente desconectar o perfil ${client.instagram}? Os dados históricos salvos permanecerão preservados.`)) {
-      instagramService.disconnectAccount(client.id);
-      notificationService.addNotification(
-        'Conta Desconectada',
-        `A conta ${client.instagram} foi desconectada.`,
-        'warning'
-      );
+  const handleDisconnect = async () => {
+    if (!window.confirm(`Desconectar ${client.instagram}? O token será apagado do servidor. O histórico já sincronizado continua salvo.`)) return;
+    setBusy('disconnect');
+    try {
+      await instagramService.disconnectAccount(client.id);
+      notificationService.showToast('Instagram desconectado.', 'info');
+    } catch (err) {
+      notificationService.showToast(describeApiError(err, 'Falha ao desconectar.'), 'error');
+    } finally {
+      setBusy(null);
       onRefreshAccount();
     }
   };
 
   return (
     <div className="max-w-4xl space-y-6 animate-in fade-in duration-200">
-      {/* Real-world Meta Graph API Status Notice */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className={`p-2 rounded-lg ${isConnected ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}`}>
-              <Link2 className="w-5 h-5" />
+      <section className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-center shrink-0">
+              <Instagram className="w-5 h-5 text-amber-400" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-neutral-100">
-                  Integração Meta Graph API para Instagram Business
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold text-neutral-100">
+                  {account.username ? `@${account.username}` : client.instagram}
                 </h3>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                  isConnected
-                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400'
-                    : 'bg-neutral-800 border-neutral-700 text-neutral-400'
-                }`}>
-                  {isConnected ? 'CONECTADA' : 'DESCONECTADA'}
-                </span>
+                <ConnectionBadge status={status} />
+                {busy === 'refresh' && <Loader2 className="w-3.5 h-3.5 text-neutral-500 animate-spin" aria-label="Verificando status" />}
               </div>
-              <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
-                Cada cliente na agência Gabriel Speratti possui sua própria credencial de acesso individual, garantindo total isolamento de dados e conformidade com as diretrizes da Meta.
+              <p className="text-sm text-neutral-400 leading-relaxed max-w-[60ch]">
+                {isDemo ? 'Cliente de demonstração: nenhuma conexão real com a Meta é feita.' : state.description}
               </p>
+              {account.errorStatus && (status === 'ERROR' || needsReconnect || status === 'NOT_CONFIGURED') && (
+                <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-500/20 rounded-lg px-3 py-2">{account.errorStatus}</p>
+              )}
             </div>
           </div>
 
-          <button
-            onClick={() => setShowConfigModal(!showConfigModal)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 rounded-lg text-xs font-mono transition-colors shrink-0"
-          >
-            <KeyRound className="w-3.5 h-3.5" />
-            <span>Credenciais Meta</span>
-          </button>
-        </div>
-
-        {/* Credentials Form Drawer */}
-        {showConfigModal && (
-          <div className="mt-5 pt-5 border-t border-neutral-800/80 space-y-4 animate-in slide-in-from-top-2 duration-150">
-            <div className="text-xs font-mono uppercase text-amber-400 font-semibold">
-              Configuração de Conexão Oficial (Produção / Sandbox)
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-              <div>
-                <label className="block text-neutral-400 mb-1">Meta App ID (Client ID)</label>
-                <input
-                  type="text"
-                  value={appId}
-                  onChange={(e) => setAppId(e.target.value)}
-                  placeholder="Ex: 104829582910482"
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-200"
-                />
-              </div>
-
-              <div>
-                <label className="block text-neutral-400 mb-1">Instagram Business Account ID</label>
-                <input
-                  type="text"
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  placeholder="Ex: 178414058291823"
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-200"
-                />
-              </div>
-            </div>
-
-            <div className="p-3 bg-neutral-950/60 border border-neutral-800 rounded-lg text-[11px] text-neutral-400">
-              <span className="text-amber-400 font-semibold">Protocolo de Segurança:</span> Segredos da aplicação (`APP_SECRET` e `ACCESS_TOKEN`) são gerenciados exclusivamente no ambiente seguro do servidor e jamais expostos no código cliente.
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Account Details Box */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-5">
-        <h4 className="text-xs font-mono uppercase text-neutral-400 font-semibold">
-          Parâmetros da Conta de Destino
-        </h4>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="p-3.5 bg-neutral-950/60 border border-neutral-800/80 rounded-lg">
-            <div className="text-[10px] font-mono uppercase text-neutral-500 mb-1">Perfil Alvo</div>
-            <div className="text-sm font-bold font-mono text-amber-300 truncate">
-              {client.instagram}
-            </div>
-            <div className="text-xs text-neutral-400 truncate mt-0.5">{client.name}</div>
-          </div>
-
-          <div className="p-3.5 bg-neutral-950/60 border border-neutral-800/80 rounded-lg">
-            <div className="text-[10px] font-mono uppercase text-neutral-500 mb-1 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> Última Sincronização
-            </div>
-            <div className="text-xs font-mono text-neutral-200 font-medium">
-              {account.lastSyncAt ? new Date(account.lastSyncAt).toLocaleString('pt-BR') : 'Nunca sincronizado'}
-            </div>
-            <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
-              Próxima: {account.nextSyncScheduled ? new Date(account.nextSyncScheduled).toLocaleDateString('pt-BR') : 'Automática'}
-            </div>
-          </div>
-
-          <div className="p-3.5 bg-neutral-950/60 border border-neutral-800/80 rounded-lg">
-            <div className="text-[10px] font-mono uppercase text-neutral-500 mb-1 flex items-center gap-1">
-              <Shield className="w-3 h-3" /> Permissões Meta
-            </div>
-            <div className="text-xs text-neutral-300 font-mono">
-              3 escopos autorizados
-            </div>
-            <div className="text-[10px] text-emerald-400 font-mono mt-0.5 truncate">
-              instagram_basic, insights, pages
-            </div>
-          </div>
-        </div>
-
-        {/* Permissions Checklist */}
-        <div className="p-4 bg-neutral-950/40 border border-neutral-800/60 rounded-lg space-y-2">
-          <div className="text-xs font-medium text-neutral-300 mb-2">Permissões de Acesso aos Dados:</div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-mono text-neutral-400">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>instagram_basic</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>instagram_manage_insights</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>pages_read_engagement</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Sync Controls */}
-        <div className="pt-4 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {isConnected ? (
+          <div className="flex flex-wrap gap-2 shrink-0">
+            {account.isConnected ? (
               <>
                 <button
                   onClick={onSync}
-                  disabled={isSyncing}
-                  className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 shadow-xs"
+                  disabled={isSyncing || busy !== null}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 text-sm font-semibold transition disabled:opacity-60"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Agora'}</span>
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Sincronizando...' : 'Sincronizar agora'}
                 </button>
-
                 <button
                   onClick={handleDisconnect}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-neutral-900 hover:bg-rose-950/30 text-neutral-400 hover:text-rose-400 border border-neutral-800 hover:border-rose-900/50 rounded-lg text-xs transition-colors"
+                  disabled={busy !== null || isSyncing}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 text-sm transition disabled:opacity-50"
                 >
-                  <Unlink className="w-3.5 h-3.5" />
-                  <span>Desconectar</span>
+                  <Unlink className="w-4 h-4" />
+                  Desconectar
                 </button>
               </>
             ) : (
               <button
                 onClick={handleConnect}
-                className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs"
+                disabled={!canConnect || busy !== null}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Link2 className="w-3.5 h-3.5" />
-                <span>Conectar Instagram de {client.name}</span>
+                {busy === 'connect' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                {status === 'NOT_CONFIGURED' ? 'Instagram API não configurada' : needsReconnect ? 'Reconectar Instagram' : 'Conectar Instagram'}
               </button>
             )}
           </div>
-
-          <div className="text-xs font-mono text-neutral-500">
-            Status: {isSyncing ? 'Sincronizando...' : isConnected ? 'Sincronizado' : 'Aguardando Conexão'}
-          </div>
         </div>
-      </div>
+
+        <dl className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-neutral-800 pt-5 text-sm">
+          <div>
+            <dt className="text-xs text-neutral-500">Última sincronização</dt>
+            <dd className="text-neutral-200 mt-0.5">{formatDateTime(account.lastSyncAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-neutral-500">Autorização válida até</dt>
+            <dd className="text-neutral-200 mt-0.5">{account.tokenExpiresAt ? formatDateTime(account.tokenExpiresAt) : 'n/d'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-neutral-500">Conta profissional (ID)</dt>
+            <dd className="text-neutral-200 mt-0.5 font-mono text-xs break-all">{account.accountId || 'n/d'}</dd>
+          </div>
+        </dl>
+
+        {account.permissions.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {account.permissions.map((scope) => (
+              <span key={scope} className="text-[11px] px-2 py-0.5 rounded-md bg-neutral-950 border border-neutral-800 text-neutral-400">
+                {SCOPE_LABELS[scope] ?? scope}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="md:col-span-3 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5">
+          <h4 className="text-sm font-semibold text-neutral-100 mb-3">Histórico de sincronização</h4>
+          {syncLogs.length === 0 ? (
+            <p className="text-sm text-neutral-500">Nenhuma sincronização registrada ainda.</p>
+          ) : (
+            <ul className="space-y-2.5">
+              {syncLogs.map((log) => (
+                <li key={log.id} className="flex items-start justify-between gap-3 text-sm">
+                  <div className="min-w-0">
+                    <div className="text-neutral-200">{formatDateTime(log.startedAt)}</div>
+                    <div className="text-xs text-neutral-500 truncate">
+                      {log.status === 'ERROR' ? log.errors[0] ?? 'Falha' : `${log.recordsFetched} mídias, ${log.recordsCreated} novas, ${log.recordsUpdated} atualizadas`}
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[11px] px-2 py-0.5 rounded-md border shrink-0 ${
+                      log.status === 'SUCCESS'
+                        ? 'text-emerald-300 border-emerald-500/30'
+                        : log.status === 'PARTIAL'
+                          ? 'text-amber-300 border-amber-500/30'
+                          : 'text-rose-300 border-rose-500/30'
+                    }`}
+                  >
+                    {log.status === 'SUCCESS' ? 'Sucesso' : log.status === 'PARTIAL' ? 'Parcial' : 'Erro'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="md:col-span-2 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 space-y-3 text-sm text-neutral-400">
+          <h4 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            Como a conexão é protegida
+          </h4>
+          <p className="flex gap-2">
+            <KeyRound className="w-4 h-4 mt-0.5 shrink-0 text-neutral-500" />
+            O login acontece na Meta. O token fica criptografado no servidor e nunca chega ao navegador.
+          </p>
+          <p>Requer uma conta Instagram profissional vinculada a uma Página do Facebook.</p>
+          <p>Métricas que a Meta não fornece aparecem como “n/d”, nunca como zero.</p>
+        </div>
+      </section>
     </div>
   );
 };

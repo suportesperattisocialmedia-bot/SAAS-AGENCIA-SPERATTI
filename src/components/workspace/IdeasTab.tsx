@@ -19,6 +19,7 @@ import {
   Layers,
   Target
 } from 'lucide-react';
+import { describeApiError } from '../../services/api/apiClient';
 
 interface IdeasTabProps {
   client: Client;
@@ -76,12 +77,12 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
 
       notificationService.addNotification(
         'Novas Ideias Geradas',
-        `A IA gerou 3 ideias de conteúdo hiper-personalizadas para ${client.name}.`,
+        `${generated.length} ideia(s) gerada(s) por IA para ${client.name}. Revise antes de produzir.`,
         'success'
       );
       onRefresh();
-    } catch {
-      notificationService.showToast('Erro ao gerar ideias.', 'error');
+    } catch (err) {
+      notificationService.showToast(describeApiError(err, 'Erro ao gerar ideias.'), 'error');
     } finally {
       setIsGenerating(false);
     }
@@ -138,7 +139,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
         <div className="flex items-center gap-2.5 self-start sm:self-center">
           <button
             onClick={() => setShowHookBankModal(true)}
-            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-mono transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs transition-colors"
           >
             <BookOpen className="w-3.5 h-3.5 text-amber-400" />
             <span>Banco de Ganchos (14)</span>

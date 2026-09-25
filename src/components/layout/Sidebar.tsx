@@ -11,6 +11,7 @@ import {
   Bell,
   Settings,
   ShieldCheck,
+  LogOut,
   ChevronRight,
   Database
 } from 'lucide-react';
@@ -40,6 +41,9 @@ interface SidebarProps {
   onToggleDemoData: () => void;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
+  userName?: string | null;
+  userRole?: string | null;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -52,7 +56,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDemoLoaded,
   onToggleDemoData,
   isOpenMobile,
-  onCloseMobile
+  onCloseMobile,
+  userName,
+  userRole,
+  onLogout
 }) => {
   const navItems: Array<{ id: MainNavSection; label: string; icon: React.ReactNode; badge?: number }> = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
@@ -173,7 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <span className="flex items-center gap-1.5">
               <Database className="w-3 h-3" />
-              {isDemoLoaded ? 'Mock Ravi Ativo' : 'Carregar Mock Ravi'}
+              {isDemoLoaded ? 'Sair da demonstração' : 'Ver demonstração'}
             </span>
             <span className="text-[9px] uppercase px-1 py-0.2 bg-neutral-800 rounded">
               {isDemoLoaded ? 'Limpar' : 'Demo'}
@@ -193,10 +200,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
             />
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-neutral-200 truncate">Gabriel Speratti</div>
-              <div className="text-[10px] text-neutral-500 font-mono truncate">Proprietário da Agência</div>
+              <div className="text-xs font-medium text-neutral-200 truncate">{userName || 'Modo demonstração'}</div>
+              <div className="text-[10px] text-neutral-500 font-mono truncate">
+                {userRole === 'owner' ? 'Proprietário' : userRole === 'admin' ? 'Administrador' : userRole ? 'Equipe' : 'Sem login'}
+              </div>
             </div>
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            {onLogout ? (
+              <button onClick={onLogout} className="p-1.5 rounded-md text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800" aria-label="Sair" title="Sair">
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            )}
           </div>
         </div>
       </aside>

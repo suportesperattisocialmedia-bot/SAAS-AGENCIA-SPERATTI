@@ -6,7 +6,7 @@
 
 import {
   DEMO_CLIENT_ID,
-  DEMO_CLIENT_RAVI,
+  DEMO_CLIENT,
   DEMO_INSTAGRAM_ACCOUNT,
   generateDemoSnapshots,
   DEMO_CONTENTS,
@@ -15,7 +15,7 @@ import {
   DEMO_IDEAS,
   DEMO_CALENDAR_ITEMS,
   DEMO_ALERTS
-} from '../../data/demo/demoData';
+} from '../../demo/demoData';
 import {
   Client,
   InstagramAccount,
@@ -49,7 +49,7 @@ export const DemoProvider = {
   },
 
   getDemoClient(): Client {
-    return { ...DEMO_CLIENT_RAVI };
+    return { ...DEMO_CLIENT };
   },
 
   getDemoInstagram(): InstagramAccount {

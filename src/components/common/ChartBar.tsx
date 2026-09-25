@@ -2,7 +2,7 @@ import React from 'react';
 
 export interface BarDataPoint {
   label: string;
-  value: number;
+  value: number | null;
   secondaryValue?: number;
   sublabel?: string;
   color?: string;
@@ -18,14 +18,15 @@ interface ChartBarProps {
 }
 
 export const ChartBar: React.FC<ChartBarProps> = ({
-  data,
+  data: rawData,
   title,
   subtitle,
   height = 200,
   valueFormatter = (v) => v.toLocaleString('pt-BR'),
   defaultColor = '#f59e0b'
 }) => {
-  if (!data || data.length === 0) {
+  const data = (rawData || []).filter((d): d is BarDataPoint & { value: number } => typeof d.value === 'number');
+  if (data.length === 0) {
     return (
       <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col items-center justify-center text-neutral-500 text-sm h-48">
         Sem dados para gráfico de barras.

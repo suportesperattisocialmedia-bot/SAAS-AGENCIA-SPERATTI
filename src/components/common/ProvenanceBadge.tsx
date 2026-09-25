@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { DataProvenanceType, getProvenanceConfig } from '../../utils/provenance';
+import { DemoProvider } from '../../services/demo/DemoProvider';
 
 interface ProvenanceBadgeProps {
   type: DataProvenanceType;
@@ -17,7 +18,9 @@ export const ProvenanceBadge: React.FC<ProvenanceBadgeProps> = ({
   showSublabel = false,
   className = ''
 }) => {
-  const config = getProvenanceConfig(type);
+  // Em modo demonstração, dados nunca são apresentados como reais ou calculados de fontes reais.
+  const effective: DataProvenanceType = DemoProvider.isDemoActive() && (type === 'REAL_DATA' || type === 'CALCULATED_DATA') ? 'MOCK_DATA' : type;
+  const config = getProvenanceConfig(effective);
 
   return (
     <span

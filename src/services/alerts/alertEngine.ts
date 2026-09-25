@@ -3,6 +3,7 @@
  * Alert Engine - Deterministic rules evaluation and alert generation
  */
 
+import { generateUUID } from '../../utils/uuid';
 import { Alert, AlertType, AlertSeverity, AlertStatus, Client, AccountSnapshot, Content, InstagramAccount } from '../../types';
 import { defaultStorageAdapter } from '../storage/LocalStorageAdapter';
 import { analyticsService } from '../analyticsService';
@@ -22,7 +23,7 @@ export const alertEngine = {
   createAlert(alert: Omit<Alert, 'id' | 'createdAt' | 'status'>): Alert {
     const newItem: Alert = {
       ...alert,
-      id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      id: `alert-${generateUUID()}`,
       status: 'NEW',
       createdAt: new Date().toISOString()
     };
@@ -78,8 +79,8 @@ export const alertEngine = {
 
     // Rule 1: Token or Sync Error
     if (instagramAccount) {
-      if (instagramAccount.status === 'TOKEN_EXPIRED') {
-        const title = 'Token de acesso Meta expirado';
+      if (instagramAccount.status === 'EXPIRED' || instagramAccount.status === 'REAUTH_REQUIRED') {
+        const title = 'Autorização do Instagram expirada ou revogada';
         if (!existing.some(a => a.title === title && a.status !== 'RESOLVED')) {
           generated.push(
             this.createAlert({
@@ -88,8 +89,8 @@ export const alertEngine = {
               type: 'TOKEN_EXPIRADO',
               severity: 'critical',
               title,
-              message: 'O token da Meta Graph API expirou. É necessário reconectar para retomar a coleta.',
-              evidence: 'Status de autenticação retornado como TOKEN_EXPIRED pelo servidor.'
+              message: 'É necessário reconectar a conta do Instagram para retomar a coleta de dados.',
+              evidence: `Status da conexão informado pelo servidor: ${instagramAccount.status}.`
             })
           );
         }
@@ -128,7 +129,7 @@ export const alertEngine = {
               type: 'QUEDA DE PERFORMANCE',
               severity: 'high',
               title,
-              message: `As visualizações caíram de ${summary.totalViews.previous?.toLocaleString('pt-BR')} para ${summary.totalViews.current.toLocaleString('pt-BR')}.`,
+              message: `As visualizações caíram de ${summary.totalViews.previous?.toLocaleString('pt-BR')} para ${summary.totalViews.current?.toLocaleString('pt-BR')}.`,
               calculatedMetricComparison: `${summary.totalViews.percentDiff}% em relação ao período anterior`,
               evidence: 'Cálculo determinístico com base nos snapshots diários da Meta API.'
             })
@@ -158,11 +159,11 @@ export const alertEngine = {
 
     // Rule 3: Content above average
     if (contents.length >= 4) {
-      const totalSaves = contents.reduce((acc, c) => acc + c.metrics.saves, 0);
-      const avgSaves = totalSaves / contents.length;
+      const withSaves = contents.filter((c): c is typeof c & { metrics: { saves: number } } => typeof c.metrics.saves === 'number');
+      const avgSaves = withSaves.length > 0 ? withSaves.reduce((acc, c) => acc + c.metrics.saves, 0) / withSaves.length : 0;
 
-      contents.forEach(c => {
-        if (c.metrics.saves > avgSaves * 2.5 && c.metrics.saves >= 50) {
+      withSaves.forEach(c => {
+        if (withSaves.length >= 4 && c.metrics.saves > avgSaves * 2.5 && c.metrics.saves >= 50) {
           const title = `Conteúdo "${c.title}" superou média de salvamentos`;
           if (!existing.some(a => a.title === title && a.status !== 'RESOLVED')) {
             generated.push(

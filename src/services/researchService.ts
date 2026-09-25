@@ -9,9 +9,8 @@
 
 import { AudienceInsight, AudienceInsightCategory, Client } from '../types';
 import { storageService } from './storageService';
-import { apiClient } from './api/apiClient';
+import { apiClient, describeApiError } from './api/apiClient';
 import { logger } from '../utils/logger';
-import { generateUUID } from '../utils/uuid';
 
 export const AUDIENCE_CATEGORIES: AudienceInsightCategory[] = [
   'Dores',
@@ -78,7 +77,9 @@ export const researchService = {
   },
 
   /**
-   * Runs audience research against backend provider (honest verification check)
+   * Pesquisa externa real via backend (/api/research). Sem provider configurado,
+   * retorna configured=false e nenhum dado é inventado. Fontes encontradas são
+   * salvas como HIPÓTESE (confiança baixa) com URL, trecho e data de coleta.
    */
   async runAudienceDiscovery(client: Client, targetCategory: AudienceInsightCategory = 'Dores'): Promise<{
     success: boolean;
@@ -86,43 +87,39 @@ export const researchService = {
     message?: string;
     newInsights: AudienceInsight[];
   }> {
-    logger.info(`Running audience discovery for ${client.name} in category ${targetCategory}...`);
-    const query = `${client.segment} ${client.subsegment || ''} ${targetCategory} Brasil`;
-
     try {
       const res = await apiClient.post<{
         configured: boolean;
         message?: string;
-        insights?: any[];
-      }>('/api/research/query', {
-        clientId: client.id,
-        segment: client.segment,
-        category: targetCategory,
-        query
-      });
+        sources: Array<{ title: string; sourceUrl: string; source: string; evidence: string | null; publishedAt: string | null; retrievedAt: string }>;
+      }>('/api/research', { kind: 'audience', clientId: client.id, segment: client.segment || client.name, category: targetCategory });
 
       if (!res.configured) {
-        return {
-          success: true,
-          configured: false,
-          message: res.message || 'Pesquisa externa não configurada no servidor (.env sem chaves de busca).',
-          newInsights: []
-        };
+        return { success: true, configured: false, message: res.message || 'Pesquisa externa não configurada.', newInsights: [] };
       }
-
-      return {
-        success: true,
-        configured: true,
-        newInsights: []
-      };
-    } catch (err: any) {
-      logger.warn('Audience discovery API query failed', { error: err.message });
-      return {
-        success: false,
-        configured: false,
-        message: err.message || 'Falha ao consultar mecanismo de pesquisa.',
-        newInsights: []
-      };
+      const known = new Set(this.getByClient(client.id).map((i) => i.sourceUrl).filter(Boolean));
+      const newInsights = res.sources
+        .filter((src) => !known.has(src.sourceUrl))
+        .map((src) =>
+          this.addInsight({
+            clientId: client.id,
+            category: targetCategory,
+            title: src.title.slice(0, 200),
+            description: src.evidence || 'Trecho não disponível na fonte.',
+            source: src.source,
+            sourceUrl: src.sourceUrl,
+            sourceDate: src.publishedAt || src.retrievedAt,
+            evidence: src.evidence || undefined,
+            context: `Coletado em ${new Date(src.retrievedAt).toLocaleString('pt-BR')}`,
+            interpretation: 'Fonte pública ainda não validada pela equipe.',
+            isHypothesis: true,
+            confidence: 'LOW'
+          })
+        );
+      return { success: true, configured: true, newInsights };
+    } catch (err) {
+      logger.warn('Audience discovery API query failed', { error: describeApiError(err) });
+      return { success: false, configured: true, message: describeApiError(err, 'Falha ao consultar a pesquisa externa.'), newInsights: [] };
     }
   },
 

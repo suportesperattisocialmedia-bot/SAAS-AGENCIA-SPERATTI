@@ -1,7 +1,9 @@
 import React from 'react';
 import { Client, MetricSnapshot } from '../../types';
-import { MoreVertical, ArrowRight, Copy, Trash2, Edit3, CheckCircle2, Clock } from 'lucide-react';
-import { ASSETS } from '../../data/assets';
+import { MoreVertical, ArrowRight, Copy, Trash2, Edit3 } from 'lucide-react';
+import { storageService } from '../../services/storageService';
+import { formatMetric } from '../../utils/metrics';
+import { ConnectionBadge } from '../common/ConnectionBadge';
 
 interface ClientCardProps {
   client: Client;
@@ -22,12 +24,12 @@ export const ClientCard: React.FC<ClientCardProps> = ({
 }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
 
-  const isDrRavi = client.instagram.toLowerCase().includes('ravi');
-  const avatarUrl = isDrRavi ? ASSETS.raviPortrait : client.avatarUrl;
-
-  const followers = latestSnapshot?.followers ?? 18430;
-  const views = latestSnapshot?.views ?? 41290;
-  const engRate = latestSnapshot?.engagementRate ?? 8.2;
+  const avatarUrl = client.avatarUrl;
+  // Sem snapshot real = "n/d". Nunca exibir números de exemplo como se fossem do cliente.
+  const followers = latestSnapshot?.followers ?? null;
+  const views = latestSnapshot?.views ?? null;
+  const engRate = latestSnapshot?.engagementRate ?? null;
+  const connectionStatus = storageService.instagram.getByClientId(client.id)?.status ?? 'DISCONNECTED';
 
   return (
     <div className="bg-neutral-900/90 border border-neutral-800 hover:border-neutral-700 rounded-xl p-5 flex flex-col justify-between transition-all duration-200 group relative">
@@ -68,6 +70,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
           <div className="relative shrink-0">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
+              aria-expanded={menuOpen}
               className="p-1 text-neutral-500 hover:text-neutral-300 rounded hover:bg-neutral-800 transition-colors"
               aria-label="Opções do cliente"
             >
@@ -132,19 +135,19 @@ export const ClientCard: React.FC<ClientCardProps> = ({
           <div>
             <div className="text-[10px] uppercase font-mono text-neutral-500">Seguidores</div>
             <div className="text-sm font-bold font-mono text-neutral-200 tabular-nums">
-              {followers.toLocaleString('pt-BR')}
+              {formatMetric(followers)}
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase font-mono text-neutral-500">Views 30d</div>
+            <div className="text-[10px] uppercase font-mono text-neutral-500">Views</div>
             <div className="text-sm font-bold font-mono text-neutral-200 tabular-nums">
-              {views.toLocaleString('pt-BR')}
+              {formatMetric(views)}
             </div>
           </div>
           <div>
             <div className="text-[10px] uppercase font-mono text-neutral-500">Engajamento</div>
             <div className="text-sm font-bold font-mono text-emerald-400 tabular-nums">
-              {engRate}%
+              {formatMetric(engRate, { suffix: '%' })}
             </div>
           </div>
         </div>
@@ -152,9 +155,11 @@ export const ClientCard: React.FC<ClientCardProps> = ({
 
       {/* Footer & Action */}
       <div className="pt-3 border-t border-neutral-800 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-mono">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span className="text-neutral-400 text-[11px]">Conectado</span>
+        <div className="flex flex-col gap-1">
+          <ConnectionBadge status={connectionStatus} />
+          <span className="text-[10px] font-mono text-neutral-500">
+            {latestSnapshot ? `Último dado: ${new Date(`${latestSnapshot.date}T12:00:00`).toLocaleDateString('pt-BR')}` : 'Sem dados sincronizados'}
+          </span>
         </div>
 
         <button

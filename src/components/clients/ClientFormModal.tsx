@@ -633,7 +633,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           </button>
           <button
             type="submit"
-            className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-bold transition-colors shadow-lg shadow-amber-500/10 font-mono"
+            className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-bold transition-colors shadow-lg shadow-amber-500/10"
           >
             {initialData ? 'Salvar Alterações' : 'Concluir Cadastro'}
           </button>

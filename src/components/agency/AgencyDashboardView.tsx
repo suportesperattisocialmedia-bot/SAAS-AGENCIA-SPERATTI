@@ -3,6 +3,7 @@ import { Client, Alert, AccountSnapshot } from '../../types';
 import { ClientCard } from '../clients/ClientCard';
 import { StatCard } from '../common/StatCard';
 import { ASSETS } from '../../data/assets';
+import { avgMetric, formatMetric, isMetric, sumMetric } from '../../utils/metrics';
 import {
   Users,
   Eye,
@@ -41,31 +42,22 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   onOpenAlerts,
   onSeedDemoData
 }) => {
-  // Consolidated statistics derived strictly from real snapshots
-  const totalFollowers = snapshots
-    .filter((s, idx, arr) => {
-      const clientSnaps = arr.filter(cs => cs.clientId === s.clientId);
-      return s.id === clientSnaps[clientSnaps.length - 1]?.id;
-    })
-    .reduce((sum, s) => sum + s.followers, 0);
-
-  // Total views from available snapshots
-  const totalViews = snapshots.reduce((sum, s) => sum + s.views, 0);
-
-  // Real weighted engagement rate calculation (Interactions / Reach)
-  const totalReach = snapshots.reduce((sum, s) => sum + s.reach, 0);
-  const totalInteractions = snapshots.reduce(
-    (sum, s) => sum + (s.likes + s.comments + s.shares + s.saves),
-    0
-  );
-
-  let calculatedEngagementRate = '0.0%';
-  if (totalReach > 0) {
-    calculatedEngagementRate = `${((totalInteractions / totalReach) * 100).toFixed(1)}%`;
-  } else if (snapshots.length > 0) {
-    const avgEng = snapshots.reduce((sum, s) => sum + s.engagementRate, 0) / snapshots.length;
-    calculatedEngagementRate = `${avgEng.toFixed(1)}%`;
-  }
+  // Estatísticas consolidadas apenas de snapshots reais (métricas ausentes não viram zero).
+  const latestByClient = new Map<string, AccountSnapshot>();
+  [...snapshots]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .forEach((s) => {
+      if (isMetric(s.followers)) latestByClient.set(s.clientId, s);
+    });
+  const totalFollowers = sumMetric([...latestByClient.values()].map((s) => s.followers));
+  const totalViews = sumMetric(snapshots.map((s) => s.views));
+  const totalReach = sumMetric(snapshots.map((s) => s.reach));
+  const totalInteractions = sumMetric(snapshots.flatMap((s) => [s.likes, s.comments, s.shares, s.saves]));
+  const engagement =
+    isMetric(totalReach) && totalReach > 0 && isMetric(totalInteractions)
+      ? (totalInteractions / totalReach) * 100
+      : avgMetric(snapshots.map((s) => s.engagementRate), 2);
+  const calculatedEngagementRate = formatMetric(engagement, { suffix: '%', digits: 1, fallback: 'Sem dados' });
 
   const unhandledAlerts = alerts.filter(a => a.status === 'NEW');
 
@@ -84,15 +76,9 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
 
         <div className="relative z-10 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-mono font-medium">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>GABRIEL SPERATTI · SOCIAL INTELLIGENCE SYSTEM</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-neutral-100 tracking-tight font-serif">
-              Painel de Gestão Estratégica & Inteligência Competitiva
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed font-sans">
-              Sistema interno para auditoria de posicionamento, governança de dados da Meta Graph API, benchmark analítico e arquitetura de autoridade de clientes.
+            <h1 className="text-2xl sm:text-3xl font-bold text-neutral-50 tracking-tight">Visão geral da agência</h1>
+            <p className="text-sm text-neutral-400 leading-relaxed max-w-[60ch]">
+              Acompanhe clientes, conexões com o Instagram e alertas. Todos os números vêm de dados sincronizados ou registrados pela equipe.
             </p>
           </div>
 
@@ -100,16 +86,16 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
             {unhandledAlerts.length > 0 && (
               <button
                 onClick={onOpenAlerts}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium hover:bg-rose-500/20 transition-all font-mono"
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium hover:bg-rose-500/20 transition-all"
               >
-                <AlertTriangle className="w-4 h-4 text-rose-400 animate-pulse" />
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
                 <span>{unhandledAlerts.length} Alerta(s) Ativo(s)</span>
               </button>
             )}
 
             <button
               onClick={onOpenNewClient}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold font-mono transition-all shadow-lg shadow-amber-500/10"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold transition-all active:scale-[0.98]"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>Novo Cliente</span>
@@ -121,7 +107,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
       {/* KPI Global Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="Clientes Ativos"
+          label="Clientes ativos"
           value={clients.length}
           typeTag="DADO REAL"
           subtext="Contas em operação ativa"
@@ -129,26 +115,26 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
         />
 
         <StatCard
-          label="Seguidores Monitorados"
-          value={totalFollowers > 0 ? totalFollowers.toLocaleString('pt-BR') : '0'}
+          label="Seguidores monitorados"
+          value={formatMetric(totalFollowers, { fallback: 'Sem dados' })}
           typeTag="DADO REAL"
           subtext="Base combinada da agência"
           icon={<TrendingUp className="w-4 h-4 text-emerald-400" />}
         />
 
         <StatCard
-          label="Visualizações Totais"
-          value={totalViews > 0 ? totalViews.toLocaleString('pt-BR') : '0'}
+          label="Visualizações registradas"
+          value={formatMetric(totalViews, { fallback: 'Sem dados' })}
           typeTag="DADO REAL"
           subtext="Histórico consolidado catalogado"
           icon={<Eye className="w-4 h-4 text-sky-400" />}
         />
 
         <StatCard
-          label="Taxa Média de Engajamento"
+          label="Engajamento médio"
           value={calculatedEngagementRate}
           typeTag="DADO CALCULADO"
-          subtext={totalReach > 0 ? 'Ponderada por alcance real' : 'Sem alcance para ponderação'}
+          subtext={isMetric(totalReach) && totalReach > 0 ? 'Ponderada por alcance real' : 'Sem alcance para ponderação'}
           icon={<Sparkles className="w-4 h-4 text-purple-400" />}
         />
       </div>
@@ -162,7 +148,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
               <span className="text-xs font-mono text-neutral-400">({clients.length})</span>
             </h2>
             <p className="text-xs text-neutral-400 mt-0.5">
-              Selecione uma conta para acessar a inteligência aprofundada, métricas e pipeline
+              Abra um cliente para ver métricas, conteúdo, pesquisa e planejamento.
             </p>
           </div>
 
@@ -185,24 +171,24 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                 Nenhum cliente cadastrado ainda
               </h3>
               <p className="text-xs text-neutral-400 leading-relaxed font-sans">
-                O sistema está limpo e pronto para receber seus clientes reais. Inicie o cadastro preenchendo o perfil da conta, nicho e objetivos estratégicos.
+                Cadastre o perfil, o nicho e os objetivos do cliente. Depois conecte o Instagram para começar a coletar métricas reais.
               </p>
             </div>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
                 onClick={onOpenNewClient}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-xl text-xs font-bold transition-all shadow-md font-mono"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-xl text-xs font-bold transition-all shadow-md"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Cadastrar Primeiro Cliente</span>
+                <span>Cadastrar primeiro cliente</span>
               </button>
               {onSeedDemoData && (
                 <button
                   onClick={onSeedDemoData}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-semibold transition-all font-mono"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-semibold transition-all"
                 >
                   <Database className="w-4 h-4 text-amber-400" />
-                  <span>Explorar com Dados de Demonstração</span>
+                  <span>Ver demonstração</span>
                 </button>
               )}
             </div>
@@ -210,8 +196,10 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {clients.map(client => {
-              const clientSnaps = snapshots.filter(s => s.clientId === client.id);
-              const latestSnap = clientSnaps[clientSnaps.length - 1];
+              const latestSnap = snapshots
+                .filter((s) => s.clientId === client.id)
+                .sort((a, b) => a.date.localeCompare(b.date))
+                .at(-1);
 
               return (
                 <ClientCard

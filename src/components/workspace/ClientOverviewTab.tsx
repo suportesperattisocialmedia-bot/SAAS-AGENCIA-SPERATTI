@@ -13,6 +13,7 @@ import {
   Share2,
   CheckCircle2
 } from 'lucide-react';
+import { formatMetric } from '../../utils/metrics';
 
 interface ClientOverviewTabProps {
   client: Client;
@@ -73,7 +74,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Seguidores Atuais"
-          value={periodSummary.followersGrowth.current.toLocaleString('pt-BR')}
+          value={formatMetric(periodSummary.followersGrowth.current)}
           typeTag="DADO REAL"
           diffPercent={periodSummary.followersGrowth.percentDiff ?? undefined}
           periodLabel="Últimos 30 dias"
@@ -81,7 +82,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
 
         <StatCard
           label="Visualizações Totais"
-          value={periodSummary.totalViews.current.toLocaleString('pt-BR')}
+          value={formatMetric(periodSummary.totalViews.current)}
           typeTag="DADO REAL"
           diffPercent={periodSummary.totalViews.percentDiff ?? undefined}
           periodLabel="Últimos 30 dias"
@@ -154,7 +155,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
                       <Eye className="w-3 h-3" /> Views
                     </div>
                     <div className="text-xs font-bold text-neutral-200 mt-0.5">
-                      {topContent.metrics.views.toLocaleString('pt-BR')}
+                      {formatMetric(topContent.metrics.views)}
                     </div>
                   </div>
 
@@ -163,7 +164,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
                       <Bookmark className="w-3 h-3" /> Salvos
                     </div>
                     <div className="text-xs font-bold text-neutral-200 mt-0.5">
-                      {topContent.metrics.saves.toLocaleString('pt-BR')}
+                      {formatMetric(topContent.metrics.saves)}
                     </div>
                   </div>
 
@@ -172,7 +173,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
                       <Share2 className="w-3 h-3" /> Shares
                     </div>
                     <div className="text-xs font-bold text-neutral-200 mt-0.5">
-                      {topContent.metrics.shares.toLocaleString('pt-BR')}
+                      {formatMetric(topContent.metrics.shares)}
                     </div>
                   </div>
                 </div>

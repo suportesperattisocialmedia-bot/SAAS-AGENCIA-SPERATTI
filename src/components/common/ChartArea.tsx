@@ -3,9 +3,12 @@ import React, { useState, useId } from 'react';
 export interface ChartDataPoint {
   date: string;
   label?: string;
-  value: number;
+  /** null = dado indisponível naquela data (o ponto é omitido, nunca desenhado como zero). */
+  value: number | null;
   secondaryValue?: number;
 }
+
+type PlottedPoint = ChartDataPoint & { value: number };
 
 interface ChartAreaProps {
   data: ChartDataPoint[];
@@ -20,7 +23,7 @@ interface ChartAreaProps {
 }
 
 export const ChartArea: React.FC<ChartAreaProps> = ({
-  data,
+  data: rawData,
   title,
   subtitle,
   height = 240,
@@ -32,17 +35,18 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 }) => {
   const gradientId = useId();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const data: PlottedPoint[] = (rawData || []).filter((d): d is PlottedPoint => typeof d.value === 'number');
 
   if (!data || data.length === 0) {
     return (
       <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col items-center justify-center text-neutral-500 text-sm h-60">
-        Nenhum dado disponível para renderizar o gráfico.
+        Dados históricos insuficientes.
       </div>
     );
   }
 
   const width = 800;
-  const paddingX = 40;
+  const paddingX = 64;
   const paddingTop = 25;
   const paddingBottom = 40;
 

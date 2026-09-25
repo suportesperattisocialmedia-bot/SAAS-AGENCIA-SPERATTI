@@ -29,7 +29,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Existe um motivo pelo qual [grupo relevante] nunca fala sobre [assunto]',
     example: 'Existe um motivo pelo qual os maiores restaurantes de SP nunca postam foto de comida no feed.',
     bestForPillars: ['Educação', 'Autoridade'],
-    historicalAvgViewsDiff: '+34%',
     recommendedFormat: 'Reels',
     psychologicalTrigger: 'Gatilho de Informação Privilegiada'
   },
@@ -40,7 +39,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Se você ainda faz [prática comum], você está literalmente perdendo [recurso/tempo/dinheiro]',
     example: 'Se você ainda usa 30 hashtags e faz sorteio no Instagram, você está jogando dinheiro no lixo.',
     bestForPillars: ['Autoridade', 'Posicionamento'],
-    historicalAvgViewsDiff: '+58%',
     recommendedFormat: 'Carrossel',
     psychologicalTrigger: 'Quebra de Paradigma'
   },
@@ -51,7 +49,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Todo mundo diz que você precisa de [X]. Aqui está o porquê de você fazer exatamente o oposto.',
     example: 'Todo mundo diz que você precisa postar 3 Reels por dia. Aqui está por que reduzir para 3 por semana triplicou nosso faturamento.',
     bestForPillars: ['Autoridade', 'Educação'],
-    historicalAvgViewsDiff: '+47%',
     recommendedFormat: 'Reels',
     psychologicalTrigger: 'Subversão de Consenso'
   },
@@ -62,7 +59,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: '3 erros graves que você comete ao [ação] e nem percebe',
     example: '3 erros graves que médicos cometem no Instagram e que afastam pacientes particulares.',
     bestForPillars: ['Educação', 'Venda'],
-    historicalAvgViewsDiff: '+29%',
     recommendedFormat: 'Carrossel',
     psychologicalTrigger: 'Aversão à Perda'
   },
@@ -73,7 +69,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Em [ano/momento], nós tomamos uma decisão que quase quebrou a empresa...',
     example: 'Em 2024, nós decidimos demitir 40% da carteira de clientes. O que aconteceu nos 6 meses seguintes mudou tudo.',
     bestForPillars: ['Conexão', 'Bastidores'],
-    historicalAvgViewsDiff: '+21%',
     recommendedFormat: 'Reels',
     psychologicalTrigger: 'Vulnerabilidade Controlada'
   },
@@ -82,9 +77,8 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     category: 'Resultado',
     title: 'Demonstração irrefutável de métricas',
     formula: 'Como nós fomos de [ponto A] para [ponto B] em apenas [período de tempo]',
-    example: 'Como o Dr. Ravi gerou 48 novos agendamentos particulares em 21 dias com apenas 4 Carrosséis.',
+    example: 'Como [cliente] conseguiu [resultado verificável] em [prazo] mudando apenas [uma ação].',
     bestForPillars: ['Prova social', 'Venda'],
-    historicalAvgViewsDiff: '+62%',
     recommendedFormat: 'Carrossel',
     psychologicalTrigger: 'Prova Social Irrefutável'
   },
@@ -95,7 +89,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Depois de analisar mais de [número expressivo] de [objeto de estudo], eu notei um único padrão.',
     example: 'Depois de analisar mais de 1.200 campanhas de captação de pacientes, eu notei um padrão que define quem escala.',
     bestForPillars: ['Autoridade', 'Educação'],
-    historicalAvgViewsDiff: '+41%',
     recommendedFormat: 'Reels',
     psychologicalTrigger: 'Volume de Horas de Voo'
   },
@@ -106,7 +99,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Você trabalha 14 horas por dia, mas no final do mês sente que [consequência dolorosa]?',
     example: 'Você lota a agenda de consultas, mas no final do mês sente que trabalha apenas para pagar impostos e clínica?',
     bestForPillars: ['Conexão', 'Venda'],
-    historicalAvgViewsDiff: '+38%',
     recommendedFormat: 'Reels',
     psychologicalTrigger: 'Identificação Empática Imediata'
   },
@@ -117,7 +109,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Como seria se você pudesse [resultado dos sonhos] sem ter que [maior sacrifício]?',
     example: 'Como seria ter a agenda fechada com 3 meses de antecedência sem precisar fazer dancinha no TikTok?',
     bestForPillars: ['Venda', 'Desejo'],
-    historicalAvgViewsDiff: '+33%',
     recommendedFormat: 'Reels',
     psychologicalTrigger: 'Visualização de Estado Futuro'
   },
@@ -128,7 +119,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'A diferença entre quem fatura [baixo valor] e quem fatura [alto valor] com [ferramenta]',
     example: 'A diferença real entre uma clínica que cobra R$ 250 e uma que cobra R$ 1.500 na consulta.',
     bestForPillars: ['Educação', 'Posicionamento'],
-    historicalAvgViewsDiff: '+44%',
     recommendedFormat: 'Carrossel',
     psychologicalTrigger: 'Contraste de Status'
   },
@@ -139,7 +129,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: '[Número] coisas que eu gostaria de ter aprendido antes de começar a [área]',
     example: '5 checklists práticos que todo gestor de clínica precisa checar toda segunda-feira de manhã.',
     bestForPillars: ['Educação'],
-    historicalAvgViewsDiff: '+19%',
     recommendedFormat: 'Carrossel',
     psychologicalTrigger: 'Economia Cognitiva'
   },
@@ -150,7 +139,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Estudo de caso: como o cliente [nome/perfil] faturou [resultado] em [prazo]',
     example: 'Estudo de caso: por que essa campanha simples de R$ 30/dia gerou 14 cirurgias de alta complexidade.',
     bestForPillars: ['Prova social', 'Autoridade'],
-    historicalAvgViewsDiff: '+51%',
     recommendedFormat: 'Carrossel',
     psychologicalTrigger: 'Caso de Sucesso Estruturado'
   },
@@ -161,7 +149,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Por que [público] ainda insiste em [hábito prejudicial]?',
     example: 'Por que empresários inteligentes ainda contratam estagiários para cuidar da reputação digital da empresa?',
     bestForPillars: ['Posicionamento', 'Educação'],
-    historicalAvgViewsDiff: '+26%',
     recommendedFormat: 'Reels',
     psychologicalTrigger: 'Interrupção de Padrão'
   },
@@ -172,7 +159,6 @@ export const HOOK_TEMPLATES: HookTemplate[] = [
     formula: 'Você não precisa de [crença limitante] para conseguir [grande objetivo]. Você precisa disto:',
     example: 'Você não precisa de 100 mil seguidores para faturar 6 dígitos com marketing médico. Você só precisa disto:',
     bestForPillars: ['Educação', 'Autoridade'],
-    historicalAvgViewsDiff: '+49%',
     recommendedFormat: 'Reels',
     psychologicalTrigger: 'Alívio e Simplificação'
   }
