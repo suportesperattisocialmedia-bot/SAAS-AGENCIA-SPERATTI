@@ -40,6 +40,34 @@ export function setGeminiGeneratorForTests(generator: GenerateJson | null): void
   generatorOverride = generator;
 }
 
+/**
+ * Traduz o erro do Google em uma mensagem útil para o usuário, sem expor detalhes internos.
+ */
+export function describeGeminiError(err: unknown, model: string): { status: number; message: string; reason: string } {
+  const raw = err instanceof Error ? err.message : String(err);
+  const status = typeof (err as { status?: unknown })?.status === 'number' ? (err as { status: number }).status : 0;
+  const has = (re: RegExp) => re.test(raw);
+  if (has(/API_KEY_INVALID|API key not valid|API key expired/i)) {
+    return { status: 502, reason: 'KEY_INVALID', message: 'A chave do Gemini (GEMINI_API_KEY) é inválida ou expirou. Gere uma nova em aistudio.google.com/apikey e atualize na Vercel.' };
+  }
+  if (status === 429 || has(/RESOURCE_EXHAUSTED|quota/i)) {
+    return { status: 429, reason: 'QUOTA', message: 'A cota gratuita do Gemini acabou por agora. Aguarde alguns minutos ou ative o faturamento no Google AI Studio.' };
+  }
+  if (status === 404 || has(/is not found|not supported for generateContent|NOT_FOUND/i)) {
+    return { status: 502, reason: 'MODEL_NOT_FOUND', message: `O modelo "${model}" não está disponível para esta chave. Use GEMINI_MODEL=gemini-2.5-flash.` };
+  }
+  if (status === 403 || has(/PERMISSION_DENIED|SERVICE_DISABLED|has not been used/i)) {
+    return { status: 502, reason: 'PERMISSION', message: 'A chave do Gemini não tem permissão para a API Generative Language. Crie a chave pelo Google AI Studio.' };
+  }
+  if (has(/location is not supported|FAILED_PRECONDITION/i)) {
+    return { status: 502, reason: 'REGION', message: 'O Gemini recusou a requisição por restrição de região/conta.' };
+  }
+  if (status >= 500 || has(/UNAVAILABLE|overloaded|DEADLINE/i)) {
+    return { status: 503, reason: 'UNAVAILABLE', message: 'O Gemini está temporariamente indisponível. Tente novamente em instantes.' };
+  }
+  return { status: 502, reason: 'UNKNOWN', message: 'Falha ao processar a solicitação com a IA. Tente novamente.' };
+}
+
 export function safeJsonParse(text: string): unknown {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   try {
@@ -65,8 +93,15 @@ export async function generateStructured<S extends z.ZodType>(input: {
   try {
     text = await generate({ model: config.model, prompt: input.prompt, responseSchema: input.responseSchema });
   } catch (err) {
-    log.error('gemini.request_failed', { requestId: input.requestId, operation: input.operation, model: config.model, cause: err instanceof Error ? err : String(err) });
-    throw new AppError('AI_EXECUTION_ERROR', 502, 'Falha ao processar a solicitação com a IA. Tente novamente.', { cause: err });
+    const described = describeGeminiError(err, config.model);
+    log.error('gemini.request_failed', {
+      requestId: input.requestId,
+      operation: input.operation,
+      model: config.model,
+      reason: described.reason,
+      cause: err instanceof Error ? err : String(err)
+    });
+    throw new AppError('AI_EXECUTION_ERROR', described.status, described.message, { cause: err });
   }
 
   const parsed = safeJsonParse(text);
