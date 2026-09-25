@@ -1,6 +1,7 @@
 import React from 'react';
 import { Client, InstagramAccount } from '../../types';
 import {
+  BarChart3,
   RefreshCw,
   Sparkles,
   ArrowLeft,
@@ -19,6 +20,7 @@ import { ConnectionBadge } from '../common/ConnectionBadge';
 
 export type WorkspaceSubTab =
   | 'overview'
+  | 'metrics'
   | 'instagram'
   | 'diagnostic'
   | 'performance'
@@ -57,6 +59,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
 
   const tabs: Array<{ id: WorkspaceSubTab; label: string; icon: React.ReactNode }> = [
     { id: 'overview', label: 'Overview', icon: <Activity className="w-3.5 h-3.5" /> },
+    { id: 'metrics', label: 'Métricas', icon: <BarChart3 className="w-3.5 h-3.5" /> },
     { id: 'instagram', label: 'Instagram', icon: <Link2 className="w-3.5 h-3.5" /> },
     { id: 'diagnostic', label: 'Diagnóstico', icon: <Sparkles className="w-3.5 h-3.5" /> },
     { id: 'performance', label: 'Performance', icon: <TrendingUp className="w-3.5 h-3.5" /> },

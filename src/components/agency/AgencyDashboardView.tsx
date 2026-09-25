@@ -171,7 +171,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                 Nenhum cliente cadastrado ainda
               </h3>
               <p className="text-xs text-neutral-400 leading-relaxed font-sans">
-                Cadastre o perfil, o nicho e os objetivos do cliente. Depois conecte o Instagram para começar a coletar métricas reais.
+                Cadastre o perfil, o nicho e os objetivos do cliente. Depois importe as métricas do Meta Business Suite na aba Métricas.
               </p>
             </div>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">

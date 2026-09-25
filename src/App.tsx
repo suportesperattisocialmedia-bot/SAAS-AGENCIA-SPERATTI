@@ -53,6 +53,7 @@ import { ToastContainer } from './components/common/ToastContainer';
 import { WorkspaceHeader, WorkspaceSubTab } from './components/workspace/WorkspaceHeader';
 import { ClientOverviewTab } from './components/workspace/ClientOverviewTab';
 import { InstagramConnectTab } from './components/workspace/InstagramConnectTab';
+import { MetricsTab } from './components/workspace/MetricsTab';
 import { DiagnosticTab } from './components/workspace/DiagnosticTab';
 import { PerformanceTab } from './components/workspace/PerformanceTab';
 import { ContentTab } from './components/workspace/ContentTab';
@@ -646,6 +647,19 @@ export default function App() {
                       alerts={alerts.filter(a => a.clientId === activeClient.id)}
                       onNavigateTab={setWorkspaceTab}
                       nextActions={nextActions}
+                    />
+                  )}
+
+                  {workspaceTab === 'metrics' && (
+                    <MetricsTab
+                      client={activeClient}
+                      contents={contents}
+                      snapshots={snapshots}
+                      hasDiagnostic={profileDiagnostic !== null}
+                      ideasCount={ideas.length}
+                      calendarCount={calendarItems.length}
+                      onRefresh={() => loadClientData(activeClient)}
+                      onNavigateTab={setWorkspaceTab}
                     />
                   )}
 
