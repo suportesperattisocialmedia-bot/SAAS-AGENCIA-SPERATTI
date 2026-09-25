@@ -13,7 +13,8 @@ const SECRET_PATTERNS: RegExp[] = [
   /fb_exchange_token=[^&\s"']+/gi,
   /appsecret_proof=[^&\s"']+/gi,
   /\bEA[A-Za-z0-9]{20,}\b/g, // tokens Meta
-  /\bAIza[0-9A-Za-z_-]{20,}\b/g // chaves Google
+  /\bAIza[0-9A-Za-z_-]{20,}\b/g, // chaves Google (formato antigo)
+  /\bAQ\.[0-9A-Za-z_.-]{20,}/g // chaves Google (formato novo)
 ];
 
 export function redactString(value: string): string {

@@ -51,6 +51,7 @@ describe('logs', () => {
     expect(JSON.stringify(out)).not.toContain('EAAxyz');
     expect(JSON.stringify(out)).not.toContain('u:p@h');
     expect(redactString('postgresql://user:pass@host:5432/db')).toBe('[REDACTED]');
+    expect(redactString('key AQ.Ab8RN6Ixxxxxxxxxxxxxxxxxxxxxxxx end')).toBe('key [REDACTED] end');
   });
 });
 
@@ -62,5 +63,26 @@ describe('rate limit', () => {
     expect(checkRateLimit(rule, 'ip', 1)).toBe(true);
     expect(checkRateLimit(rule, 'ip', 2)).toBe(false);
     expect(checkRateLimit(rule, 'ip', 1001)).toBe(true);
+  });
+});
+
+import { describeGeminiError } from '../server/services/geminiService.js';
+
+describe('erros do Gemini', () => {
+  it('traduz o motivo sem expor detalhes', () => {
+    const invalid = Object.assign(new Error('{"error":{"code":400,"message":"API key not valid.","details":[{"reason":"API_KEY_INVALID"}]}}'), { status: 400 });
+    expect(describeGeminiError(invalid, 'gemini-2.5-flash').reason).toBe('KEY_INVALID');
+    expect(describeGeminiError(Object.assign(new Error('RESOURCE_EXHAUSTED'), { status: 429 }), 'm').status).toBe(429);
+    expect(describeGeminiError(Object.assign(new Error('models/x is not found'), { status: 404 }), 'x').reason).toBe('MODEL_NOT_FOUND');
+    expect(describeGeminiError(new Error('boom'), 'm').message).not.toContain('boom');
+  });
+});
+
+describe('variáveis de ambiente', () => {
+  it('ignora aspas e espaços colados no painel', async () => {
+    const { getGeminiConfig } = await import('../server/config/env.js');
+    process.env.GEMINI_API_KEY = '  "AIzaExemplo"  ';
+    expect(getGeminiConfig()?.apiKey).toBe('AIzaExemplo');
+    delete process.env.GEMINI_API_KEY;
   });
 });

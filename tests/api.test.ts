@@ -188,8 +188,10 @@ describe.skipIf(!dbAvailable)('API', () => {
         throw new Error('quota exceeded for key AIzaSyFAKEFAKEFAKEFAKEFAKE');
       });
       const failed = await analyze(req('/api/ai/analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
-      expect(failed.status).toBe(502);
-      expect(await failed.text()).not.toContain('AIza');
+      expect(failed.status).toBe(429);
+      const failedText = await failed.text();
+      expect(failedText).toContain('cota');
+      expect(failedText).not.toContain('AIza');
     });
   });
 

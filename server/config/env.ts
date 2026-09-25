@@ -11,7 +11,9 @@ const DEFAULT_META_GRAPH_VERSION = 'v23.0';
 
 function read(name: string): string {
   const value = process.env[name];
-  return typeof value === 'string' ? value.trim() : '';
+  if (typeof value !== 'string') return '';
+  // Tolera valores colados no painel com aspas ou espaços em volta ("valor" ou 'valor').
+  return value.trim().replace(/^(['"])(.*)\1$/s, '$2').trim();
 }
 
 export function getEnvironment(): 'production' | 'preview' | 'development' | 'test' {
