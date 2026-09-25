@@ -99,13 +99,23 @@ export function getBootstrapAdmin(): BootstrapAdmin | null {
   };
 }
 
-/** Origem pública da aplicação, derivada de META_REDIRECT_URI ou APP_URL. */
+/**
+ * Origem pública para onde o callback OAuth devolve o usuário. Usa a própria origem
+ * da requisição (o callback já roda no domínio registrado na Meta); APP_URL é só fallback
+ * e é ignorado se apontar para localhost em produção.
+ */
 export function getAppOrigin(requestUrl?: string): string {
-  const explicit = read('APP_URL');
-  if (explicit) return new URL(explicit).origin;
-  const meta = read('META_REDIRECT_URI');
-  if (meta) return new URL(meta).origin;
   if (requestUrl) return new URL(requestUrl).origin;
+  for (const candidate of [read('APP_URL'), read('META_REDIRECT_URI')]) {
+    if (!candidate) continue;
+    try {
+      const origin = new URL(candidate).origin;
+      if (isProductionLike() && /\/\/(localhost|127\.0\.0\.1)/.test(origin)) continue;
+      return origin;
+    } catch {
+      continue;
+    }
+  }
   return '';
 }
 

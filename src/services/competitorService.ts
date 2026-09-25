@@ -11,6 +11,7 @@ import { Client, Competitor, CompetitorStatus, ContentFormat } from '../types';
 import { storageService } from './storageService';
 import { logger } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
+import { apiClient, describeApiError } from './api/apiClient';
 
 export interface CompetitorBenchmarkRow {
   name: string;
@@ -123,8 +124,8 @@ export const competitorService = {
         id: `pat-${generateUUID()}`,
         type: 'FORMATO PREDOMINANTE',
         title: `Predomínio de ${dominantFormat[0]} no Nicho`,
-        description: `${dominantFormat[1]} de ${competitors.length} concorrentes utilizam ${dominantFormat[0]} como principal alavanca de alcance.`,
-        strategicImplication: `Priorizar ${dominantFormat[0]} com ganchos de alta retenção nos primeiros 3 segundos.`
+        description: `${dominantFormat[1]} de ${competitors.length} concorrentes monitorados têm ${dominantFormat[0]} entre os formatos principais.`,
+        strategicImplication: `Avaliar se ${dominantFormat[0]} merece mais espaço no calendário do cliente.`
       });
     }
 
@@ -145,7 +146,7 @@ export const competitorService = {
       insights.push({
         id: `pat-${generateUUID()}`,
         type: 'TEMAS EM ALTA',
-        title: 'Foco em Solução de Dores e Prova Social',
+        title: 'Temas recorrentes observados',
         description: `Pautas frequentes observadas: ${allThemes.slice(0, 3).join(', ')}.`,
         strategicImplication: 'Abordar estes temas com ângulo mais técnico e autoral para se diferenciar.'
       });
@@ -203,6 +204,51 @@ export const competitorService = {
     };
   },
 
+  /**
+   * Descoberta de candidatos via backend. Sem provider configurado não inventa nada.
+   * Candidatos vêm com fonte, URL, evidência e data; métricas desconhecidas = null.
+   */
+  async discoverCandidates(client: Client): Promise<{ configured: boolean; message?: string; added: Competitor[] }> {
+    try {
+      const res = await apiClient.post<{
+        configured: boolean;
+        message?: string;
+        candidates: Array<{ name: string; instagram: string; source: string; sourceUrl: string; evidence: string | null; retrievedAt: string }>;
+      }>('/api/research', { kind: 'competitors', clientId: client.id, segment: client.segment || client.name, city: client.city || undefined });
+      if (!res.configured) return { configured: false, message: res.message || 'Pesquisa externa não configurada.', added: [] };
+      const known = new Set(this.getByClient(client.id).map((c) => c.instagram.toLowerCase()));
+      const own = client.instagram.toLowerCase();
+      const added = res.candidates
+        .filter((c) => !known.has(c.instagram.toLowerCase()) && c.instagram.toLowerCase() !== own)
+        .map((c) =>
+          this.addCompetitor({
+            clientId: client.id,
+            name: c.name,
+            instagram: c.instagram,
+            website: '',
+            segment: client.segment,
+            similarityScore: null,
+            similarityCriteria: ['Dados insuficientes para cálculo de similaridade'],
+            similarityMethod: 'INSUFFICIENT_DATA',
+            followers: null,
+            postingFrequencyWeekly: null,
+            topFormats: [],
+            avgViews: null,
+            avgEngagementRate: null,
+            recentThemes: [],
+            notes: c.evidence ? `Evidência: ${c.evidence}` : '',
+            status: 'candidate',
+            candidateReason: `Encontrado em ${c.source} em ${new Date(c.retrievedAt).toLocaleDateString('pt-BR')}.`,
+            evidenceUrl: c.sourceUrl
+          })
+        );
+      return { configured: true, added };
+    } catch (err) {
+      logger.warn('Competitor discovery failed', { error: describeApiError(err) });
+      throw err;
+    }
+  },
+
   async registerCandidate(
     client: Client,
     data: {
@@ -234,7 +280,7 @@ export const competitorService = {
       similarityMethod: method,
       followers: data.followers ?? null,
       postingFrequencyWeekly: data.weeklyFrequency ?? null,
-      topFormats: data.topFormats || ['Reels', 'Carrossel'],
+      topFormats: data.topFormats || [],
       avgViews: null,
       avgEngagementRate: null,
       recentThemes: [],

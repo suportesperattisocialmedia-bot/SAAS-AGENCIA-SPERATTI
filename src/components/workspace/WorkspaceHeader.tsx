@@ -15,7 +15,7 @@ import {
   Activity,
   Link2
 } from 'lucide-react';
-import { ASSETS } from '../../data/assets';
+import { ConnectionBadge } from '../common/ConnectionBadge';
 
 export type WorkspaceSubTab =
   | 'overview'
@@ -53,12 +53,11 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
   onAnalyzeProfile,
   isAnalyzing
 }) => {
-  const isDrRavi = client.instagram.toLowerCase().includes('ravi');
-  const avatarUrl = isDrRavi ? ASSETS.raviPortrait : client.avatarUrl;
+  const avatarUrl = client.avatarUrl;
 
   const tabs: Array<{ id: WorkspaceSubTab; label: string; icon: React.ReactNode }> = [
     { id: 'overview', label: 'Overview', icon: <Activity className="w-3.5 h-3.5" /> },
-    { id: 'instagram', label: 'Conectar Instagram', icon: <Link2 className="w-3.5 h-3.5" /> },
+    { id: 'instagram', label: 'Instagram', icon: <Link2 className="w-3.5 h-3.5" /> },
     { id: 'diagnostic', label: 'Diagnóstico', icon: <Sparkles className="w-3.5 h-3.5" /> },
     { id: 'performance', label: 'Performance', icon: <TrendingUp className="w-3.5 h-3.5" /> },
     { id: 'content', label: 'Conteúdo', icon: <Layers className="w-3.5 h-3.5" /> },
@@ -108,15 +107,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
                 <span>{client.company}</span>
                 <span>·</span>
                 <span className="text-neutral-300">{client.segment}</span>
-                {account?.isConnected && (
-                  <>
-                    <span>·</span>
-                    <span className="flex items-center gap-1 text-emerald-400 text-[11px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      Sincronizado
-                    </span>
-                  </>
-                )}
+                <ConnectionBadge status={account?.status ?? 'DISCONNECTED'} />
               </div>
             </div>
           </div>
@@ -126,11 +117,12 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
         <div className="flex items-center gap-2.5 self-end lg:self-center">
           <button
             onClick={onSync}
-            disabled={isSyncing}
-            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 rounded-lg text-xs font-mono font-medium transition-colors disabled:opacity-50"
+            disabled={isSyncing || !account?.isConnected}
+            title={account?.isConnected ? 'Sincronizar mídia e métricas da Meta' : 'Conecte o Instagram para sincronizar'}
+            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-400' : 'text-neutral-400'}`} />
-            <span>{isSyncing ? 'Sincronizando Meta API...' : 'Sincronizar Agora'}</span>
+            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar'}</span>
           </button>
 
           <button

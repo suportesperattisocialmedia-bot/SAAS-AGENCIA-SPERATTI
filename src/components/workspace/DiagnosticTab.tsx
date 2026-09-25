@@ -119,13 +119,13 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
               </div>
 
               <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Equilíbrio de Formatos</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.contentSection.formatBalance}</p>
+                <span className="text-[10px] font-mono text-neutral-500 uppercase">Formatos Predominantes</span>
+                <p className="text-neutral-300 leading-relaxed">{diagnostic.contentSection.predominantFormats}</p>
               </div>
 
               <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Eficácia dos Ganchos</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.contentSection.hookEffectiveness}</p>
+                <span className="text-[10px] font-mono text-neutral-500 uppercase">Uso de Ganchos</span>
+                <p className="text-neutral-300 leading-relaxed">{diagnostic.contentSection.hookUsage}</p>
               </div>
 
               <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
@@ -146,23 +146,23 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Crescimento de Base</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.observedGrowth}</p>
+                <span className="text-[10px] font-mono text-neutral-500 uppercase">Engajamento</span>
+                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.engagementAnalysis}</p>
               </div>
 
               <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Qualidade do Engajamento</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.engagementQuality}</p>
+                <span className="text-[10px] font-mono text-neutral-500 uppercase">Alcance e Impressões</span>
+                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.reachAndImpressions}</p>
               </div>
 
               <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Taxa de Salvamento e Compartilhamento</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.saveAndShareRatio}</p>
+                <span className="text-[10px] font-mono text-neutral-500 uppercase">Salvamentos e Compartilhamentos</span>
+                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.savesAndShares}</p>
               </div>
 
               <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Média de Visualizações</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.topAudienceDraw}</p>
+                <span className="text-[10px] font-mono text-neutral-500 uppercase">Conteúdos de Melhor Resultado</span>
+                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.bestContentObservations}</p>
               </div>
             </div>
           </div>
@@ -177,26 +177,30 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Posicionamento de Autoridade</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.strategySection.authorityStatus}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Prontidão para Venda de Alto Ticket</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.strategySection.salesReadiness}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Equilíbrio de Funil</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.strategySection.funnelBalance}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-amber-500/30 bg-amber-950/10 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-amber-400 uppercase font-semibold">Maior Oportunidade Identificada</span>
-                <p className="text-amber-200 leading-relaxed">{diagnostic.strategySection.biggestOpportunity}</p>
-              </div>
+              {([
+                ['Forças', diagnostic.strategySection.strengths],
+                ['Vulnerabilidades', diagnostic.strategySection.vulnerabilities],
+                ['Oportunidades Imediatas', diagnostic.strategySection.immediateOpportunities],
+                ['Formatos Recomendados', diagnostic.strategySection.recommendedFormats]
+              ] as Array<[string, string[]]>).map(([label, items]) => (
+                <div key={label} className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1.5">
+                  <span className="text-[10px] font-mono text-neutral-500 uppercase">{label}</span>
+                  {items.length === 0 ? (
+                    <p className="text-neutral-500">Sem itens.</p>
+                  ) : (
+                    <ul className="list-disc pl-4 space-y-1 text-neutral-300 leading-relaxed">
+                      {items.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
             </div>
+            <p className="text-[11px] text-neutral-500">
+              Análise gerada por IA{diagnostic.model ? ` (${diagnostic.model})` : ''}
+              {diagnostic.analyzedAt ? ` em ${new Date(diagnostic.analyzedAt).toLocaleString('pt-BR')}` : ''}. Trate como hipótese estratégica e valide com os dados.
+            </p>
           </div>
         </div>
       ) : (

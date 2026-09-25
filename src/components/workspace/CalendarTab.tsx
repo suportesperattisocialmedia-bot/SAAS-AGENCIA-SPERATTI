@@ -81,7 +81,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
   };
 
   const handleDeleteItem = (id: string) => {
-    storageService.calendar.deleteItem(id);
+    storageService.calendar.delete(id);
     onRefresh();
   };
 

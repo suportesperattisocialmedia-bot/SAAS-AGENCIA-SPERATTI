@@ -63,16 +63,14 @@ export const ClientSchema = z.object({
 export const InstagramAccountSchema = z.object({
   clientId: z.string().min(1),
   handle: z.string().min(1),
-  status: z.enum([
-    'NOT_CONNECTED',
-    'CONNECTING',
-    'CONNECTED',
-    'TOKEN_EXPIRED',
-    'PERMISSION_ERROR',
-    'SYNCING',
-    'SYNCED',
-    'ERROR'
-  ]).default('NOT_CONNECTED'),
+  // Valores legados (antes da conexão OAuth real) são normalizados para os estados atuais.
+  status: z.preprocess(
+    (value) => {
+      const legacy: Record<string, string> = { NOT_CONNECTED: 'DISCONNECTED', TOKEN_EXPIRED: 'EXPIRED', PERMISSION_ERROR: 'REAUTH_REQUIRED', SYNCED: 'CONNECTED' };
+      return typeof value === 'string' && legacy[value] ? legacy[value] : value;
+    },
+    z.enum(['NOT_CONFIGURED', 'DISCONNECTED', 'CONNECTING', 'CONNECTED', 'SYNCING', 'ERROR', 'EXPIRED', 'REAUTH_REQUIRED'])
+  ).default('DISCONNECTED'),
   isConnected: z.boolean().default(false),
   connectedAt: z.string().optional(),
   lastSyncAt: z.string().optional(),
@@ -81,24 +79,26 @@ export const InstagramAccountSchema = z.object({
   accountId: z.string().optional(),
   pageId: z.string().optional(),
   permissions: z.array(z.string()).default([]),
-  errorStatus: z.string().nullable().optional()
+  errorStatus: z.string().nullable().optional(),
+  username: z.string().nullable().optional(),
+  tokenExpiresAt: z.string().nullable().optional()
 });
 
 export const AccountSnapshotSchema = z.object({
   id: z.string().min(1),
   clientId: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD'),
-  followers: z.number().nonnegative(),
-  reach: z.number().nonnegative(),
-  views: z.number().nonnegative(),
-  likes: z.number().nonnegative(),
-  comments: z.number().nonnegative(),
-  shares: z.number().nonnegative(),
-  saves: z.number().nonnegative(),
-  profileVisits: z.number().nonnegative(),
-  websiteClicks: z.number().nonnegative(),
-  postsPublished: z.number().nonnegative(),
-  engagementRate: z.number().nonnegative(),
+  followers: z.number().nonnegative().nullable(),
+  reach: z.number().nonnegative().nullable(),
+  views: z.number().nonnegative().nullable(),
+  likes: z.number().nonnegative().nullable(),
+  comments: z.number().nonnegative().nullable(),
+  shares: z.number().nonnegative().nullable(),
+  saves: z.number().nonnegative().nullable(),
+  profileVisits: z.number().nonnegative().nullable(),
+  websiteClicks: z.number().nonnegative().nullable(),
+  postsPublished: z.number().nonnegative().nullable(),
+  engagementRate: z.number().nonnegative().nullable(),
   source: SnapshotSourceSchema.default('MANUAL'),
   sourceTimestamp: z.string().default(() => new Date().toISOString())
 });
@@ -127,13 +127,13 @@ export const ContentSchema = z.object({
   tone: z.string().optional(),
   intent: z.string().optional(),
   metrics: z.object({
-    views: z.number().nonnegative().default(0),
-    likes: z.number().nonnegative().default(0),
-    comments: z.number().nonnegative().default(0),
-    shares: z.number().nonnegative().default(0),
-    saves: z.number().nonnegative().default(0),
-    reach: z.number().nonnegative().default(0),
-    engagementRate: z.number().nonnegative().default(0)
+    views: z.number().nonnegative().nullable().default(null),
+    likes: z.number().nonnegative().nullable().default(null),
+    comments: z.number().nonnegative().nullable().default(null),
+    shares: z.number().nonnegative().nullable().default(null),
+    saves: z.number().nonnegative().nullable().default(null),
+    reach: z.number().nonnegative().nullable().default(null),
+    engagementRate: z.number().nonnegative().nullable().default(null)
   }),
   aiAnalysis: z.object({
     summary: z.string(),

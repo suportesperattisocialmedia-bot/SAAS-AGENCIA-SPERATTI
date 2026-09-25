@@ -1,7 +1,8 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { DemoProvider } from '../../services/demo/DemoProvider';
 
-export type MetricTypeTag = 'DADO REAL' | 'DADO CALCULADO' | 'INSIGHT DA IA' | 'RECOMENDAÇÃO';
+export type MetricTypeTag = 'DADO REAL' | 'DADO CALCULADO' | 'INSIGHT DA IA' | 'RECOMENDAÇÃO' | 'DADO FICTÍCIO';
 
 interface StatCardProps {
   label: string;
@@ -44,52 +45,44 @@ export const StatCard: React.FC<StatCardProps> = ({
         return 'text-purple-400/90 border-purple-500/20 bg-purple-950/30';
       case 'RECOMENDAÇÃO':
         return 'text-emerald-400/90 border-emerald-500/20 bg-emerald-950/30';
+      case 'DADO FICTÍCIO':
+        return 'text-rose-300 border-rose-500/30 bg-rose-950/30';
     }
   };
 
-  return (
-    <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4 flex flex-col justify-between transition-colors hover:border-neutral-700">
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider truncate">
-            {label}
-          </span>
-          <div className="flex items-center gap-1.5">
-            {typeTag && (
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${getTagColor(typeTag)}`}>
-                {typeTag}
-              </span>
-            )}
-            {icon && <span className="text-neutral-500">{icon}</span>}
-          </div>
-        </div>
+  // Valor indisponível: exibido esmaecido e sem selo de proveniência (não há dado a classificar).
+  // No modo demonstração nenhum número é rotulado como real.
+  const shownTag: MetricTypeTag | undefined = typeTag && DemoProvider.isDemoActive() ? 'DADO FICTÍCIO' : typeTag;
+  const unavailable = typeof value === 'string' && /^(n\/d|sem dados)/i.test(value.trim());
 
-        <div className="flex items-baseline gap-2">
-          <div className="text-2xl font-bold font-mono tabular-nums text-neutral-100 tracking-tight">
-            {value}
-          </div>
+  return (
+    <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-colors hover:border-neutral-700">
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <span className="text-sm font-medium text-neutral-400 leading-snug">{label}</span>
+          {icon && <span className="shrink-0 mt-0.5">{icon}</span>}
+        </div>
+        <div className={`text-[1.75rem] leading-none font-semibold tabular-nums tracking-tight ${unavailable ? 'text-neutral-500 text-xl' : 'text-neutral-50'}`}>
+          {value}
         </div>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-neutral-800/80 flex items-center justify-between text-xs">
+      <div className="flex items-center justify-between gap-2 text-xs">
         {isDiffDefined ? (
-          <div className="flex items-center gap-1 font-mono tabular-nums">
+          <div className="flex items-center gap-1 tabular-nums">
             {isPositive && <ArrowUpRight className={`w-3.5 h-3.5 ${isGood ? 'text-emerald-400' : 'text-rose-400'}`} />}
             {isNegative && <ArrowDownRight className={`w-3.5 h-3.5 ${isBad ? 'text-rose-400' : 'text-emerald-400'}`} />}
             {isNeutral && <Minus className="w-3.5 h-3.5 text-neutral-500" />}
             <span className={isGood ? 'text-emerald-400 font-semibold' : isBad ? 'text-rose-400 font-semibold' : 'text-neutral-400'}>
               {diffPercent > 0 ? `+${diffPercent}%` : `${diffPercent}%`}
             </span>
-            <span className="text-neutral-500 text-[11px] ml-1">vs anterior</span>
+            <span className="text-neutral-500 ml-1">vs anterior</span>
           </div>
-        ) : diffText ? (
-          <span className="text-neutral-400 font-mono text-[11px]">{diffText}</span>
         ) : (
-          <span className="text-neutral-500 text-[11px]">{subtext || 'Histórico consolidado'}</span>
+          <span className="text-neutral-500">{diffText || subtext || periodLabel || ''}</span>
         )}
-
-        {periodLabel && (
-          <span className="text-[11px] text-neutral-500 font-mono">{periodLabel}</span>
+        {shownTag && !unavailable && (
+          <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${getTagColor(shownTag)}`}>{shownTag}</span>
         )}
       </div>
     </div>

@@ -38,15 +38,15 @@ export interface Client {
   updatedAt: string;
 }
 
-export type InstagramConnectionStatus = 
-  | 'NOT_CONNECTED'
+export type InstagramConnectionStatus =
+  | 'NOT_CONFIGURED'
+  | 'DISCONNECTED'
   | 'CONNECTING'
   | 'CONNECTED'
-  | 'TOKEN_EXPIRED'
-  | 'PERMISSION_ERROR'
   | 'SYNCING'
-  | 'SYNCED'
-  | 'ERROR';
+  | 'ERROR'
+  | 'EXPIRED'
+  | 'REAUTH_REQUIRED';
 
 export interface InstagramAccount {
   clientId: string;
@@ -61,25 +61,30 @@ export interface InstagramAccount {
   pageId?: string;
   permissions: string[];
   errorStatus?: string | null;
+  username?: string | null;
+  tokenExpiresAt?: string | null;
 }
 
 export type SnapshotSource = 'META_API' | 'IMPORT' | 'MANUAL' | 'DEMO';
+
+/** Métrica real ou null quando indisponível na fonte. Nunca substituir por 0. */
+export type Metric = number | null;
 
 export interface AccountSnapshot {
   id: string;
   clientId: string;
   date: string; // ISO date string YYYY-MM-DD
-  followers: number;
-  reach: number;
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  saves: number;
-  profileVisits: number;
-  websiteClicks: number;
-  postsPublished: number;
-  engagementRate: number;
+  followers: Metric;
+  reach: Metric;
+  views: Metric;
+  likes: Metric;
+  comments: Metric;
+  shares: Metric;
+  saves: Metric;
+  profileVisits: Metric;
+  websiteClicks: Metric;
+  postsPublished: Metric;
+  engagementRate: Metric;
   source: SnapshotSource;
   sourceTimestamp: string;
 }
@@ -90,13 +95,13 @@ export type MetricSnapshot = AccountSnapshot;
 export type ContentFormat = 'Reels' | 'Carrossel' | 'Foto' | 'Stories' | 'Live';
 
 export interface ContentMetrics {
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  saves: number;
-  reach: number;
-  engagementRate: number;
+  views: Metric;
+  likes: Metric;
+  comments: Metric;
+  shares: Metric;
+  saves: Metric;
+  reach: Metric;
+  engagementRate: Metric;
 }
 
 export interface ContentAiAnalysis {
@@ -141,14 +146,14 @@ export interface ContentMetricSnapshot {
   id: string;
   contentId: string;
   timestamp: string;
-  views: number;
-  reach: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  saves: number;
-  profileActivity: number;
-  engagementRate: number;
+  views: Metric;
+  reach: Metric;
+  likes: Metric;
+  comments: Metric;
+  shares: Metric;
+  saves: Metric;
+  profileActivity: Metric;
+  engagementRate: Metric;
   source: SnapshotSource;
 }
 
@@ -361,7 +366,6 @@ export interface HookTemplate {
   formula: string;
   example: string;
   bestForPillars: string[];
-  historicalAvgViewsDiff?: string;
   recommendedFormat?: ContentFormat;
   psychologicalTrigger?: string;
 }
@@ -396,7 +400,7 @@ export interface Alert {
 }
 
 export interface PeriodComparison {
-  current: number;
+  current: number | null;
   previous: number | null;
   absoluteDiff: number | null;
   percentDiff: number | null;
@@ -431,13 +435,13 @@ export interface Report {
   endDate: string;
   executiveSummary: string;
   kpis: {
-    followers: number;
+    followers: Metric;
     followersDiffPct: number | null;
-    views: number;
+    views: Metric;
     viewsDiffPct: number | null;
-    reach: number;
+    reach: Metric;
     reachDiffPct: number | null;
-    engagementRate: number;
+    engagementRate: Metric;
     engagementDiffPct: number | null;
     postsCount: number;
   };

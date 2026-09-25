@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Client, Competitor } from '../../types';
-import { competitorService, CompetitorPatternInsight } from '../../services/competitorService';
+import { Client, Competitor, ContentFormat } from '../../types';
+import { competitorService, CompetitorBenchmarkRow } from '../../services/competitorService';
+import { describeApiError } from '../../services/api/apiClient';
 import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
 import { Modal } from '../common/Modal';
@@ -16,6 +17,7 @@ import {
   AlertCircle,
   Clock
 } from 'lucide-react';
+import { formatMetric } from '../../utils/metrics';
 
 interface CompetitorTabProps {
   client: Client;
@@ -35,32 +37,38 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
     instagram: '',
     website: '',
     segment: client.segment,
-    followers: 25000,
-    postingFrequencyWeekly: 3,
-    avgViews: 18000,
-    avgEngagementRate: 4.5,
-    topFormats: 'Reels, Carrossel',
-    recentThemes: 'Procedimentos, Pós-operatório',
+    followers: '',
+    postingFrequencyWeekly: '',
+    avgViews: '',
+    avgEngagementRate: '',
+    topFormats: '',
+    recentThemes: '',
+    evidenceUrl: '',
     notes: ''
   });
 
   const approvedCompetitors = competitors.filter(c => c.status === 'approved');
-  const candidateCompetitors = competitors.filter(c => c.status === 'candidate');
-  const benchmarkMatrix = competitorService.generateBenchmarkMatrix(client, approvedCompetitors);
+  const candidateCompetitors = competitors.filter(c => c.status === 'candidate' || c.status === 'discovered');
+  const latestFollowers = [...storageService.history.getByClient(client.id)].reverse().find((s) => s.followers !== null)?.followers ?? null;
+  const benchmarkMatrix = competitorService.generateBenchmarkTable(client, latestFollowers, null);
   const patternInsights = competitorService.detectCompetitorPatterns(approvedCompetitors);
 
   const handleDiscover = async () => {
     setIsSearching(true);
     try {
-      const candidates = await competitorService.discoverCandidateCompetitors(client);
-      notificationService.addNotification(
-        'Busca de Concorrentes Concluída',
-        `${candidates.length} candidato(s) encontrados com base no segmento ${client.segment}.`,
-        'info'
-      );
+      const result = await competitorService.discoverCandidates(client);
+      if (!result.configured) {
+        notificationService.showToast(result.message || 'Pesquisa externa não configurada.', 'info');
+      } else {
+        notificationService.addNotification(
+          'Busca de concorrentes concluída',
+          `${result.added.length} novo(s) candidato(s) com fonte registrada. Revise antes de aprovar.`,
+          'info'
+        );
+      }
       onRefresh();
-    } catch {
-      notificationService.showToast('Erro ao buscar concorrentes.', 'error');
+    } catch (err) {
+      notificationService.showToast(describeApiError(err, 'Erro ao buscar concorrentes.'), 'error');
     } finally {
       setIsSearching(false);
     }
@@ -82,20 +90,38 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
     e.preventDefault();
     if (!newCompForm.name || !newCompForm.instagram) return;
 
+    const toNumber = (value: string): number | null => (value.trim() === '' || Number.isNaN(Number(value)) ? null : Number(value));
+    const validFormats: ContentFormat[] = ['Reels', 'Carrossel', 'Foto', 'Stories', 'Live'];
+    const topFormats = newCompForm.topFormats
+      .split(',')
+      .map((f) => f.trim())
+      .filter((f): f is ContentFormat => (validFormats as string[]).includes(f));
+    const candidate = {
+      segment: newCompForm.segment,
+      topFormats,
+      followers: toNumber(newCompForm.followers),
+      notes: newCompForm.notes
+    };
+    const similarity = competitorService.calculateSimilarity(client, candidate);
+
     storageService.competitors.create({
       clientId: client.id,
       name: newCompForm.name,
       instagram: newCompForm.instagram.startsWith('@') ? newCompForm.instagram : `@${newCompForm.instagram}`,
       website: newCompForm.website,
       segment: newCompForm.segment,
-      similarityScore: 85,
-      followers: Number(newCompForm.followers),
-      postingFrequencyWeekly: Number(newCompForm.postingFrequencyWeekly),
-      topFormats: newCompForm.topFormats.split(',').map(s => s.trim()) as any,
-      avgViews: Number(newCompForm.avgViews),
-      avgEngagementRate: Number(newCompForm.avgEngagementRate),
-      recentThemes: newCompForm.recentThemes.split(',').map(s => s.trim()),
+      similarityScore: similarity.score,
+      similarityCriteria: similarity.criteria,
+      similarityMethod: similarity.method,
+      followers: candidate.followers,
+      postingFrequencyWeekly: toNumber(newCompForm.postingFrequencyWeekly),
+      topFormats,
+      avgViews: toNumber(newCompForm.avgViews),
+      avgEngagementRate: toNumber(newCompForm.avgEngagementRate),
+      recentThemes: newCompForm.recentThemes.split(',').map((t) => t.trim()).filter(Boolean),
       notes: newCompForm.notes,
+      evidenceUrl: newCompForm.evidenceUrl || undefined,
+      candidateReason: 'Cadastro manual pela equipe (valores observados manualmente).',
       status: 'approved'
     });
 
@@ -128,7 +154,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
           <button
             onClick={handleDiscover}
             disabled={isSearching}
-            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-mono transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs transition-colors disabled:opacity-50"
           >
             <Search className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-amber-400' : ''}`} />
             <span>{isSearching ? 'Buscando...' : 'Encontrar Concorrentes'}</span>
@@ -155,7 +181,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
               </h4>
             </div>
             <span className="text-[10px] font-mono text-neutral-400">
-              Aprovação necessária por Gabriel Speratti
+              Revise a fonte antes de aprovar
             </span>
           </div>
 
@@ -172,17 +198,22 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                       <span className="text-[11px] font-mono text-amber-400">{cand.instagram}</span>
                     </div>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
-                      {cand.similarityScore}% similar
+                      {cand.similarityScore === null ? 'Similaridade n/d' : `${cand.similarityScore}% similar`}
                     </span>
                   </div>
 
                   <p className="text-xs text-neutral-400 mb-3">
                     {cand.candidateReason || cand.notes}
                   </p>
+                  {cand.evidenceUrl && (
+                    <a href={cand.evidenceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 mb-3">
+                      <ExternalLink className="w-3 h-3" /> Ver fonte
+                    </a>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-neutral-400 bg-neutral-950 p-2 rounded mb-3">
-                    <div>Seguidores: <span className="text-neutral-200">{cand.followers.toLocaleString('pt-BR')}</span></div>
-                    <div>Cadência: <span className="text-neutral-200">{cand.postingFrequencyWeekly}x / sem</span></div>
+                    <div>Seguidores: <span className="text-neutral-200">{formatMetric(cand.followers)}</span></div>
+                    <div>Cadência: <span className="text-neutral-200">{formatMetric(cand.postingFrequencyWeekly, { suffix: 'x / sem' })}</span></div>
                   </div>
                 </div>
 
@@ -234,7 +265,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800/60 text-neutral-300">
-              {benchmarkMatrix.map((row, idx) => (
+              {benchmarkMatrix.map((row: CompetitorBenchmarkRow, idx: number) => (
                 <tr
                   key={idx}
                   className={row.isClient ? 'bg-amber-950/20 font-semibold text-neutral-100' : 'hover:bg-neutral-850/50'}
@@ -253,20 +284,20 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                     </div>
                   </td>
                   <td className="py-3 text-right font-bold tabular-nums">
-                    {row.followers.toLocaleString('pt-BR')}
+                    {formatMetric(row.followers)}
                   </td>
                   <td className="py-3 text-center tabular-nums">
-                    {row.weeklyFrequency}x / sem
+                    {formatMetric(row.weeklyFrequency, { suffix: 'x / sem' })}
                   </td>
                   <td className="py-3 text-right tabular-nums">
-                    {row.avgViews.toLocaleString('pt-BR')}
+                    {formatMetric(row.avgViews)}
                   </td>
                   <td className="py-3 text-right text-emerald-400 font-bold tabular-nums">
-                    {row.avgEngagementRate}%
+                    {formatMetric(row.avgEngagementRate, { suffix: '%' })}
                   </td>
                   <td className="py-3">
                     <div className="flex flex-wrap gap-1">
-                      {row.topFormats.map((f, i) => (
+                      {row.topFormats.map((f: string, i: number) => (
                         <span key={i} className="text-[10px] px-1.5 py-0.2 rounded bg-neutral-800 border border-neutral-700 text-neutral-300">
                           {f}
                         </span>
@@ -296,6 +327,11 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {patternInsights.length === 0 && (
+            <p className="text-sm text-neutral-500 md:col-span-3">
+              Aprove ou cadastre concorrentes com dados observados para identificar padrões.
+            </p>
+          )}
           {patternInsights.map(insight => (
             <div
               key={insight.id}
@@ -365,7 +401,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 <input
                   type="number"
                   value={newCompForm.followers}
-                  onChange={(e) => setNewCompForm({ ...newCompForm, followers: Number(e.target.value) })}
+                  onChange={(e) => setNewCompForm({ ...newCompForm, followers: e.target.value })}
                   className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
                 />
               </div>
@@ -376,17 +412,17 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   type="number"
                   step="0.5"
                   value={newCompForm.postingFrequencyWeekly}
-                  onChange={(e) => setNewCompForm({ ...newCompForm, postingFrequencyWeekly: Number(e.target.value) })}
+                  onChange={(e) => setNewCompForm({ ...newCompForm, postingFrequencyWeekly: e.target.value })}
                   className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
                 />
               </div>
 
               <div>
-                <label className="block text-neutral-400 mb-1">Views Médias Estimadas</label>
+                <label className="block text-neutral-400 mb-1">Views médias observadas</label>
                 <input
                   type="number"
                   value={newCompForm.avgViews}
-                  onChange={(e) => setNewCompForm({ ...newCompForm, avgViews: Number(e.target.value) })}
+                  onChange={(e) => setNewCompForm({ ...newCompForm, avgViews: e.target.value })}
                   className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
                 />
               </div>
@@ -397,7 +433,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   type="number"
                   step="0.1"
                   value={newCompForm.avgEngagementRate}
-                  onChange={(e) => setNewCompForm({ ...newCompForm, avgEngagementRate: Number(e.target.value) })}
+                  onChange={(e) => setNewCompForm({ ...newCompForm, avgEngagementRate: e.target.value })}
                   className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
                 />
               </div>
@@ -421,6 +457,17 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 value={newCompForm.recentThemes}
                 onChange={(e) => setNewCompForm({ ...newCompForm, recentThemes: e.target.value })}
                 placeholder="Ex: Recuperação, Cicatriz, Lipoaspiração"
+                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-neutral-400 mb-1">Fonte / evidência (URL)</label>
+              <input
+                type="url"
+                value={newCompForm.evidenceUrl}
+                onChange={(e) => setNewCompForm({ ...newCompForm, evidenceUrl: e.target.value })}
+                placeholder="https://www.instagram.com/perfil"
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
               />
             </div>

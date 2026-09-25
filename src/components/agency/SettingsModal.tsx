@@ -111,9 +111,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <div className="flex items-center justify-between p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
             <div>
-              <div className="text-neutral-200 font-semibold">Cliente Modelo (Dr. Ravi Alencar)</div>
+              <div className="text-neutral-200 font-semibold">Cliente de demonstração (Clínica Aurora)</div>
               <div className="text-[11px] text-neutral-500 mt-0.5">
-                {isDemoLoaded ? 'Dados mockados carregados e ativos' : 'Carregar base completa de demonstração'}
+                {isDemoLoaded ? 'Dados fictícios de demonstração ativos' : 'Carregar base completa de demonstração'}
               </div>
             </div>
 
@@ -131,7 +131,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClick={onSeedDemoData}
                 className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded transition-colors text-[11px]"
               >
-                Carregar Mock Ravi
+                Ativar demonstração
               </button>
             )}
           </div>

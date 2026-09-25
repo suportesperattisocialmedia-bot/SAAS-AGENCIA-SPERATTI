@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { notificationService } from '../../services/notificationService';
 import { NotificationType } from '../../types';
 import { CheckCircle2, AlertCircle, Info, XCircle, X } from 'lucide-react';
+import { generateUUID } from '../../utils/uuid';
 
 interface ToastItem {
   id: string;
@@ -14,7 +15,7 @@ export const ToastContainer: React.FC = () => {
 
   useEffect(() => {
     const unsub = notificationService.subscribeToast(({ message, type }) => {
-      const id = `toast-${Date.now()}-${Math.random()}`;
+      const id = `toast-${generateUUID()}`;
       setToasts(prev => [...prev, { id, message, type }]);
 
       setTimeout(() => {

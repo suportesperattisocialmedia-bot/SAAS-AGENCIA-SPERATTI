@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, X, Users, FileText, Lightbulb, Swords, ArrowRight } from 'lucide-react';
 import { Client, Content, ContentIdea, Competitor, Report } from '../../types';
+import { formatMetric } from '../../utils/metrics';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -108,7 +109,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         <div className="p-4 overflow-y-auto custom-scrollbar space-y-4">
           {!results ? (
             <div className="py-8 text-center text-xs text-neutral-500 font-mono">
-              Pesquise por clientes (@dr.ravialencar), temas de conteúdo, ganchos ou concorrentes.
+              Pesquise por clientes, temas de conteúdo, ganchos ou concorrentes.
             </div>
           ) : results.total === 0 ? (
             <div className="py-8 text-center text-xs text-neutral-400">
@@ -177,7 +178,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                             <span>·</span>
                             <span>{c.pillar}</span>
                             <span>·</span>
-                            <span>{c.metrics.views.toLocaleString('pt-BR')} views</span>
+                            <span>{formatMetric(c.metrics.views)} views</span>
                           </div>
                         </div>
                         <ArrowRight className="w-3.5 h-3.5 text-neutral-600 group-hover:text-amber-400 shrink-0" />
@@ -245,7 +246,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                             {comp.name}
                           </div>
                           <div className="text-[11px] font-mono text-neutral-400">
-                            {comp.instagram} · {comp.followers.toLocaleString('pt-BR')} seg.
+                            {comp.instagram} · {formatMetric(comp.followers)} seg.
                           </div>
                         </div>
                         <ArrowRight className="w-3.5 h-3.5 text-neutral-600 group-hover:text-amber-400 shrink-0" />

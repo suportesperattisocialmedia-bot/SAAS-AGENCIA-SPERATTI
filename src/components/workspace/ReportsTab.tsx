@@ -14,6 +14,7 @@ import {
   Share2,
   Eye
 } from 'lucide-react';
+import { formatMetric } from '../../utils/metrics';
 
 interface ReportsTabProps {
   client: Client;
@@ -50,8 +51,13 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleExportPdf = async () => {
+    if (!activeReport) return;
+    try {
+      await reportService.exportToPdf(activeReport, client);
+    } catch {
+      notificationService.showToast('Não foi possível gerar o PDF.', 'error');
+    }
   };
 
   const handleExportCsv = () => {
@@ -113,9 +119,9 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           {activeReport && (
             <>
               <button
-                onClick={handlePrint}
+                onClick={handleExportPdf}
                 className="flex items-center gap-1 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs transition-colors"
-                title="Imprimir ou Salvar como PDF"
+                title="Baixar relatório em PDF"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">PDF</span>
@@ -142,7 +148,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <div className="text-[11px] font-mono text-amber-400 tracking-wider uppercase">
                 GABRIEL SPERATTI · SOCIAL INTELLIGENCE
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-neutral-100 font-serif mt-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-neutral-100 tracking-tight mt-1">
                 {activeReport.title}
               </h1>
               <div className="flex items-center gap-2 mt-2 text-xs text-neutral-400 font-mono">
@@ -178,7 +184,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-xl">
                 <span className="text-[10px] text-neutral-500 uppercase block mb-1">Seguidores Finais</span>
                 <div className="text-lg font-bold text-neutral-100 tabular-nums">
-                  {activeReport.kpis.followers.toLocaleString('pt-BR')}
+                  {formatMetric(activeReport.kpis.followers)}
                 </div>
                 <div className="text-[11px] mt-1 font-sans">
                   {formatDiff(activeReport.kpis.followersDiffPct)}
@@ -188,7 +194,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-xl">
                 <span className="text-[10px] text-neutral-500 uppercase block mb-1">Visualizações Totais</span>
                 <div className="text-lg font-bold text-neutral-100 tabular-nums">
-                  {activeReport.kpis.views.toLocaleString('pt-BR')}
+                  {formatMetric(activeReport.kpis.views)}
                 </div>
                 <div className="text-[11px] mt-1 font-sans">
                   {formatDiff(activeReport.kpis.viewsDiffPct)}
@@ -198,7 +204,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-xl">
                 <span className="text-[10px] text-neutral-500 uppercase block mb-1">Alcance Único</span>
                 <div className="text-lg font-bold text-neutral-100 tabular-nums">
-                  {activeReport.kpis.reach.toLocaleString('pt-BR')}
+                  {formatMetric(activeReport.kpis.reach)}
                 </div>
                 <div className="text-[11px] mt-1 font-sans">
                   {formatDiff(activeReport.kpis.reachDiffPct)}
@@ -239,7 +245,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     <div className="flex items-center gap-3 text-[11px] text-neutral-400 font-mono pt-2 border-t border-neutral-800/60">
                       <span className="flex items-center gap-1">
                         <Eye className="w-3 h-3 text-sky-400" />
-                        {content.metrics.views.toLocaleString('pt-BR')}
+                        {formatMetric(content.metrics.views)}
                       </span>
                       <span className="flex items-center gap-1">
                         <Bookmark className="w-3 h-3 text-purple-400" />

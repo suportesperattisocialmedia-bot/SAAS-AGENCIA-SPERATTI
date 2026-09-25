@@ -4,6 +4,7 @@
  */
 
 import { AppNotification, NotificationType } from '../types';
+import { generateUUID } from '../utils/uuid';
 
 type NotificationListener = (notifications: AppNotification[]) => void;
 type ToastListener = (toast: { message: string; type: NotificationType }) => void;
@@ -37,7 +38,7 @@ class NotificationService {
 
   addNotification(title: string, message: string, type: NotificationType = 'info', actionUrl?: string): AppNotification {
     const newNotif: AppNotification = {
-      id: `notif-${Date.now()}`,
+      id: `notif-${generateUUID()}`,
       title,
       message,
       type,

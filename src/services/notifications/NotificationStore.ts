@@ -3,8 +3,10 @@
  * Persistent NotificationStore & Notification Service
  */
 
+import { notificationService as toastService } from '../notificationService';
 import { AppNotification, NotificationType } from '../../types';
 import { defaultStorageAdapter } from '../storage/LocalStorageAdapter';
+import { generateUUID } from '../../utils/uuid';
 
 const NOTIFICATIONS_STORAGE_KEY = 'gs_intel_notifications';
 
@@ -23,7 +25,7 @@ class NotificationStore {
 
   notify(title: string, message: string, type: NotificationType = 'info', actionUrl?: string): AppNotification {
     const item: AppNotification = {
-      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      id: `notif-${generateUUID()}`,
       title,
       message,
       type,
@@ -35,6 +37,7 @@ class NotificationStore {
     const all = this.getAll();
     defaultStorageAdapter.setCollection(NOTIFICATIONS_STORAGE_KEY, [item, ...all.slice(0, 99)]);
     this.broadcast();
+    toastService.showToast(message, type);
     return item;
   }
 
@@ -82,13 +85,5 @@ class NotificationStore {
 
 export const notificationStore = new NotificationStore();
 
-// UI Toast Notification helper
-export const notificationService = {
-  showToast(message: string, type: NotificationType = 'info'): void {
-    notificationStore.notify(
-      type === 'success' ? 'Sucesso' : type === 'error' ? 'Erro' : type === 'warning' ? 'Atenção' : 'Informação',
-      message,
-      type
-    );
-  }
-};
+// Toasts visuais: delega ao serviço único consumido pelo ToastContainer.
+export { notificationService } from '../notificationService';

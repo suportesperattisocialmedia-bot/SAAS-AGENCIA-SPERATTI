@@ -14,17 +14,18 @@ import {
   ContentIdea,
   CalendarItem,
   Alert
-} from '../../types';
+} from '../types';
+import demoPortrait from './assets/demo_client_portrait.jpg';
 
-export const DEMO_CLIENT_ID = 'client-ravi-demo';
+export const DEMO_CLIENT_ID = 'client-demo-aurora';
 
-export const DEMO_CLIENT_RAVI: Client = {
+export const DEMO_CLIENT: Client = {
   id: DEMO_CLIENT_ID,
-  name: 'Dr. Ravi Alencar (DEMO)',
-  company: 'Instituto Ravi de Cirurgia Plástica e Longevidade',
-  instagram: '@dr.ravialencar',
-  website: 'https://institutoravi.com.br',
-  whatsapp: '+55 11 98842-1920',
+  name: 'Clínica Aurora (DEMO)',
+  company: 'Clínica Aurora de Cirurgia Plástica (fictícia)',
+  instagram: '@clinica.aurora.demo',
+  website: 'https://exemplo.com.br',
+  whatsapp: '+55 11 90000-0000',
   city: 'São Paulo - SP (Jardins)',
   segment: 'Saúde e Alta Performance',
   subsegment: 'Cirurgia Plástica Facial & Longevidade Saudável',
@@ -41,7 +42,7 @@ export const DEMO_CLIENT_RAVI: Client = {
   notes: 'Cliente modelo para demonstração de recursos didáticos do sistema Gabriel Speratti.',
   status: 'active',
   onboardingStep: 10,
-  avatarUrl: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400&auto=format&fit=crop',
+  avatarUrl: demoPortrait,
   healthStatus: 'healthy',
   createdAt: '2026-08-01T10:00:00.000Z',
   updatedAt: '2026-09-23T07:30:00.000Z'
@@ -49,14 +50,14 @@ export const DEMO_CLIENT_RAVI: Client = {
 
 export const DEMO_INSTAGRAM_ACCOUNT: InstagramAccount = {
   clientId: DEMO_CLIENT_ID,
-  handle: '@dr.ravialencar',
+  handle: '@clinica.aurora.demo',
   status: 'CONNECTED',
   isConnected: true,
   connectedAt: '2026-08-02T14:15:00.000Z',
   lastSyncAt: '2026-09-23T07:15:00.000Z',
   nextSyncScheduled: '2026-09-24T06:00:00.000Z',
   appId: 'meta-app-gs-intelligence',
-  accountId: 'act_ravi_instagram_official',
+  accountId: 'demo-instagram-account',
   permissions: ['instagram_basic', 'instagram_manage_insights', 'pages_read_engagement']
 };
 
@@ -218,11 +219,11 @@ export const DEMO_AUDIENCE_INSIGHTS: AudienceInsight[] = [
     title: 'Medo de ficar com a face repuxada ou artificial (boca de coringa)',
     description: 'Pacientes de 40-55 anos temem que familiares ou colegas notem que foi feita uma cirurgia invasiva.',
     source: 'Comentários de Reels de pré-operatório',
-    sourceUrl: 'https://instagram.com/dr.ravialencar/p/demo1',
+    sourceUrl: 'https://exemplo.com.br/demo',
     sourceDate: '2026-09-18',
     evidence: '14 comentários explícitos perguntando: "o resultado fica natural ou esticado?"',
     context: 'Dúvida recorrente em mulheres executivas e de cargos de liderança.',
-    interpretation: 'A barreira não é o preço (R$ 38k+), mas o risco reputacional de um resultado inautêntico.',
+    interpretation: 'A barreira não é o preço (ticket alto), mas o risco reputacional de um resultado inautêntico.',
     isHypothesis: false,
     confidence: 'HIGH',
     createdAt: '2026-09-18T10:00:00.000Z'
@@ -291,7 +292,7 @@ export const DEMO_ALERTS: Alert[] = [
   {
     id: 'demo-alert-1',
     clientId: DEMO_CLIENT_ID,
-    clientName: 'Dr. Ravi Alencar (DEMO)',
+    clientName: 'Clínica Aurora (DEMO)',
     type: 'CONTEÚDO ACIMA DA MÉDIA',
     severity: 'high',
     title: 'Reels com 62.4k visualizações superou a média em +84%',
