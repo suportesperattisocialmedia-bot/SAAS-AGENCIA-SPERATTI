@@ -214,7 +214,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-xl">
                 <span className="text-[10px] text-neutral-500 uppercase block mb-1">Taxa de Engajamento</span>
                 <div className="text-lg font-bold text-emerald-400 tabular-nums">
-                  {activeReport.kpis.engagementRate}%
+                  {formatMetric(activeReport.kpis.engagementRate, { suffix: '%' })}
                 </div>
                 <div className="text-[11px] text-neutral-400 mt-1 font-sans">
                   {activeReport.kpis.postsCount} posts no período

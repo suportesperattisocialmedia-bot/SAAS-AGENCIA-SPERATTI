@@ -174,7 +174,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
                     {formatMetric(snap.saves)}
                   </td>
                   <td className="py-2.5 text-right text-emerald-400 font-bold tabular-nums">
-                    {snap.engagementRate}%
+                    {formatMetric(snap.engagementRate, { suffix: '%' })}
                   </td>
                 </tr>
               ))}

@@ -161,7 +161,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
                 <div>
                   <div className="text-[9px] text-neutral-500">Eng %</div>
                   <div className="text-emerald-400 font-semibold tabular-nums text-[11px]">
-                    {content.metrics.engagementRate}%
+                    {formatMetric(content.metrics.engagementRate, { suffix: '%' })}
                   </div>
                 </div>
               </div>
@@ -217,7 +217,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
                 </div>
                 <div className="p-2 bg-neutral-900 rounded border border-neutral-800">
                   <div className="text-[10px] text-neutral-500">Engajamento</div>
-                  <div className="text-xs font-bold text-emerald-400">{activeContent.metrics.engagementRate}%</div>
+                  <div className="text-xs font-bold text-emerald-400">{formatMetric(activeContent.metrics.engagementRate, { suffix: '%' })}</div>
                 </div>
               </div>
             </div>

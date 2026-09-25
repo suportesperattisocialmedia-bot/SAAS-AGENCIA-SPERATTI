@@ -90,7 +90,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
 
         <StatCard
           label="Taxa Média de Engajamento"
-          value={`${periodSummary.avgEngagementRate.current}%`}
+          value={formatMetric(periodSummary.avgEngagementRate.current, { suffix: '%' })}
           typeTag="DADO CALCULADO"
           diffPercent={periodSummary.avgEngagementRate.percentDiff ?? undefined}
           periodLabel="Base: Alcance real"
