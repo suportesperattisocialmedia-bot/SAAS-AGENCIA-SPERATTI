@@ -6,7 +6,7 @@
 export const SERVICE_NAME = 'social-intelligence-api';
 export const API_VERSION = '4.0.0';
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 const DEFAULT_META_GRAPH_VERSION = 'v23.0';
 
 function read(name: string): string {

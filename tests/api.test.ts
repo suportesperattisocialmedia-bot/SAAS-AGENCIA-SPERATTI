@@ -157,7 +157,7 @@ describe.skipIf(!dbAvailable)('API', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.diagnostic.nextActions).toEqual(['agir']);
-      expect(body.data.metadata.model).toBe('gemini-2.5-flash');
+      expect(body.data.metadata.model).toBe('gemini-3.8-flash');
       const audit = await getPool().query('SELECT analysis_type FROM ai_analyses');
       expect(audit.rows[0].analysis_type).toBe('PROFILE_DIAGNOSTIC');
     });
