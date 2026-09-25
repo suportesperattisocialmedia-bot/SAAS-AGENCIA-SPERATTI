@@ -30,6 +30,9 @@ import { sessionService, type BackendStatus, type SessionUser } from './services
 import { describeApiError } from './services/api/apiClient';
 import { DemoProvider } from './services/demo/DemoProvider';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { ManualAiModal } from './components/common/ManualAiModal';
+import { buildDiagnosticPrompt, parseDiagnosticResponse } from './ai/manualPrompts';
+import { ProfileDiagnosticResponseSchema } from './schemas/aiSchemas';
 
 // Layout & Common Components
 import { Sidebar, MainNavSection } from './components/layout/Sidebar';
@@ -99,7 +102,8 @@ export default function App() {
   const [profileDiagnostic, setProfileDiagnostic] = useState<ProfileDiagnosticResult | null>(null);
   const [nextActions, setNextActions] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const isAnalyzing = false;
+  const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
   const [isDemoLoaded, setIsDemoLoaded] = useState(false);
 
   // Modal Controls
@@ -146,8 +150,19 @@ export default function App() {
     alertEngine.evaluateClientRules(client, clientSnaps, clientContents, acc);
     setAlerts(alertEngine.getAll());
 
-    // Generate deterministic next actions
-    const actions = aiService.generateNextActions(client, clientContents, clientSnaps);
+    // Último diagnóstico salvo (persistido localmente)
+    const lastDiagnostic = storageService.aiAnalyses.getByClient(client.id).find((a) => a.analysisType === 'PROFILE_DIAGNOSTIC');
+    const savedDiagnostic = lastDiagnostic ? ProfileDiagnosticResponseSchema.safeParse(lastDiagnostic.output) : null;
+    setProfileDiagnostic(
+      savedDiagnostic?.success
+        ? { ...savedDiagnostic.data, analyzedAt: lastDiagnostic?.createdAt, model: lastDiagnostic?.model }
+        : null
+    );
+
+    // Próximas ações: do último diagnóstico ou regras determinísticas
+    const actions = savedDiagnostic?.success && savedDiagnostic.data.nextActions.length > 0
+      ? savedDiagnostic.data.nextActions
+      : aiService.generateNextActions(client, clientContents, clientSnaps);
     setNextActions(actions);
   }, []);
 
@@ -349,24 +364,41 @@ export default function App() {
   };
 
   // Profile Analysis handler
-  const handleAnalyzeProfile = async () => {
+  // IA manual: abre o modal com o prompt completo do cliente.
+  const handleAnalyzeProfile = () => {
     if (!activeClient) return;
-    setIsAnalyzing(true);
-    try {
-      const diag = await aiService.analyzeProfile(activeClient, contents, snapshots);
-      setProfileDiagnostic(diag);
-      setNextActions(diag.nextActions || nextActions);
-      notificationStore.notify(
-        'Diagnóstico Gerado',
-        `Auditoria estratégica concluída para ${activeClient.name}.`,
-        'success'
-      );
-      setWorkspaceTab('diagnostic');
-    } catch (err) {
-      notificationService.showToast(describeApiError(err, 'Erro ao realizar diagnóstico com IA.'), 'error');
-    } finally {
-      setIsAnalyzing(false);
-    }
+    setDiagnosticModalOpen(true);
+  };
+
+  const diagnosticPrompt = activeClient && diagnosticModalOpen
+    ? buildDiagnosticPrompt({
+        client: activeClient,
+        contents,
+        snapshots,
+        competitors,
+        audienceInsights
+      })
+    : '';
+
+  const handleImportDiagnostic = (response: string) => {
+    if (!activeClient) return;
+    const parsed = parseDiagnosticResponse(response);
+    const diagnostic: ProfileDiagnosticResult = { ...parsed, analyzedAt: new Date().toISOString(), model: 'IA externa (prompt manual)' };
+    storageService.aiAnalyses.create({
+      clientId: activeClient.id,
+      analysisType: 'PROFILE_DIAGNOSTIC',
+      model: 'IA externa (prompt manual)',
+      promptVersion: 'MANUAL_DIAGNOSTIC_V1',
+      inputDataHash: `contents:${contents.length}`,
+      output: diagnostic,
+      confidence: 'MEDIUM',
+      sourceDataIds: contents.map((c) => c.id).slice(0, 10)
+    });
+    setProfileDiagnostic(diagnostic);
+    if (diagnostic.nextActions.length > 0) setNextActions(diagnostic.nextActions);
+    setDiagnosticModalOpen(false);
+    setWorkspaceTab('diagnostic');
+    notificationStore.notify('Diagnóstico importado', `Análise salva para ${activeClient.name}.`, 'success');
   };
 
   // Client CRUD Handlers
@@ -796,6 +828,15 @@ export default function App() {
           setSettingsModalOpen(false);
         }}
         isDemoLoaded={isDemoLoaded}
+      />
+
+      <ManualAiModal
+        isOpen={diagnosticModalOpen}
+        onClose={() => setDiagnosticModalOpen(false)}
+        title={`Análise completa: ${activeClient?.name ?? ''}`}
+        prompt={diagnosticPrompt}
+        onImport={handleImportDiagnostic}
+        importLabel="Importar diagnóstico"
       />
 
       {/* Persistent Toast Notifications */}

@@ -1,6 +1,15 @@
 # Gabriel Speratti | Social Intelligence
 
-Sistema interno da agência para inteligência de conteúdo no Instagram: métricas reais via Meta Graph API, diagnóstico e ideias com Gemini, pesquisa de público, concorrentes, calendário e relatórios.
+Sistema interno da agência para inteligência de conteúdo no Instagram: métricas reais via Meta Graph API, diagnóstico e ideias com IA, pesquisa de público, concorrentes, calendário e relatórios.
+
+## IA sem chave de API (fluxo manual)
+
+Diagnóstico ("Gerar análise completa") e Banco de Ideias ("Gerar prompt de ideias") funcionam assim:
+1. O sistema monta um prompt completo com os dados reais do cliente (cadastro, métricas, posts, concorrentes, público).
+2. Você copia e cola em qualquer IA (ChatGPT, Gemini, Claude).
+3. Cola a resposta de volta no sistema; ela é validada e salva.
+
+Código: `src/ai/manualPrompts.ts` e `src/components/common/ManualAiModal.tsx`. As rotas `/api/ai/*` com Gemini continuam no backend como opção, mas a interface não depende delas.
 
 Produção: https://saas-agencia-speratti.vercel.app
 
@@ -51,9 +60,8 @@ Veja `.env.example`. Obrigatórias em produção:
 | `SESSION_SECRET` | ≥ 32 caracteres; assina a sessão e deriva a chave de criptografia dos tokens |
 | `META_APP_ID`, `META_APP_SECRET` | App da Meta |
 | `META_REDIRECT_URI` | `https://saas-agencia-speratti.vercel.app/api/auth/instagram/callback` |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | IA (padrão `gemini-3.8-flash`) |
 
-Opcionais: `ADMIN_EMAIL`/`ADMIN_PASSWORD` (primeiro usuário), `TOKEN_ENCRYPTION_KEY`, `META_GRAPH_VERSION`, `SERPAPI_KEY`, `DATABASE_SSL`.
+Opcionais: `GEMINI_API_KEY`/`GEMINI_MODEL` (só para as rotas `/api/ai/*`), `ADMIN_EMAIL`/`ADMIN_PASSWORD` (primeiro usuário), `TOKEN_ENCRYPTION_KEY`, `META_GRAPH_VERSION`, `SERPAPI_KEY`, `DATABASE_SSL`.
 
 > Trocar `SESSION_SECRET` invalida sessões e torna ilegíveis os tokens já salvos (será preciso reconectar o Instagram), a menos que `TOKEN_ENCRYPTION_KEY` esteja definida.
 

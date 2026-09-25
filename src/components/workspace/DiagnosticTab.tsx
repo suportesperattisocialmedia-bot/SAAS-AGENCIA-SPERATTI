@@ -41,7 +41,7 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
               Diagnóstico Estratégico Profundo da Conta
             </h3>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-purple-500/30 text-purple-400 bg-purple-950/20">
-              INSIGHT DA IA
+              ANÁLISE POR IA EXTERNA
             </span>
           </div>
           <p className="text-xs text-neutral-400 mt-1">
@@ -55,7 +55,7 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
           className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60 shadow-xs shrink-0 self-start sm:self-center"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
-          <span>{isAnalyzing ? 'Executando Análise...' : 'Reanalisar Perfil Agora'}</span>
+          <span>{diagnostic ? 'Gerar nova análise' : 'Gerar análise completa'}</span>
         </button>
       </div>
 
@@ -208,7 +208,7 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
           <Sparkles className="w-8 h-8 text-neutral-500 mx-auto" />
           <h4 className="text-sm font-semibold text-neutral-300">Nenhum diagnóstico gerado ainda</h4>
           <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-            Clique no botão acima para iniciar a auditoria completa de perfil e conteúdo com a IA.
+            Clique em "Gerar análise completa", copie o prompt, use na IA que preferir (ChatGPT, Gemini, Claude) e cole a resposta de volta aqui.
           </p>
         </div>
       )}
