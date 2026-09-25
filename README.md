@@ -51,7 +51,7 @@ Veja `.env.example`. Obrigatórias em produção:
 | `SESSION_SECRET` | ≥ 32 caracteres; assina a sessão e deriva a chave de criptografia dos tokens |
 | `META_APP_ID`, `META_APP_SECRET` | App da Meta |
 | `META_REDIRECT_URI` | `https://saas-agencia-speratti.vercel.app/api/auth/instagram/callback` |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | IA (padrão `gemini-2.5-flash`) |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | IA (padrão `gemini-3.8-flash`) |
 
 Opcionais: `ADMIN_EMAIL`/`ADMIN_PASSWORD` (primeiro usuário), `TOKEN_ENCRYPTION_KEY`, `META_GRAPH_VERSION`, `SERPAPI_KEY`, `DATABASE_SSL`.
 

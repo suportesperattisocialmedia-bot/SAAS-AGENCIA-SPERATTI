@@ -27,7 +27,7 @@ function defaultGenerator(apiKey: string): GenerateJson {
     const response = await client.models.generateContent({
       model,
       contents: prompt,
-      config: { responseMimeType: 'application/json', responseSchema, temperature: 0.6 }
+      config: { responseMimeType: 'application/json', responseSchema }
     });
     return response.text ?? '';
   };
@@ -43,6 +43,8 @@ export function setGeminiGeneratorForTests(generator: GenerateJson | null): void
 /**
  * Traduz o erro do Google em uma mensagem útil para o usuário, sem expor detalhes internos.
  */
+const RECOMMENDED_MODEL = 'gemini-3.8-flash';
+
 export function describeGeminiError(err: unknown, model: string): { status: number; message: string; reason: string } {
   const raw = err instanceof Error ? err.message : String(err);
   const status = typeof (err as { status?: unknown })?.status === 'number' ? (err as { status: number }).status : 0;
@@ -54,7 +56,7 @@ export function describeGeminiError(err: unknown, model: string): { status: numb
     return { status: 429, reason: 'QUOTA', message: 'A cota gratuita do Gemini acabou por agora. Aguarde alguns minutos ou ative o faturamento no Google AI Studio.' };
   }
   if (status === 404 || has(/is not found|not supported for generateContent|NOT_FOUND/i)) {
-    return { status: 502, reason: 'MODEL_NOT_FOUND', message: `O modelo "${model}" não está disponível para esta chave. Use GEMINI_MODEL=gemini-2.5-flash.` };
+    return { status: 502, reason: 'MODEL_NOT_FOUND', message: `O modelo "${model}" não está disponível para esta chave. Ajuste GEMINI_MODEL na Vercel (recomendado: ${RECOMMENDED_MODEL}).` };
   }
   if (status === 403 || has(/PERMISSION_DENIED|SERVICE_DISABLED|has not been used/i)) {
     return { status: 502, reason: 'PERMISSION', message: 'A chave do Gemini não tem permissão para a API Generative Language. Crie a chave pelo Google AI Studio.' };
