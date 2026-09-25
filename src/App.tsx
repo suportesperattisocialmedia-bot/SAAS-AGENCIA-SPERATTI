@@ -60,6 +60,16 @@ import { CalendarTab } from './components/workspace/CalendarTab';
 import { ReportsTab } from './components/workspace/ReportsTab';
 import { HistoryTab } from './components/workspace/HistoryTab';
 
+/** Itens do menu lateral que abrem uma aba do workspace do cliente. */
+const SECTION_TO_TAB: Partial<Record<MainNavSection, WorkspaceSubTab>> = {
+  performance: 'performance',
+  competitors: 'competitors',
+  research: 'research',
+  ideas: 'ideas',
+  calendar: 'calendar',
+  reports: 'reports'
+};
+
 export default function App() {
   // Boot & System Lifecycle State
   const [isBooting, setIsBooting] = useState(true);
@@ -493,13 +503,21 @@ export default function App() {
         <Sidebar
           currentSection={currentSection}
           onNavigate={(sec) => {
+            setMobileMenuOpen(false);
             if (sec === 'settings') {
               setSettingsModalOpen(true);
-            } else if (sec === 'alerts') {
+              return;
+            }
+            if (sec === 'alerts') {
               setAlertsModalOpen(true);
-            } else {
-              setCurrentSection(sec);
-              if (!activeClient && clients.length > 0 && sec !== 'dashboard' && sec !== 'clients') {
+              return;
+            }
+            setCurrentSection(sec);
+            // Cada item do menu abre a aba correspondente do cliente ativo.
+            const tab = SECTION_TO_TAB[sec];
+            if (tab) {
+              setWorkspaceTab(tab);
+              if (!activeClient && clients.length > 0) {
                 setActiveClient(clients[0]);
                 loadClientData(clients[0]);
               }
@@ -542,13 +560,41 @@ export default function App() {
           <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             <ErrorBoundary>
               {/* Workspace Tab View */}
-              {activeClient && currentSection !== 'dashboard' && currentSection !== 'clients' ? (
+              {!activeClient && SECTION_TO_TAB[currentSection] ? (
+                <div className="max-w-lg mx-auto mt-16 text-center bg-neutral-900/60 border border-neutral-800 rounded-2xl p-8 space-y-4">
+                  <h2 className="text-lg font-semibold text-neutral-100">Cadastre um cliente primeiro</h2>
+                  <p className="text-sm text-neutral-400">
+                    {getSectionTitle()} funciona dentro do workspace de cada cliente. Cadastre o primeiro cliente para começar.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <button
+                      onClick={() => {
+                        setEditingClient(null);
+                        setClientFormModalOpen(true);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-sm font-semibold"
+                    >
+                      Cadastrar cliente
+                    </button>
+                    <button
+                      onClick={() => setCurrentSection('dashboard')}
+                      className="px-4 py-2 rounded-xl border border-neutral-700 text-neutral-300 hover:bg-neutral-800 text-sm"
+                    >
+                      Voltar ao painel
+                    </button>
+                  </div>
+                </div>
+              ) : activeClient && currentSection !== 'dashboard' && currentSection !== 'clients' ? (
                 <div>
                   <WorkspaceHeader
                     client={activeClient}
                     account={instagramAccount}
                     activeTab={workspaceTab}
-                    onTabChange={setWorkspaceTab}
+                    onTabChange={(tab) => {
+                      setWorkspaceTab(tab);
+                      const section = (Object.keys(SECTION_TO_TAB) as MainNavSection[]).find((k) => SECTION_TO_TAB[k] === tab);
+                      setCurrentSection(section ?? 'performance');
+                    }}
                     onBackToClients={() => {
                       setActiveClient(null);
                       setCurrentSection('dashboard');
