@@ -5,7 +5,6 @@
  */
 
 import { Client, Content, ContentAiAnalysis, AudienceInsight, Competitor, AccountSnapshot } from '../types';
-import { storageService } from './storageService';
 import { formatMetric, isMetric, medianMetric } from '../utils/metrics';
 import type { ProfileDiagnosticResponse } from '../schemas/aiSchemas';
 
@@ -59,14 +58,15 @@ export const aiService = {
   },
 
   /** Próximas ações determinísticas (regras sobre o estado real do workspace). */
-  generateNextActions(client: Client, contents: Content[], _snapshots?: AccountSnapshot[]): string[] {
+  generateNextActions(client: Client, contents: Content[], snapshots: AccountSnapshot[] = []): string[] {
     const actions: string[] = [];
-    const account = storageService.instagram.getByClientId(client.id);
-    if (!account?.isConnected) {
-      actions.push('Conectar o Instagram do cliente para sincronizar métricas reais.');
+    if (contents.length === 0) {
+      actions.push('Importar os posts e métricas do Meta Business Suite na aba Métricas.');
+    } else if (contents.length < 5) {
+      actions.push('Importar mais publicações (ideal: últimos 90 dias) para criar a base de comparação.');
     }
-    if (contents.length < 5) {
-      actions.push('Sincronizar ou catalogar as primeiras publicações para criar a base de comparação.');
+    if (!snapshots.some((s) => isMetric(s.followers))) {
+      actions.push('Registrar o número atual de seguidores na aba Métricas.');
     }
     if (client.pillars.length === 0) {
       actions.push('Definir os pilares editoriais no cadastro do cliente.');

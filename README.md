@@ -2,6 +2,17 @@
 
 Sistema interno da agência para inteligência de conteúdo no Instagram: métricas reais via Meta Graph API, diagnóstico e ideias com IA, pesquisa de público, concorrentes, calendário e relatórios.
 
+## Métricas sem API (aba Métricas)
+
+Cada cliente tem a aba **Métricas** com:
+- checklist de onboarding (cadastro, posts, seguidores, análise, ideias, calendário, rotina semanal de 7 dias);
+- passo a passo para exportar o CSV em **Meta Business Suite → Insights → Conteúdo → Exportar dados**;
+- importação do CSV (português ou inglês, `,` `;` ou tab), prévia e ajuste de colunas; reimportar atualiza sem duplicar;
+- planilha-modelo e colagem direta do Excel/Google Sheets;
+- registro semanal de seguidores.
+
+Código: `src/services/metricsImport.ts` e `src/components/workspace/MetricsTab.tsx`. Células vazias viram `n/d` (nunca 0).
+
 ## IA sem chave de API (fluxo manual)
 
 Diagnóstico ("Gerar análise completa") e Banco de Ideias ("Gerar prompt de ideias") funcionam assim:
