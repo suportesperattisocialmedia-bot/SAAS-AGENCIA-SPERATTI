@@ -131,7 +131,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs disabled:opacity-60"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-            <span>{isAnalyzing ? 'Analisando Perfil...' : 'Analisar Perfil'}</span>
+            <span>Gerar análise completa</span>
           </button>
         </div>
       </div>

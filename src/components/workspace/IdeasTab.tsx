@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Client, ContentIdea, PipelineStatus, Content, HookTemplate, WeekDay } from '../../types';
 import { HOOK_CATEGORIES, HOOK_TEMPLATES } from '../../data/hookBank';
-import { aiService } from '../../services/aiService';
+import { buildIdeasPrompt, parseIdeasResponse } from '../../ai/manualPrompts';
+import { ManualAiModal } from '../common/ManualAiModal';
 import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
 import { normalizeWeekDay } from '../../services/storage/migration';
@@ -19,7 +20,6 @@ import {
   Layers,
   Target
 } from 'lucide-react';
-import { describeApiError } from '../../services/api/apiClient';
 
 interface IdeasTabProps {
   client: Client;
@@ -46,7 +46,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
   contents,
   onRefresh
 }) => {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [showIdeasModal, setShowIdeasModal] = useState(false);
   const [showHookBankModal, setShowHookBankModal] = useState(false);
   const [selectedHookCategory, setSelectedHookCategory] = useState<string>('all');
   const [activeIdeaModal, setActiveIdeaModal] = useState<ContentIdea | null>(null);
@@ -56,36 +56,30 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
     i => filterStatus === 'all' || i.status === filterStatus
   );
 
-  const handleGenerateAiIdeas = async () => {
-    setIsGenerating(true);
-    try {
-      const topContents = contents.slice(0, 3);
-      const audienceInsights = storageService.audience.getByClient(client.id);
-      const competitors = storageService.competitors.getByClient(client.id);
-      const snapshots = storageService.history.getByClient(client.id);
+  // IA manual: o prompt é montado com os dados reais do cliente e a resposta é colada de volta.
+  const ideasPrompt = showIdeasModal
+    ? buildIdeasPrompt(
+        {
+          client,
+          contents,
+          snapshots: storageService.history.getByClient(client.id),
+          competitors: storageService.competitors.getByClient(client.id),
+          audienceInsights: storageService.audience.getByClient(client.id)
+        },
+        5
+      )
+    : '';
 
-      const generated = await aiService.generateIdeas({
-        client,
-        topContents,
-        audienceInsights,
-        competitors
-      }, 3);
-
-      for (const item of generated) {
-        storageService.ideas.create(item);
-      }
-
-      notificationService.addNotification(
-        'Novas Ideias Geradas',
-        `${generated.length} ideia(s) gerada(s) por IA para ${client.name}. Revise antes de produzir.`,
-        'success'
-      );
-      onRefresh();
-    } catch (err) {
-      notificationService.showToast(describeApiError(err, 'Erro ao gerar ideias.'), 'error');
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleImportIdeas = (response: string) => {
+    const imported = parseIdeasResponse(response, client.id);
+    imported.forEach((idea) => storageService.ideas.create(idea));
+    setShowIdeasModal(false);
+    notificationService.addNotification(
+      'Ideias importadas',
+      `${imported.length} ideia(s) adicionada(s) ao banco de ${client.name}. Revise antes de produzir.`,
+      'success'
+    );
+    onRefresh();
   };
 
   const handleUpdateStatus = (id: string, newStatus: PipelineStatus) => {
@@ -146,12 +140,11 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
           </button>
 
           <button
-            onClick={handleGenerateAiIdeas}
-            disabled={isGenerating}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs disabled:opacity-50"
+            onClick={() => setShowIdeasModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs"
           >
-            <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-            <span>{isGenerating ? 'Criando Ideias...' : 'Gerar Ideias com IA'}</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Gerar prompt de ideias</span>
           </button>
         </div>
       </div>
@@ -398,6 +391,14 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
           </div>
         </Modal>
       )}
+      <ManualAiModal
+        isOpen={showIdeasModal}
+        onClose={() => setShowIdeasModal(false)}
+        title={`Ideias de conteúdo: ${client.name}`}
+        prompt={ideasPrompt}
+        onImport={handleImportIdeas}
+        importLabel="Importar ideias"
+      />
     </div>
   );
 };
