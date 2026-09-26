@@ -28,7 +28,7 @@ export const ProfileDiagnosticResponseSchema = z.object({
   }),
   performanceSection: z.object({
     engagementAnalysis: z.string(),
-    reachAndImpressions: z.string().optional().default('Dados não sincronizados'),
+    reachAndImpressions: z.string().optional().default(''),
     savesAndShares: z.string(),
     audienceRetention: z.string().optional().default(''),
     bestContentObservations: z.string(),

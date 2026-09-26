@@ -8,6 +8,8 @@ import { ConnectionBadge } from '../common/ConnectionBadge';
 interface ClientCardProps {
   client: Client;
   latestSnapshot?: MetricSnapshot;
+  /** Totais dos últimos 30 dias (snapshots ou posts importados). */
+  period30?: { views: number | null; engagementRate: number | null };
   onOpenWorkspace: (client: Client) => void;
   onEdit: (client: Client) => void;
   onDuplicate: (client: Client) => void;
@@ -17,6 +19,7 @@ interface ClientCardProps {
 export const ClientCard: React.FC<ClientCardProps> = ({
   client,
   latestSnapshot,
+  period30,
   onOpenWorkspace,
   onEdit,
   onDuplicate,
@@ -27,8 +30,8 @@ export const ClientCard: React.FC<ClientCardProps> = ({
   const avatarUrl = client.avatarUrl;
   // Sem snapshot real = "n/d". Nunca exibir números de exemplo como se fossem do cliente.
   const followers = latestSnapshot?.followers ?? null;
-  const views = latestSnapshot?.views ?? null;
-  const engRate = latestSnapshot?.engagementRate ?? null;
+  const views = period30?.views ?? latestSnapshot?.views ?? null;
+  const engRate = period30?.engagementRate ?? latestSnapshot?.engagementRate ?? null;
   const connectionStatus = storageService.instagram.getByClientId(client.id)?.status ?? 'DISCONNECTED';
 
   return (
@@ -139,7 +142,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase font-mono text-neutral-500">Views</div>
+            <div className="text-[10px] uppercase font-mono text-neutral-500">Views 30d</div>
             <div className="text-sm font-bold font-mono text-neutral-200 tabular-nums">
               {formatMetric(views)}
             </div>

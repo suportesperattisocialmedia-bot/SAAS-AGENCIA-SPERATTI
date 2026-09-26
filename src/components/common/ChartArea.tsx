@@ -46,7 +46,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   }
 
   const width = 800;
-  const paddingX = 64;
+  const paddingX = 88; // espaço para rótulos como "12.345 seg."
   const paddingTop = 25;
   const paddingBottom = 40;
 
@@ -146,6 +146,16 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
               </g>
             );
           })}
+
+          {/* Com um único registro não há linha: mostra o ponto e o valor. */}
+          {points.length === 1 && (
+            <g>
+              <circle cx={points[0].x} cy={points[0].y} r={5} fill={lineColor} />
+              <text x={points[0].x} y={points[0].y - 12} textAnchor="middle" className="text-[11px] font-mono fill-neutral-300">
+                {valueFormatter(points[0].data.value)}
+              </text>
+            </g>
+          )}
 
           {/* Area under curve */}
           <path d={areaPath} fill={`url(#${gradientId})`} />

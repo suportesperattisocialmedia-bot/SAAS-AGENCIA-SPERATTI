@@ -1,9 +1,10 @@
 import React from 'react';
-import { Client, Alert, AccountSnapshot } from '../../types';
+import { Client, Alert, AccountSnapshot, Content } from '../../types';
+import { analyticsService } from '../../services/analyticsService';
 import { ClientCard } from '../clients/ClientCard';
 import { StatCard } from '../common/StatCard';
 import { ASSETS } from '../../data/assets';
-import { avgMetric, formatMetric, isMetric, sumMetric } from '../../utils/metrics';
+import { formatMetric, isMetric, sumMetric } from '../../utils/metrics';
 import {
   Users,
   Eye,
@@ -20,6 +21,7 @@ import {
 interface AgencyDashboardViewProps {
   clients: Client[];
   snapshots: AccountSnapshot[];
+  contents: Content[];
   alerts: Alert[];
   onOpenWorkspace: (client: Client) => void;
   onOpenNewClient: () => void;
@@ -33,6 +35,7 @@ interface AgencyDashboardViewProps {
 export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   clients,
   snapshots,
+  contents,
   alerts,
   onOpenWorkspace,
   onOpenNewClient,
@@ -50,13 +53,23 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
       if (isMetric(s.followers)) latestByClient.set(s.clientId, s);
     });
   const totalFollowers = sumMetric([...latestByClient.values()].map((s) => s.followers));
-  const totalViews = sumMetric(snapshots.map((s) => s.views));
-  const totalReach = sumMetric(snapshots.map((s) => s.reach));
-  const totalInteractions = sumMetric(snapshots.flatMap((s) => [s.likes, s.comments, s.shares, s.saves]));
-  const engagement =
-    isMetric(totalReach) && totalReach > 0 && isMetric(totalInteractions)
-      ? (totalInteractions / totalReach) * 100
-      : avgMetric(snapshots.map((s) => s.engagementRate), 2);
+  // Últimos 30 dias de cada cliente: snapshots da conta ou, na falta, soma dos posts importados.
+  const periods = clients.map((c) =>
+    analyticsService.calculatePeriod(
+      snapshots.filter((s) => s.clientId === c.id),
+      30,
+      undefined,
+      contents.filter((ct) => ct.clientId === c.id)
+    )
+  );
+  const totalViews = sumMetric(periods.map((p) => p.totalViews.current));
+  const totalReach = sumMetric(periods.map((p) => p.totalReach.current));
+  // Engajamento ponderado pelo alcance de cada cliente.
+  const weighted = periods.filter((p) => isMetric(p.avgEngagementRate.current) && isMetric(p.totalReach.current) && p.totalReach.current > 0);
+  const weightedReach = weighted.reduce((acc, p) => acc + (p.totalReach.current ?? 0), 0);
+  const engagement = weightedReach > 0
+    ? weighted.reduce((acc, p) => acc + (p.avgEngagementRate.current ?? 0) * (p.totalReach.current ?? 0), 0) / weightedReach
+    : null;
   const calculatedEngagementRate = formatMetric(engagement, { suffix: '%', digits: 1, fallback: 'Sem dados' });
 
   const unhandledAlerts = alerts.filter(a => a.status === 'NEW');
@@ -123,15 +136,15 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
         />
 
         <StatCard
-          label="Visualizações registradas"
+          label="Visualizações (30 dias)"
           value={formatMetric(totalViews, { fallback: 'Sem dados' })}
           typeTag="DADO REAL"
-          subtext="Histórico consolidado catalogado"
+          subtext="Soma dos clientes no período"
           icon={<Eye className="w-4 h-4 text-sky-400" />}
         />
 
         <StatCard
-          label="Engajamento médio"
+          label="Engajamento médio (30 dias)"
           value={calculatedEngagementRate}
           typeTag="DADO CALCULADO"
           subtext={isMetric(totalReach) && totalReach > 0 ? 'Ponderada por alcance real' : 'Sem alcance para ponderação'}
@@ -195,7 +208,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {clients.map(client => {
+            {clients.map((client, idx) => {
               const latestSnap = snapshots
                 .filter((s) => s.clientId === client.id)
                 .sort((a, b) => a.date.localeCompare(b.date))
@@ -206,6 +219,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                   key={client.id}
                   client={client}
                   latestSnapshot={latestSnap}
+                  period30={{ views: periods[idx].totalViews.current, engagementRate: periods[idx].avgEngagementRate.current }}
                   onOpenWorkspace={onOpenWorkspace}
                   onEdit={onEditClient}
                   onDuplicate={onDuplicateClient}

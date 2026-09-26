@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { analyticsService } from '../src/services/analyticsService';
 import { avgMetric, engagementFrom, formatMetric, sumMetric } from '../src/utils/metrics';
-import type { AccountSnapshot } from '../src/types';
+import type { AccountSnapshot, Content } from '../src/types';
+import { ReportSchema } from '../src/schemas';
+import { normalizeWeekDay, weekDayLabel } from '../src/services/storage/migration';
 
 function snap(date: string, patch: Partial<AccountSnapshot> = {}): AccountSnapshot {
   return {
@@ -64,5 +66,40 @@ describe('analyticsService', () => {
     const res = analyticsService.calculatePeriod([], 30);
     expect(res.followersGrowth.current).toBeNull();
     expect(res.avgEngagementRate.current).toBeNull();
+  });
+});
+
+describe('período calculado a partir dos posts importados (sem snapshots da conta)', () => {
+  const post = (publishedAt: string, views: number | null, reach: number | null) =>
+    ({ publishedAt, metrics: { views, reach, likes: 10, comments: 2, shares: 1, saves: 7 } }) as unknown as Content;
+
+  it('soma visualizações/alcance dos posts do período e conta as publicações', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const recent = `${today}T15:00:00.000Z`;
+    const period = analyticsService.calculatePeriod([], 30, undefined, [post(recent, 1000, 800), post(recent, null, 200)]);
+    expect(period.totalViews.current).toBe(1000);
+    expect(period.totalReach.current).toBe(1000);
+    expect(period.postsPublished.current).toBe(2);
+    expect(period.avgEngagementRate.current).toBe(4); // (20+4+2+14)/1000
+    expect(period.hasPreviousPeriod).toBe(false);
+  });
+
+  it('seguidores registrados continuam vindo do snapshot; visualizações dos posts', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const period = analyticsService.calculatePeriod([snap(today, { followers: 8500, source: 'MANUAL' })], 30, undefined, [post(`${today}T15:00:00.000Z`, 500, 400)]);
+    expect(period.followersGrowth.current).toBe(8500);
+    expect(period.totalViews.current).toBe(500);
+  });
+});
+
+describe('regressões encontradas no QA do navegador', () => {
+  it('relatório aceita KPIs indisponíveis (null) em vez de quebrar', () => {
+    const kpis = ReportSchema.shape.kpis.parse({ followers: null, views: null, reach: null, engagementRate: null, postsCount: 0 });
+    expect(kpis.views).toBeNull();
+  });
+
+  it('dia da semana salvo normalizado tem rótulo legível', () => {
+    expect(weekDayLabel('terca')).toBe('Terça-feira');
+    expect(weekDayLabel(normalizeWeekDay('Sábado'))).toBe('Sábado');
   });
 });

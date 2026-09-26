@@ -330,13 +330,13 @@ export const ReportSchema = z.object({
   endDate: z.string().min(1),
   executiveSummary: z.string().default(''),
   kpis: z.object({
-    followers: z.number().default(0),
+    followers: z.number().nullable().default(null),
     followersDiffPct: z.number().nullable().default(null),
-    views: z.number().default(0),
+    views: z.number().nullable().default(null),
     viewsDiffPct: z.number().nullable().default(null),
-    reach: z.number().default(0),
+    reach: z.number().nullable().default(null),
     reachDiffPct: z.number().nullable().default(null),
-    engagementRate: z.number().default(0),
+    engagementRate: z.number().nullable().default(null),
     engagementDiffPct: z.number().nullable().default(null),
     postsCount: z.number().default(0)
   }),

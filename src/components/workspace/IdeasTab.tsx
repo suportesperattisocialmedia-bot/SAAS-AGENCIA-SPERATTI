@@ -5,7 +5,7 @@ import { buildIdeasPrompt, parseIdeasResponse } from '../../ai/manualPrompts';
 import { ManualAiModal } from '../common/ManualAiModal';
 import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
-import { normalizeWeekDay } from '../../services/storage/migration';
+import { normalizeWeekDay, weekDayLabel } from '../../services/storage/migration';
 import { Modal } from '../common/Modal';
 import {
   Lightbulb,
@@ -235,7 +235,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
             {/* Actions Footer */}
             <div className="pt-3 border-t border-neutral-800 flex items-center justify-between text-xs font-mono">
               <span className="text-neutral-500 text-[11px]">
-                {idea.calendarDay ? `Agendado: ${idea.calendarDay}` : 'Não agendado'}
+                {idea.calendarDay ? `Agendado: ${weekDayLabel(idea.calendarDay)}` : 'Não agendado'}
               </span>
 
               <div className="flex items-center gap-2">

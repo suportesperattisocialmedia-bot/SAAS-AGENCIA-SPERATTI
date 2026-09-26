@@ -121,6 +121,20 @@ export default function App() {
     return storageService.isDemoLoaded() ? all.filter((c) => c.id === demoId) : all.filter((c) => c.id !== demoId);
   }, []);
 
+  const visibleIds = new Set(clients.map((c) => c.id));
+
+  // Ctrl/Cmd + K abre a busca global (atalho exibido no cabeçalho).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setGlobalSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Load Client Domain Data
   const loadClientData = useCallback((client: Client) => {
     const acc = instagramService.getAccount(client.id);
@@ -647,6 +661,7 @@ export default function App() {
                       alerts={alerts.filter(a => a.clientId === activeClient.id)}
                       onNavigateTab={setWorkspaceTab}
                       nextActions={nextActions}
+                      actionsFromAi={Boolean(profileDiagnostic?.nextActions.length)}
                     />
                   )}
 
@@ -754,6 +769,7 @@ export default function App() {
                 <AgencyDashboardView
                   clients={clients}
                   snapshots={storageService.history.getAll()}
+                  contents={storageService.contents.getAll()}
                   alerts={alerts}
                   onOpenWorkspace={(client) => {
                     setActiveClient(client);
@@ -770,11 +786,15 @@ export default function App() {
                     setClientFormModalOpen(true);
                   }}
                   onDuplicateClient={(client) => {
+                    // Novo id: a cópia não pode compartilhar identidade (nem conexão) com o original.
+                    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = client;
                     const dup = storageService.clients.create({
-                      ...client,
+                      ...rest,
                       name: `${client.name} (Cópia)`,
-                      instagram: `${client.instagram}_copy`
+                      instagram: `${client.instagram}_copy`,
+                      healthStatus: 'not_connected'
                     });
+                    registerOnServer(dup);
                     notificationService.showToast(`Cliente duplicado como "${dup.name}".`, 'info');
                     reloadAllData();
                   }}
@@ -807,16 +827,20 @@ export default function App() {
         isOpen={globalSearchOpen}
         onClose={() => setGlobalSearchOpen(false)}
         clients={clients}
-        contents={storageService.contents.getAll()}
-        ideas={storageService.ideas.getAll()}
-        competitors={storageService.competitors.getAll()}
-        reports={storageService.reports.getAll()}
+        contents={storageService.contents.getAll().filter((c) => visibleIds.has(c.clientId))}
+        ideas={storageService.ideas.getAll().filter((i) => visibleIds.has(i.clientId))}
+        competitors={storageService.competitors.getAll().filter((c) => visibleIds.has(c.clientId))}
+        reports={storageService.reports.getAll().filter((r) => visibleIds.has(r.clientId))}
         onSelectClient={(client) => {
           setActiveClient(client);
           loadClientData(client);
         }}
-        onNavigateSection={(sec) => {
-          setWorkspaceTab(sec);
+        onNavigateSection={(target: string) => {
+          // Resultado da busca abre o workspace do cliente na aba correspondente.
+          const tab: WorkspaceSubTab =
+            target === 'content' ? 'content' : SECTION_TO_TAB[target as MainNavSection] ?? 'overview';
+          setCurrentSection(target in SECTION_TO_TAB ? (target as MainNavSection) : 'performance');
+          setWorkspaceTab(tab);
         }}
       />
 

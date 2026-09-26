@@ -164,7 +164,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         onClick={() => {
                           const client = clients.find(cl => cl.id === c.clientId);
                           if (client) onSelectClient(client);
-                          onNavigateSection('performance');
+                          onNavigateSection('content');
                           onClose();
                         }}
                         className="w-full flex items-center justify-between p-2.5 rounded-lg bg-neutral-950/40 hover:bg-neutral-800/80 border border-neutral-800/60 text-left transition-colors group"

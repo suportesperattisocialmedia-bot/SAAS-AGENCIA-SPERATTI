@@ -15,6 +15,7 @@ import {
   Eye
 } from 'lucide-react';
 import { formatMetric } from '../../utils/metrics';
+import { logger } from '../../utils/logger';
 
 interface ReportsTabProps {
   client: Client;
@@ -44,8 +45,9 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
         'success'
       );
       onRefresh();
-    } catch {
-      notificationService.showToast('Erro ao gerar relatório.', 'error');
+    } catch (err) {
+      logger.error('Falha ao gerar relatório', { error: err instanceof Error ? err.message : String(err) });
+      notificationService.showToast('Erro ao gerar relatório. Verifique os dados do período e tente novamente.', 'error');
     } finally {
       setIsGenerating(false);
     }
