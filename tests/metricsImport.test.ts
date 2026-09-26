@@ -17,8 +17,9 @@ describe('parseNumber', () => {
 
 describe('parseDate', () => {
   it('converte dd/mm, mm/dd e ISO', () => {
-    expect(parseDate('15/09/2026 10:30', true)).toBe('2026-09-15T10:30:00.000Z');
-    expect(parseDate('09/15/2026 10:30', false)).toBe('2026-09-15T10:30:00.000Z');
+    expect(parseDate('15/09/2026 10:30', true)).toBe('2026-09-15T13:30:00.000Z'); // 10:30 em Brasília
+    expect(parseDate('16/09/2026 01:00', true)).toBe('2026-09-16T04:00:00.000Z'); // madrugada não volta um dia
+    expect(parseDate('09/15/2026 10:30', false)).toBe('2026-09-15T13:30:00.000Z');
     expect(parseDate('2026-09-15T12:00:00Z', true)).toBe('2026-09-15T12:00:00.000Z');
     expect(parseDate('Lifetime', true)).toBeNull();
   });
@@ -45,7 +46,7 @@ describe('buildPreview', () => {
     expect(preview.posts).toHaveLength(2);
     expect(preview.posts[0]).toMatchObject({
       externalId: '1790001',
-      publishedAt: '2026-09-16T14:05:00.000Z',
+      publishedAt: '2026-09-16T17:05:00.000Z',
       format: 'Reels',
       views: 1520,
       reach: 980,
@@ -64,7 +65,7 @@ describe('buildPreview', () => {
       '555;Tour pela obra;15/09/2026 18:00;https://www.instagram.com/p/XYZ/;Imagem do IG;2.300;1.100;120;9;14;40'
     ].join('\n');
     const [post] = buildPreview(csv).posts;
-    expect(post).toMatchObject({ externalId: '555', publishedAt: '2026-09-15T18:00:00.000Z', format: 'Foto', views: 2300, reach: 1100, saves: 40 });
+    expect(post).toMatchObject({ externalId: '555', publishedAt: '2026-09-15T21:00:00.000Z', format: 'Foto', views: 2300, reach: 1100, saves: 40 });
   });
 
   it('aceita linhas coladas do Excel (tab) e avisa colunas ausentes', () => {

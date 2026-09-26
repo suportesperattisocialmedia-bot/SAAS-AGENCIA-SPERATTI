@@ -193,7 +193,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-2">
           <span className="text-[10px] font-mono uppercase text-neutral-500">Taxa de Engajamento (Média)</span>
           <div className="text-2xl font-bold text-emerald-400 font-mono">
-            {periodData.avgEngagementRate.current}%
+            {formatMetric(periodData.avgEngagementRate.current, { suffix: '%' })}
           </div>
           {renderComparison(periodData.avgEngagementRate)}
         </div>
@@ -320,7 +320,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
                       </div>
                       <div className="bg-neutral-950 p-1.5 rounded-lg">
                         <span className="text-[10px] text-neutral-500 block">Engajamento</span>
-                        <span className="text-xs text-emerald-400">{c.metrics.engagementRate}%</span>
+                        <span className="text-xs text-emerald-400">{formatMetric(c.metrics.engagementRate, { suffix: '%' })}</span>
                       </div>
                     </div>
                   </div>
