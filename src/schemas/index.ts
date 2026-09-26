@@ -43,6 +43,7 @@ export const ClientSchema = z.object({
   targetAudience: z.string().default(''),
   persona: z.string().default(''),
   averageTicket: z.string().default(''),
+  monthlyDeliverables: z.number().int().min(1).max(300).optional(),
   products: z.string().default(''),
   services: z.string().default(''),
   objectives: z.array(z.string()).default([]),

@@ -9,6 +9,14 @@ import { applyWeeklyPlan, addDays, buildWeeklyPlanPrompt, nextMonday, parseWeekl
 import { formatCompact, formatMetric, isMetric } from '../../utils/metrics';
 import { weekDayLabel } from '../../services/storage/migration';
 
+/** Escala do mapa de calor: cinza (baixo) até âmbar (alto), sem tons marrons. */
+function heatColor(t: number): string {
+  const from = [64, 64, 68];
+  const to = [245, 158, 11];
+  const mix = from.map((v, i) => Math.round(v + (to[i] - v) * t));
+  return `rgb(${mix.join(', ')})`;
+}
+
 const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const FIELD = 'w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-100 focus:border-amber-500/60 focus:outline-none focus:ring-2 focus:ring-amber-500/20';
 
@@ -78,7 +86,41 @@ export const PatternCards: React.FC<{ p: WinningPatterns; compact?: boolean }> =
           </div>
         </div>
       )}
-      {p.lowSample && p.sample > 0 && (
+      {p.heatmap && (() => {
+        const heat = p.heatmap;
+        const hmax = Math.max(0, ...heat.flatMap((d) => d.cells.map((c) => c.avgViews ?? 0)));
+        return (
+          <div className="rounded-2xl bg-white/[0.04] p-3.5">
+            <p className="mb-2 text-[11px] text-neutral-400">Mapa de calor: visualizações médias por dia e horário</p>
+            <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] gap-1 text-[10px]">
+              <span />
+              {['Madrug.', 'Manhã', 'Tarde', 'Noite'].map((l) => (
+                <span key={l} className="pb-1 text-center text-neutral-500">{l}</span>
+              ))}
+              {heat.map((d) => (
+                <React.Fragment key={d.day}>
+                  <span className="self-center text-neutral-500">{d.dayLabel}</span>
+                  {d.cells.map((c) => {
+                    const v = c.avgViews ?? 0;
+                    const intensity = hmax > 0 && c.posts ? 0.15 + 0.85 * (v / hmax) : 0;
+                    return (
+                      <span
+                        key={c.band}
+                        title={c.posts ? `${d.dayLabel} ${c.band}: ${formatMetric(c.avgViews)} views em média (${c.posts} post${c.posts > 1 ? 's' : ''})` : 'Sem posts'}
+                        className={`grid h-7 place-items-center rounded-md tabular-nums transition-colors ${c.posts ? 'font-semibold' : 'border border-dashed border-white/[0.06] text-neutral-700'}`}
+                        style={c.posts ? { backgroundColor: heatColor(intensity), color: intensity > 0.55 ? '#0a0a0a' : '#e5e5e5' } : undefined}
+                      >
+                        {c.posts ? formatCompact(c.avgViews) : '-'}
+                      </span>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+            {p.lowSample && p.sample > 0 && (
         <p className="flex items-start gap-2 text-[11px] text-amber-300/90">
           <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
           Amostra pequena ({p.sample} posts com visualizações). Use como indício e importe mais semanas para confirmar.

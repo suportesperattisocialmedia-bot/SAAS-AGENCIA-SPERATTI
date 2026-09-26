@@ -64,6 +64,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     targetAudience: '',
     persona: '',
     averageTicket: '',
+    monthlyDeliverables: undefined as number | undefined,
     products: '',
     services: '',
     toneOfVoice: '',
@@ -98,6 +99,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         targetAudience: initialData.targetAudience || '',
         persona: initialData.persona || '',
         averageTicket: initialData.averageTicket || '',
+        monthlyDeliverables: initialData.monthlyDeliverables,
         products: initialData.products || '',
         services: initialData.services || '',
         toneOfVoice: initialData.toneOfVoice || '',
@@ -125,6 +127,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         targetAudience: '',
         persona: '',
         averageTicket: '',
+        monthlyDeliverables: undefined,
         products: '',
         services: '',
         toneOfVoice: '',
@@ -420,6 +423,24 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 placeholder="Ex: R$ 15.000,00"
                 className="w-full bg-white/[0.04] border border-white/[0.06] rounded-2xl px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500 tabular-nums"
               />
+            </div>
+
+            <div>
+              <label htmlFor="client-package" className="block text-xs font-medium text-neutral-300 mb-1">
+                Pacote mensal (entregas por mês)
+              </label>
+              <input
+                id="client-package"
+                type="number"
+                min={1}
+                max={300}
+                inputMode="numeric"
+                value={formData.monthlyDeliverables ?? ''}
+                onChange={e => handleChange('monthlyDeliverables', e.target.value ? Math.max(1, Math.min(300, Math.round(Number(e.target.value)))) : undefined)}
+                placeholder="Ex: 12"
+                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-2xl px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-hidden focus:border-amber-500 tabular-nums"
+              />
+              <p className="mt-1 text-[11px] text-neutral-500">Posts, reels, stories e roteiros contratados. Aparece no dashboard como progresso do mês.</p>
             </div>
 
             <div>

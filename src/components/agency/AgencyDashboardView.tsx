@@ -1,7 +1,8 @@
+import { motion } from 'motion/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Client, Alert, AccountSnapshot, Content, CalendarItem, DeliveryTask } from '../../types';
 import { storageService } from '../../services/storageService';
-import { summarizeTasks, upcomingTasks } from '../../services/taskInsights';
+import { packageProgress, summarizeTasks, upcomingTasks } from '../../services/taskInsights';
 import { TasksBoard } from '../tasks/TasksBoard';
 import { ScopePicker } from './ScopePicker';
 import { PatternCards, WeeklyPilotModal } from '../pilot/WeeklyPilotModal';
@@ -28,6 +29,7 @@ import {
   KpiCard,
   RoutinePanel,
   TopPostsPanel,
+  PackagesPanel,
   UpcomingTasksPanel,
   WeekPanel,
   WeeklyViewsChart
@@ -53,6 +55,9 @@ interface AgencyDashboardViewProps {
   onSeedDemoData?: () => void;
   /** Recarregar dados do App (calendário etc.) depois de mudanças feitas aqui. */
   onDataChanged?: () => void;
+  /** Ação pedida pela paleta de comandos; executada uma vez e confirmada via onActionHandled. */
+  pendingAction?: 'pilot' | 'newTask' | null;
+  onActionHandled?: () => void;
 }
 
 function greeting(now: Date): string {
@@ -76,9 +81,12 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   onDeleteClient,
   onOpenAlerts,
   onSeedDemoData,
-  onDataChanged
+  onDataChanged,
+  pendingAction = null,
+  onActionHandled
 }) => {
   const [pilotOpen, setPilotOpen] = useState(false);
+  const [newTaskRequest, setNewTaskRequest] = useState(0);
   const now = new Date();
   const readPref = (key: string, fallback: string) => {
     try {
@@ -107,6 +115,17 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   const [backupDays, setBackupDays] = useState<number | null>(() => daysSinceBackup());
   const [allTasks, setAllTasks] = useState<DeliveryTask[]>(() => storageService.tasks.getAll());
   const reloadTasks = () => setAllTasks(storageService.tasks.getAll());
+
+  useEffect(() => {
+    if (!pendingAction) return;
+    if (pendingAction === 'pilot') setPilotOpen(true);
+    if (pendingAction === 'newTask') {
+      setMode('tasks');
+      setNewTaskRequest((n) => n + 1);
+    }
+    onActionHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAction]);
 
   // Escopo inválido (cliente excluído, troca demo/produção) volta para "todos".
   const scopeValid = scope === 'all' || (scope === 'general' && mode === 'tasks') || allClients.some((c) => c.id === scope);
@@ -227,14 +246,22 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                     role="tab"
                     aria-selected={mode === id}
                     onClick={() => setMode(id)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                      mode === id ? 'bg-neutral-50 text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'
+                    className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      mode === id ? 'text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'
                     }`}
                   >
-                    <Icon className="h-4 w-4" />
-                    {label}
+                    {mode === id && (
+                      <motion.span
+                        layoutId="dashboard-mode-pill"
+                        transition={{ type: 'spring', stiffness: 460, damping: 36 }}
+                        className="absolute inset-0 rounded-full bg-neutral-50"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <Icon className="relative h-4 w-4" />
+                    <span className="relative">{label}</span>
                     {id === 'tasks' && taskSummary.overdue > 0 && (
-                      <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white tabular-nums">{taskSummary.overdue}</span>
+                      <span className="relative rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white tabular-nums">{taskSummary.overdue}</span>
                     )}
                   </button>
                 ))}
@@ -270,7 +297,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
       )}
 
       {allClients.length > 0 && mode === 'tasks' && (
-        <TasksBoard tasks={visibleTasks} clients={allClients} scope={effectiveScope} onChanged={reloadTasks} />
+        <TasksBoard tasks={visibleTasks} clients={allClients} scope={effectiveScope} onChanged={reloadTasks} newTaskRequest={newTaskRequest} />
       )}
 
       {clients.length > 0 && mode === 'summary' && (
@@ -282,12 +309,14 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                 highlight
                 label="Visualizações"
                 value={formatMetric(views, { fallback: 'Sem dados' })}
+                numeric={{ value: views, format: (n) => Math.round(n).toLocaleString('pt-BR') }}
                 delta={percentChange(views, viewsPrev)}
                 icon={KPI_ICONS.views}
               />
               <KpiCard
                 label="Alcance"
                 value={formatMetric(reach, { fallback: 'Sem dados' })}
+                numeric={{ value: reach, format: (n) => Math.round(n).toLocaleString('pt-BR') }}
                 delta={percentChange(reach, reachPrev)}
                 icon={KPI_ICONS.reach}
                 delay={0.05}
@@ -295,6 +324,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
               <KpiCard
                 label="Engajamento"
                 value={formatMetric(engagement, { suffix: '%', digits: 1, fallback: 'Sem dados' })}
+                numeric={{ value: engagement, format: (n) => `${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%` }}
                 delta={percentChange(engagement, engagementPrev)}
                 icon={KPI_ICONS.engagement}
                 delay={0.1}
@@ -302,6 +332,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
               <KpiCard
                 label="Publicações"
                 value={String(posts)}
+                numeric={{ value: posts, format: (n) => String(Math.round(n)) }}
                 delta={percentChange(posts, postsPrev)}
                 icon={KPI_ICONS.posts}
                 delay={0.15}
@@ -372,6 +403,16 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
             <TopPostsPanel posts={top} clientsById={clientsById} onOpen={(c) => onOpenClientTab(c, 'content')} delay={0.3} />
             <RoutinePanel rows={freshness} onImport={(c) => onOpenClientTab(c, 'metrics')} delay={0.35} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+            <PackagesPanel
+              rows={packageProgress(clients, visibleTasks, now)}
+              clientsById={clientsById}
+              unconfigured={clients.filter((c) => !c.monthlyDeliverables)}
+              onConfigure={onEditClient}
+              delay={0.38}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">

@@ -1,3 +1,4 @@
+import { storageService } from '../../services/storageService';
 import React, { useState } from 'react';
 import { Client, AudienceInsight, AudienceInsightCategory } from '../../types';
 import { AUDIENCE_CATEGORIES, researchService } from '../../services/researchService';
@@ -86,9 +87,11 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
   };
 
   const handleDelete = (item: AudienceInsight) => {
-    if (!window.confirm(`Excluir o insight "${item.title}"?`)) return;
     researchService.removeInsight(item.id);
-    notificationService.showToast('Insight excluído.', 'info');
+    notificationService.undoable(`Insight "${item.title}" excluído.`, () => {
+      storageService.audience.create({ ...item });
+      onRefresh();
+    });
     onRefresh();
   };
 

@@ -76,7 +76,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
   };
 
   const handleDeleteItem = (id: string) => {
+    const item = calendarItems.find((i) => i.id === id);
     storageService.calendar.delete(id);
+    if (item) {
+      notificationService.undoable(`"${item.title}" removido do calendário.`, () => {
+        storageService.calendar.saveItem({ ...item });
+        onRefresh();
+      });
+    }
     onRefresh();
   };
 

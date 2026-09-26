@@ -49,3 +49,20 @@ describe('CRM de entregas', () => {
     expect(upcomingTasks(list, 5, NOW).map((x) => x.id)).toEqual(['atrasada', 'amanha', 'sem prazo']);
   });
 });
+
+describe('pacote mensal', () => {
+  it('conta entregas de conteúdo do mês e compara com o ritmo esperado', async () => {
+    const { packageProgress } = await import('../src/services/taskInsights');
+    const done = (id: string, type: DeliveryTask['type'], completedAt: string) => t(id, { clientId: 'c1', type, status: 'done', completedAt });
+    const list = [
+      done('a', 'Reels', '2026-09-03T15:00:00Z'),
+      done('b', 'Post', '2026-09-10T15:00:00Z'),
+      done('c', 'Reunião', '2026-09-11T15:00:00Z'), // não é conteúdo
+      done('d', 'Carrossel', '2026-08-30T15:00:00Z'), // mês anterior
+      t('e', { clientId: 'c1', type: 'Stories', dueDate: '2026-09-28' })
+    ];
+    const [p] = packageProgress([{ id: 'c1', monthlyDeliverables: 12 }, { id: 'c2' }], list, NOW);
+    expect(p).toMatchObject({ target: 12, delivered: 2, inProgress: 1, daysLeft: 4, status: 'behind' });
+    expect(p.expected).toBeCloseTo(10.4, 1); // dia 26 de 30
+  });
+});

@@ -21,6 +21,8 @@ export interface Client {
   targetAudience: string;
   persona: string;
   averageTicket: string;
+  /** Entregas contratadas por mês (pacote). */
+  monthlyDeliverables?: number;
   products: string;
   services: string;
   objectives: string[];

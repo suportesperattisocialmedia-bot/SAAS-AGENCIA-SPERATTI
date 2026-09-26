@@ -1,9 +1,19 @@
 import { PIPELINE_LABELS } from '../../utils/labels';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
 import { Search, X, Users, FileText, Lightbulb, Swords, ArrowRight, ListChecks } from 'lucide-react';
 import { Client, Content, ContentIdea, Competitor, Report, DeliveryTask } from '../../types';
 import { TASK_STATUSES, dueLabel } from '../../services/taskInsights';
 import { formatMetric } from '../../utils/metrics';
+
+/** Ação da paleta de comandos (Ctrl+K). */
+export interface CommandAction {
+  id: string;
+  label: string;
+  hint?: string;
+  keywords?: string;
+  icon: React.ElementType;
+  run: () => void;
+}
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -14,6 +24,7 @@ interface GlobalSearchModalProps {
   competitors: Competitor[];
   reports: Report[];
   tasks?: DeliveryTask[];
+  commands?: CommandAction[];
   onOpenTask?: (task: DeliveryTask) => void;
   onSelectClient: (client: Client) => void;
   onNavigateSection: (section: any) => void;
@@ -28,11 +39,37 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   competitors,
   reports,
   tasks = [],
+  commands = [],
   onOpenTask,
   onSelectClient,
   onNavigateSection
 }) => {
   const [query, setQuery] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Limpa ao fechar: a próxima abertura já começa vazia, sem texto antigo nem por um instante.
+  useEffect(() => {
+    if (!isOpen) setQuery('');
+  }, [isOpen]);
+  // Busca pesada (milhares de posts) não trava a digitação.
+  const deferredQuery = useDeferredValue(query);
+
+  const matchedCommands = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return commands;
+    return commands.filter((c) => `${c.label} ${c.keywords ?? ''} ${c.hint ?? ''}`.toLowerCase().includes(q));
+  }, [query, commands]);
+
+  // Setas navegam pelos itens; Enter aciona o item focado (ou o primeiro, a partir da busca).
+  const onListKeys = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const items = [...(listRef.current?.querySelectorAll<HTMLButtonElement>('[data-nav]') ?? [])];
+    if (items.length === 0) return;
+    e.preventDefault();
+    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = e.key === 'ArrowDown' ? (i + 1) % items.length : i <= 0 ? items.length - 1 : i - 1;
+    items[next].focus();
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -47,8 +84,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   }, [onClose]);
 
   const results = useMemo(() => {
-    if (!query.trim()) return null;
-    const q = query.toLowerCase();
+    if (!deferredQuery.trim()) return null;
+    const q = deferredQuery.toLowerCase();
 
     const matchedClients = clients.filter(
       c => c.name.toLowerCase().includes(q) || c.instagram.toLowerCase().includes(q) || c.segment.toLowerCase().includes(q)
@@ -84,7 +121,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
       reports: matchedReports,
       total: matchedTasks.length + matchedClients.length + matchedContents.length + matchedIdeas.length + matchedCompetitors.length + matchedReports.length
     };
-  }, [query, clients, contents, ideas, competitors, reports, tasks]);
+  }, [deferredQuery, clients, contents, ideas, competitors, reports, tasks]);
 
   if (!isOpen) return null;
 
@@ -100,13 +137,23 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Digite para buscar em toda a agência..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') listRef.current?.querySelector<HTMLButtonElement>('[data-nav]')?.click();
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                listRef.current?.querySelector<HTMLButtonElement>('[data-nav]')?.focus();
+              }
+            }}
+            aria-label="Buscar ou executar uma ação"
+            placeholder="Buscar ou digitar uma ação (ex.: nova tarefa)..."
             autoFocus
             className="w-full bg-transparent text-sm text-neutral-100 placeholder-neutral-500 focus:outline-hidden tabular-nums"
           />
           {query && (
             <button
+              type="button"
               onClick={() => setQuery('')}
+              aria-label="Limpar busca"
               className="text-neutral-500 hover:text-neutral-300 p-1"
             >
               <X className="w-3.5 h-3.5" />
@@ -118,12 +165,39 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         </div>
 
         {/* Search Results Area */}
-        <div className="p-4 overflow-y-auto custom-scrollbar space-y-4">
-          {!results ? (
-            <div className="py-8 text-center text-xs text-neutral-500 tabular-nums">
-              Pesquise por clientes, temas de conteúdo, ganchos ou concorrentes.
+        <div ref={listRef} onKeyDown={onListKeys} className="p-4 overflow-y-auto custom-scrollbar space-y-4">
+          {matchedCommands.length > 0 && (
+            <div>
+              <div className="mb-2 text-[11px] text-neutral-500">{query ? 'Ações' : 'Ações rápidas'}</div>
+              <div className="space-y-1">
+                {matchedCommands.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    data-nav
+                    onClick={() => {
+                      c.run();
+                      onClose();
+                    }}
+                    className="group flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition-colors hover:bg-white/[0.07] focus:bg-white/[0.07] focus:outline-none"
+                  >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.06] text-neutral-300 group-hover:text-amber-400 group-focus:text-amber-400">
+                      <c.icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm text-neutral-100">{c.label}</span>
+                      {c.hint && <span className="block truncate text-[11px] text-neutral-500">{c.hint}</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : results.total === 0 ? (
+          )}
+          {!results ? (
+            matchedCommands.length === 0 && (
+              <div className="py-8 text-center text-xs text-neutral-500">Pesquise por clientes, posts, ideias, tarefas ou concorrentes.</div>
+            )
+          ) : results.total === 0 && matchedCommands.length === 0 ? (
             <div className="py-8 text-center text-xs text-neutral-400">
               Nenhum resultado encontrado para &quot;<span className="text-amber-300">{query}</span>&quot;.
             </div>
@@ -140,6 +214,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     {results.clients.map(c => (
                       <button
                         key={c.id}
+                        data-nav
                         onClick={() => {
                           onSelectClient(c);
                           onNavigateSection('dashboard');
@@ -173,6 +248,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     {results.contents.map(c => (
                       <button
                         key={c.id}
+                        data-nav
                         onClick={() => {
                           const client = clients.find(cl => cl.id === c.clientId);
                           if (client) onSelectClient(client);
@@ -211,6 +287,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     {results.ideas.map(i => (
                       <button
                         key={i.id}
+                        data-nav
                         onClick={() => {
                           const client = clients.find(cl => cl.id === i.clientId);
                           if (client) onSelectClient(client);
@@ -245,6 +322,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     {results.tasks.map((t) => (
                       <button
                         key={t.id}
+                        data-nav
                         type="button"
                         onClick={() => {
                           onOpenTask?.(t);

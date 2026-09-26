@@ -816,6 +816,12 @@ export const storageService = {
 
     delete(id: string): void {
       storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, this.getAll().filter((t) => t.id !== id));
+    },
+
+    /** Recoloca uma tarefa excluída exatamente como era (desfazer). */
+    restore(task: DeliveryTask): void {
+      const all = this.getAll().filter((t) => t.id !== task.id);
+      storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, [...all, DeliveryTaskSchema.parse(task) as DeliveryTask]);
     }
   },
 

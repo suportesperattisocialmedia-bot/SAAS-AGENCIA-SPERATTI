@@ -29,6 +29,7 @@ import { indexedDBAdapter } from './services/storage/IndexedDBAdapter';
 import { logger } from './utils/logger';
 import { sessionService, type BackendStatus, type SessionUser } from './services/sessionService';
 import { describeApiError, onSessionExpired } from './services/api/apiClient';
+import { motion, useReducedMotion } from 'motion/react';
 import { DemoProvider } from './services/demo/DemoProvider';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { ManualAiModal } from './components/common/ManualAiModal';
@@ -38,7 +39,9 @@ import { ProfileDiagnosticResponseSchema } from './schemas/aiSchemas';
 // Layout & Common Components
 import { Sidebar, MainNavSection } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
-import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
+import { GlobalSearchModal, type CommandAction } from './components/layout/GlobalSearchModal';
+import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText } from 'lucide-react';
+import { backupStats, downloadBackup } from './services/backupService';
 import { BootLoader } from './components/common/BootLoader';
 import { DemoBanner } from './components/common/DemoBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -115,6 +118,8 @@ export default function App() {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [dashboardKey, setDashboardKey] = useState(0);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
+  const [dashboardAction, setDashboardAction] = useState<'pilot' | 'newTask' | null>(null);
 
   // Sessão expirou no meio do uso: volta ao login com aviso (os dados deste navegador ficam salvos).
   const sessionUserRef = useRef<SessionUser | null>(null);
@@ -253,6 +258,7 @@ export default function App() {
             targetAudience: p.targetAudience ?? '',
             persona: p.persona ?? '',
             averageTicket: p.averageTicket ?? '',
+            monthlyDeliverables: typeof p.monthlyDeliverables === 'number' ? p.monthlyDeliverables : undefined,
             products: '',
             services: '',
             objectives: p.objectives ?? [],
@@ -431,6 +437,51 @@ export default function App() {
 
   // Profile Analysis handler
   // IA manual: abre o modal com o prompt completo do cliente.
+  /** Ações da paleta de comandos (Ctrl+K). */
+  const buildCommands = (): CommandAction[] => {
+    const goDashboard = (mode?: 'tasks' | 'summary') => {
+      if (mode) {
+        try {
+          localStorage.setItem('gs_dash_mode', mode);
+        } catch {
+          /* preferência opcional */
+        }
+      }
+      setCurrentSection('dashboard');
+      setDashboardKey((k) => k + 1);
+    };
+    const list: CommandAction[] = [
+      { id: 'new-task', label: 'Nova tarefa', hint: 'Criar entrega no CRM', keywords: 'tarefa crm entrega', icon: ListChecks, run: () => { goDashboard('tasks'); setDashboardAction('newTask'); } },
+      { id: 'pilot', label: 'Piloto da semana', hint: 'Planejar a próxima semana de um cliente', keywords: 'planejar semana ia prompt', icon: Rocket, run: () => { goDashboard('summary'); setDashboardAction('pilot'); } },
+      { id: 'tasks', label: 'Abrir minhas tarefas', keywords: 'crm quadro kanban', icon: ListChecks, run: () => goDashboard('tasks') },
+      { id: 'new-client', label: 'Novo cliente', keywords: 'cadastrar cliente', icon: UserPlus, run: () => { setEditingClient(null); setClientFormModalOpen(true); } },
+      {
+        id: 'backup',
+        label: 'Baixar backup',
+        hint: 'Salvar todos os dados deste navegador',
+        keywords: 'backup exportar salvar',
+        icon: HardDriveDownload,
+        run: () => {
+          const file = downloadBackup();
+          notificationService.showToast(`Backup baixado (${backupStats(file).total} registros).`, 'success');
+        }
+      }
+    ];
+    if (activeClient && !isDemoLoaded) {
+      const openTab = (tab: WorkspaceSubTab) => {
+        setCurrentSection((Object.keys(SECTION_TO_TAB) as MainNavSection[]).find((k) => SECTION_TO_TAB[k] === tab) ?? 'performance');
+        setWorkspaceTab(tab);
+        loadClientData(activeClient);
+      };
+      list.push(
+        { id: 'import', label: `Importar métricas: ${activeClient.name}`, hint: 'CSV do Meta Business Suite', keywords: 'csv importar metricas meta', icon: Upload, run: () => openTab('metrics') },
+        { id: 'diagnostic', label: `Gerar análise completa: ${activeClient.name}`, keywords: 'diagnostico analise ia prompt', icon: Sparkles, run: () => { openTab('diagnostic'); handleAnalyzeProfile(); } },
+        { id: 'report', label: `Relatório: ${activeClient.name}`, keywords: 'relatorio pdf', icon: FileText, run: () => openTab('reports') }
+      );
+    }
+    return list;
+  };
+
   const handleAnalyzeProfile = () => {
     if (!activeClient) return;
     setDiagnosticModalOpen(true);
@@ -714,6 +765,12 @@ export default function App() {
                       </div>
                     }
                   >
+                  <motion.div
+                    key={workspaceTab}
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  >
                   {workspaceTab === 'overview' && (
                     <ClientOverviewTab
                       client={activeClient}
@@ -824,12 +881,15 @@ export default function App() {
                       snapshots={snapshots}
                     />
                   )}
+                  </motion.div>
                   </Suspense>
                 </div>
               ) : (
                 /* Agency Dashboard / All Clients */
                 <AgencyDashboardView
                   key={dashboardKey}
+                  pendingAction={dashboardAction}
+                  onActionHandled={() => setDashboardAction(null)}
                   clients={clients}
                   snapshots={storageService.history.getAll()}
                   contents={storageService.contents.getAll()}
@@ -906,6 +966,7 @@ export default function App() {
         competitors={storageService.competitors.getAll().filter((c) => visibleIds.has(c.clientId))}
         reports={storageService.reports.getAll().filter((r) => visibleIds.has(r.clientId))}
         tasks={globalSearchOpen ? storageService.tasks.getAll().filter((t) => (t.clientId ? visibleIds.has(t.clientId) : !isDemoLoaded)) : []}
+        commands={buildCommands()}
         onOpenTask={(task) => {
           // Abre o dashboard em "Tarefas", filtrado pelo cliente da tarefa.
           try {

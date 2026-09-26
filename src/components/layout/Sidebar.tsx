@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'motion/react';
 import React from 'react';
 import {
   LayoutDashboard,
@@ -60,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userRole,
   onLogout
 }) => {
+  const reduce = useReducedMotion();
   const navItems: Array<{ id: MainNavSection; label: string; icon: React.ReactNode; badge?: number }> = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'clients', label: 'Clientes', icon: <Users className="w-4 h-4" />, badge: clients.length },
@@ -140,13 +142,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onNavigate(item.id);
                   onCloseMobile();
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-2xl transition-colors group ${
+                className={`relative w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-2xl transition-colors group ${
                   isActive
-                    ? 'bg-neutral-800/90 text-amber-300 font-semibold border border-white/[0.08]'
+                    ? 'text-amber-300 font-semibold'
                     : 'text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.04]'
                 }`}
               >
-                <div className="flex items-center gap-3">
+                {/* Destaque que desliza até o item ativo */}
+                {isActive && (
+                  <motion.span
+                    layoutId="sidebar-active"
+                    transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 36 }}
+                    className="absolute inset-0 rounded-2xl border border-white/[0.08] bg-neutral-800/90"
+                    aria-hidden="true"
+                  />
+                )}
+                <div className="relative flex items-center gap-3">
                   <span className={isActive ? 'text-amber-400' : 'text-neutral-500 group-hover:text-neutral-300'}>
                     {item.icon}
                   </span>
@@ -155,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 {item.badge !== undefined && item.badge > 0 && (
                   <span
-                    className={`text-[10px] tabular-nums px-1.5 py-0.2 rounded-full ${
+                    className={`relative text-[10px] tabular-nums px-1.5 py-0.2 rounded-full ${
                       isActive ? 'bg-amber-500/20 text-amber-300' : 'bg-white/[0.06] text-neutral-400'
                     }`}
                   >

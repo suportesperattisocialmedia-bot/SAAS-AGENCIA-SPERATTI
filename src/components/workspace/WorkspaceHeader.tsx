@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'motion/react';
 import React from 'react';
 import { Client, InstagramAccount } from '../../types';
 import {
@@ -55,6 +56,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
   onAnalyzeProfile,
   isAnalyzing
 }) => {
+  const reduce = useReducedMotion();
   const avatarUrl = client.avatarUrl;
 
   const tabs: Array<{ id: WorkspaceSubTab; label: string; icon: React.ReactNode }> = [
@@ -147,12 +149,19 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors ${
-                isActive
-                  ? 'border-amber-500 text-amber-300 font-semibold bg-white/[0.02]'
-                  : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:border-white/[0.14]'
+              aria-current={isActive ? 'page' : undefined}
+              className={`relative flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium whitespace-nowrap transition-colors ${
+                isActive ? 'text-amber-300 font-semibold' : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
+              {isActive && (
+                <motion.span
+                  layoutId="workspace-tab-underline"
+                  transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 460, damping: 38 }}
+                  className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-amber-500"
+                  aria-hidden="true"
+                />
+              )}
               <span className={isActive ? 'text-amber-400' : 'text-neutral-500'}>
                 {tab.icon}
               </span>

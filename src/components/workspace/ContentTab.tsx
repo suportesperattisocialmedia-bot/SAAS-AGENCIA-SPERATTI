@@ -8,6 +8,8 @@ import {
   Share2,
   CheckCircle2} from 'lucide-react';
 import { formatMetric } from '../../utils/metrics';
+import { PostsTable } from './PostsTable';
+import { LayoutGrid, Table2 } from 'lucide-react';
 
 interface ContentTabProps {
   client: Client;
@@ -24,6 +26,21 @@ export const ContentTab: React.FC<ContentTabProps> = ({
   // Contas com muitos posts: renderiza em blocos para a aba abrir rápido.
   const PAGE = 60;
   const [visibleCount, setVisibleCount] = useState(PAGE);
+  const [view, setView] = useState<'cards' | 'table'>(() => {
+    try {
+      return localStorage.getItem('gs_content_view') === 'table' ? 'table' : 'cards';
+    } catch {
+      return 'cards';
+    }
+  });
+  const changeView = (v: 'cards' | 'table') => {
+    setView(v);
+    try {
+      localStorage.setItem('gs_content_view', v);
+    } catch {
+      /* preferência opcional */
+    }
+  };
 
   const filteredContents = contents.filter(c => {
     if (selectedFormat !== 'all' && c.format !== selectedFormat) return false;
@@ -40,7 +57,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#161618] border border-white/[0.06] rounded-[24px] p-4">
         <div>
           <h3 className="text-sm font-bold text-neutral-100">
-            Catálogo e Classificação de Conteúdos
+            Publicações
           </h3>
           <p className="text-xs text-neutral-400 mt-0.5">
             {filteredContents.length} de {contents.length} publicações importadas
@@ -48,6 +65,23 @@ export const ContentTab: React.FC<ContentTabProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-xs tabular-nums">
+          <div className="flex rounded-full bg-white/[0.04] p-1" role="group" aria-label="Visualização">
+            {([
+              ['cards', 'Cards', LayoutGrid],
+              ['table', 'Tabela', Table2]
+            ] as const).map(([id, label, Icon]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={view === id}
+                onClick={() => changeView(id)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium transition-colors ${view === id ? 'bg-white/[0.1] text-neutral-50' : 'text-neutral-400 hover:text-neutral-200'}`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
           {/* Format Filter */}
           <div className="flex items-center gap-1.5 bg-white/[0.03] px-2.5 py-1 rounded-2xl border border-white/[0.06]">
             <span className="text-neutral-500 text-[11px]">Formato:</span>
@@ -82,8 +116,10 @@ export const ContentTab: React.FC<ContentTabProps> = ({
         </div>
       </div>
 
+      {view === 'table' && <PostsTable contents={filteredContents} limit={visibleCount} onOpen={setActiveContent} />}
+
       {/* Contents Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${view === 'table' ? 'hidden' : ''}`}>
         {filteredContents.slice(0, visibleCount).map(content => (
           <div
             key={content.id}

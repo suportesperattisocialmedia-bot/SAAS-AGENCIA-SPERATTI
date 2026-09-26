@@ -63,3 +63,13 @@ describe('piloto da semana', () => {
     expect(() => parseWeeklyPlan('{"posts":[{"date":"29/09","format":"Reels","title":"x"}]}')).toThrow('date');
   });
 });
+
+describe('mapa de calor', () => {
+  it('agrupa por dia (seg..dom) e faixa de horário; null sem horários', () => {
+    const p = computeWinningPatterns([post('2026-09-22T22:00:00Z', 5000), post('2026-09-15T22:30:00Z', 3000)], NOW);
+    const terca = p.heatmap?.find((d) => d.day === 'terca');
+    expect(p.heatmap?.map((d) => d.day)[0]).toBe('segunda');
+    expect(terca?.cells.find((c) => c.band === 'noite')).toMatchObject({ posts: 2, avgViews: 4000 });
+    expect(computeWinningPatterns([post('2026-09-22T15:00:00Z', 10)], NOW).heatmap).toBeNull();
+  });
+});

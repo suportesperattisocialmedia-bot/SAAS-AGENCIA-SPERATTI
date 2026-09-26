@@ -228,7 +228,7 @@ export const TaskModal: React.FC<{
             <button
               type="button"
               onClick={() => {
-                if (window.confirm(`Excluir a tarefa "${draft.title}"?`)) onDelete(draft.id as string);
+                onDelete(draft.id as string);
               }}
               className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/10"
             >

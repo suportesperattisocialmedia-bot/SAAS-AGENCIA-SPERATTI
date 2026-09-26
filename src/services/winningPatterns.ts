@@ -35,6 +35,8 @@ export interface WinningPatterns {
   topPosts: Content[];
   /** Menos de 6 posts com visualizações: tratar como indício, não conclusão. */
   lowSample: boolean;
+  /** Mapa dia da semana (seg..dom) x faixa de horário; null sem horários confiáveis. */
+  heatmap: Array<{ day: string; dayLabel: string; cells: Array<{ band: string; posts: number; avgViews: Metric }> }> | null;
 }
 
 export const HOUR_BANDS = [
@@ -120,6 +122,22 @@ export function computeWinningPatterns(contents: Content[], now = new Date(), pe
     bestFormat: best(formats),
     cadencePerWeek: recent.length ? Math.round((last4 / 4) * 10) / 10 : null,
     topPosts: [...withViews].sort((a, b) => sortValue(b.metrics.views) - sortValue(a.metrics.views)).slice(0, 5),
-    lowSample: withViews.length < 6
+    lowSample: withViews.length < 6,
+    heatmap: hoursReliable
+      ? [1, 2, 3, 4, 5, 6, 0].map((dow) => {
+          const ofDay = withViews.filter((c) => new Date(`${brasiliaDay(c.publishedAt)}T12:00:00Z`).getUTCDay() === dow);
+          return {
+            day: WEEKDAYS[dow],
+            dayLabel: weekDayLabel(WEEKDAYS[dow]).slice(0, 3),
+            cells: HOUR_BANDS.map((b) => {
+              const list = ofDay.filter((c) => {
+                const { h } = brasiliaTime(c.publishedAt);
+                return h >= b.from && h < b.to;
+              });
+              return { band: b.key, posts: list.length, avgViews: avgMetric(list.map((c) => c.metrics.views)) };
+            })
+          };
+        })
+      : null
   };
 }

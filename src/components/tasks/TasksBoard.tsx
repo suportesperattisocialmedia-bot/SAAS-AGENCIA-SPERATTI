@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, CheckSquare, Columns3, Flag, List, Plus, Search } from 'lucide-react';
 import type { Client, DeliveryTask, TaskStatus } from '../../types';
@@ -41,7 +41,9 @@ export const TasksBoard: React.FC<{
   /** 'all', 'general' ou id do cliente. */
   scope: string;
   onChanged: () => void;
-}> = ({ tasks, clients, scope, onChanged }) => {
+  /** Muda de valor para abrir o formulário de nova tarefa (paleta de comandos). */
+  newTaskRequest?: number;
+}> = ({ tasks, clients, scope, onChanged, newTaskRequest = 0 }) => {
   const reduce = useReducedMotion();
   const [view, setView] = useState<'board' | 'list'>(() => {
     try {
@@ -58,7 +60,8 @@ export const TasksBoard: React.FC<{
 
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.name])), [clients]);
   const scoped = useMemo(() => filterTasks(tasks, { clientId: scope }, clientNames), [tasks, scope, clientNames]);
-  const visible = useMemo(() => filterTasks(scoped, { clientId: 'all', search, quick }, clientNames), [scoped, search, quick, clientNames]);
+  const deferredSearch = useDeferredValue(search);
+  const visible = useMemo(() => filterTasks(scoped, { clientId: 'all', search: deferredSearch, quick }, clientNames), [scoped, deferredSearch, quick, clientNames]);
   const summary = summarizeTasks(scoped);
 
   const changeView = (v: 'board' | 'list') => {
@@ -71,6 +74,10 @@ export const TasksBoard: React.FC<{
   };
 
   const defaultClient = scope !== 'all' && scope !== 'general' ? scope : '';
+  useEffect(() => {
+    if (newTaskRequest > 0) setModal((m) => ({ open: true, draft: emptyDraft({ clientId: defaultClient }), seq: m.seq + 1 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newTaskRequest]);
   const openNew = (status: TaskStatus = 'todo') => setModal((m) => ({ open: true, draft: emptyDraft({ status, clientId: defaultClient }), seq: m.seq + 1 }));
 
   const save = (d: TaskDraft) => {
@@ -91,8 +98,14 @@ export const TasksBoard: React.FC<{
   };
 
   const remove = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
     storageService.tasks.delete(id);
-    notificationService.showToast('Tarefa excluída.', 'info');
+    if (task) {
+      notificationService.undoable(`Tarefa "${task.title}" excluída.`, () => {
+        storageService.tasks.restore(task);
+        onChanged();
+      });
+    }
     setModal((m) => ({ ...m, open: false }));
     onChanged();
   };
@@ -116,8 +129,16 @@ export const TasksBoard: React.FC<{
     const done = task.checklist.filter((i) => i.done).length;
     const next = nextStatus(task.status);
     return (
-      <div
+      // Card desliza para a nova posição/coluna ao mudar de etapa (layoutId compartilhado).
+      <motion.div
         key={task.id}
+        layout={!reduce}
+        layoutId={reduce ? undefined : `task-${task.id}`}
+        initial={reduce ? false : { opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+      >
+      <div
         draggable
         onDragStart={(e) => {
           setDragId(task.id);
@@ -175,6 +196,7 @@ export const TasksBoard: React.FC<{
           )}
         </div>
       </div>
+      </motion.div>
     );
   };
 
