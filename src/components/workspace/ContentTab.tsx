@@ -111,7 +111,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
                 </div>
 
                 <span className="text-[11px] font-mono text-neutral-500">
-                  {content.publishedAt}
+                  {new Date(content.publishedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })}
                 </span>
               </div>
 

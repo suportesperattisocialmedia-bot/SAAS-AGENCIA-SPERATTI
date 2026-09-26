@@ -199,7 +199,8 @@ export function parseDate(raw: string | undefined, dayFirst: boolean): string | 
     const day = dayFirst ? a : b;
     const month = dayFirst ? b : a;
     const year = br[3].length === 2 ? 2000 + Number(br[3]) : Number(br[3]);
-    const d = new Date(Date.UTC(year, month - 1, day, Number(br[4] ?? 12), Number(br[5] ?? 0)));
+    // Horários do Meta Business Suite/planilhas são do fuso de Brasília (UTC-3, sem horário de verão desde 2019).
+    const d = new Date(Date.UTC(year, month - 1, day, Number(br[4] ?? 12) + 3, Number(br[5] ?? 0)));
     return month >= 1 && month <= 12 && day >= 1 && day <= 31 && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
   }
   const iso = new Date(v);
