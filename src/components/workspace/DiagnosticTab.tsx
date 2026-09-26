@@ -1,3 +1,4 @@
+import { formatDateTimeBR } from '../../utils/dates';
 import React from 'react';
 import { Client, Content, MetricSnapshot } from '../../types';
 import { ProfileDiagnosticResult } from '../../services/aiService';
@@ -7,10 +8,6 @@ import {
   Layers,
   TrendingUp,
   Target,
-  CheckCircle2,
-  AlertTriangle,
-  Lightbulb,
-  ShieldCheck,
   RefreshCw
 } from 'lucide-react';
 
@@ -25,8 +22,6 @@ interface DiagnosticTabProps {
 
 export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
   client,
-  contents,
-  snapshots,
   diagnostic,
   onRunDiagnostic,
   isAnalyzing
@@ -156,7 +151,7 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
             </div>
             <p className="text-[11px] text-neutral-500">
               Análise gerada por IA{diagnostic.model ? ` (${diagnostic.model})` : ''}
-              {diagnostic.analyzedAt ? ` em ${new Date(diagnostic.analyzedAt).toLocaleString('pt-BR')}` : ''}. Trate como hipótese estratégica e valide com os dados.
+              {diagnostic.analyzedAt ? ` em ${formatDateTimeBR(diagnostic.analyzedAt)}` : ''}. Trate como hipótese estratégica e valide com os dados.
             </p>
           </div>
         </div>

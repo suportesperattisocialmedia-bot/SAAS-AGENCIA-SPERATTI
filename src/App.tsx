@@ -6,7 +6,7 @@
  * Aplicação Interna de Inteligência, Estratégia e Operação de Marketing Digital
  */
 
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   Client,
   InstagramAccount,
@@ -25,6 +25,7 @@ import { aiService, ProfileDiagnosticResult } from './services/aiService';
 import { notificationService, notificationStore } from './services/notifications/NotificationStore';
 import { alertEngine } from './services/alerts/alertEngine';
 import { migrationEngine } from './services/storage/migration';
+import { indexedDBAdapter } from './services/storage/IndexedDBAdapter';
 import { logger } from './utils/logger';
 import { sessionService, type BackendStatus, type SessionUser } from './services/sessionService';
 import { describeApiError } from './services/api/apiClient';
@@ -292,6 +293,11 @@ export default function App() {
     try {
       logger.info('Starting system boot sequence...');
       
+      // Step 0: o cache do IndexedDB (posts, métricas, diagnósticos) precisa estar carregado
+      // antes de qualquer leitura ou escrita; senão a tela abre vazia e uma escrita
+      // poderia sobrescrever os dados salvos.
+      await indexedDBAdapter.ready();
+
       // Step 1: Run storage migrations
       migrationEngine.runMigrations();
 

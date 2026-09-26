@@ -4,17 +4,11 @@ import { AUDIENCE_CATEGORIES, researchService } from '../../services/researchSer
 import { notificationService } from '../../services/notificationService';
 import { Modal } from '../common/Modal';
 import {
+  Trash2,
   Search,
-  Sparkles,
   Plus,
   Globe,
-  CheckCircle2,
-  HelpCircle,
-  TrendingUp,
-  AlertCircle,
-  ExternalLink,
-  Filter
-} from 'lucide-react';
+  CheckCircle2} from 'lucide-react';
 
 interface AudienceTabProps {
   client: Client;
@@ -91,8 +85,10 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
     onRefresh();
   };
 
-  const handleDelete = (id: string) => {
-    researchService.removeInsight(id);
+  const handleDelete = (item: AudienceInsight) => {
+    if (!window.confirm(`Excluir o insight "${item.title}"?`)) return;
+    researchService.removeInsight(item.id);
+    notificationService.showToast('Insight excluído.', 'info');
     onRefresh();
   };
 
@@ -102,7 +98,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
         <div>
           <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-            <span>Public Audience Intelligence</span>
+            <span>Pesquisa de público</span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-950">
               {insights.length} insights mapeados
             </span>
@@ -173,20 +169,29 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
           >
             <div>
               {/* Category & Status */}
-              <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-500/30">
                   {item.category}
                 </span>
 
                 {item.isHypothesis ? (
                   <span className="text-[10px] font-mono px-1.5 py-0.2 rounded border border-purple-500/30 text-purple-400 bg-purple-950/20">
-                    HIPÓTESE IA
+                    HIPÓTESE
                   </span>
                 ) : (
                   <span className="text-[10px] font-mono px-1.5 py-0.2 rounded border border-emerald-500/30 text-emerald-400 bg-emerald-950/20 flex items-center gap-1">
-                    <CheckCircle2 className="w-2.5 h-2.5" /> FONTE VERIFICADA
+                    <CheckCircle2 className="w-2.5 h-2.5" /> DADO REAL
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={() => handleDelete(item)}
+                  aria-label={`Excluir insight ${item.title}`}
+                  title="Excluir"
+                  className="ml-auto grid h-7 w-7 place-items-center rounded-full text-neutral-500 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
 
               {/* Title & Description */}

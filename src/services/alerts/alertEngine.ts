@@ -4,7 +4,7 @@
  */
 
 import { generateUUID } from '../../utils/uuid';
-import { Alert, AlertType, AlertSeverity, AlertStatus, Client, AccountSnapshot, Content, InstagramAccount } from '../../types';
+import { Alert, AlertStatus, Client, AccountSnapshot, Content, InstagramAccount } from '../../types';
 import { defaultStorageAdapter } from '../storage/LocalStorageAdapter';
 import { analyticsService } from '../analyticsService';
 import { logger } from '../../utils/logger';

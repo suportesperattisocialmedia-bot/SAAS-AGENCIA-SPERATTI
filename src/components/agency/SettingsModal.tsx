@@ -5,14 +5,7 @@ import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
 import { Modal } from '../common/Modal';
 import {
-  Settings,
-  Database,
-  KeyRound,
-  Shield,
   CheckCircle2,
-  RefreshCw,
-  Building,
-  HardDrive,
   Download,
   Upload
 } from 'lucide-react';

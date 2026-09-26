@@ -7,7 +7,7 @@
  * Real PDF generation with jsPDF (no window.print dependency).
  */
 
-import { Client, Report, Content } from '../types';
+import { Client, Report} from '../types';
 import { storageService } from './storageService';
 import { analyticsService } from './analyticsService';
 import { aiService } from './aiService';

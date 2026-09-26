@@ -3,13 +3,7 @@ import { Client, AccountSnapshot } from '../../types';
 import { ChartArea } from '../common/ChartArea';
 import { reportService } from '../../services/reportService';
 import {
-  History,
-  Download,
-  Calendar,
-  Filter,
-  ArrowUpRight,
-  ArrowDownRight
-} from 'lucide-react';
+  Download} from 'lucide-react';
 import { formatMetric } from '../../utils/metrics';
 
 interface HistoryTabProps {

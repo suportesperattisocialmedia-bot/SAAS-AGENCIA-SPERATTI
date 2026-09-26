@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Client, Content, AccountSnapshot, ContentFormat } from '../../types';
 import { analyticsService } from '../../services/analyticsService';
-import { StatCard } from '../common/StatCard';
 import { ChartArea } from '../common/ChartArea';
 import { ChartBar } from '../common/ChartBar';
 import { ProvenanceBadge } from '../common/ProvenanceBadge';
@@ -9,15 +8,11 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
-  Eye,
-  Bookmark,
-  Share2,
-  Calendar,
-  Filter,
   Layers,
   Sparkles
 } from 'lucide-react';
-import { formatMetric } from '../../utils/metrics';
+import { engagementFrom, formatMetric } from '../../utils/metrics';
+import { brasiliaDay } from '../../services/dashboardInsights';
 
 interface PerformanceTabProps {
   client: Client;
@@ -26,7 +21,6 @@ interface PerformanceTabProps {
 }
 
 export const PerformanceTab: React.FC<PerformanceTabProps> = ({
-  client,
   contents,
   snapshots
 }) => {
@@ -41,9 +35,19 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
 
   const periodData = analyticsService.calculatePeriod(snapshots, selectedPeriod, customRange, contents);
 
-  const bestContents = analyticsService.rankContents(contents, selectedSortMetric, false).slice(0, 5);
-  const underperformingContents = analyticsService.rankContents(contents, selectedSortMetric, true).slice(0, 3);
-  const formatStats = analyticsService.breakdownByFormat(contents);
+  // Ranking e formatos respeitam o período escolhido (data de publicação em Brasília).
+  const periodContents = contents.filter((c) => {
+    const d = brasiliaDay(c.publishedAt);
+    return d >= periodData.startDate && d <= periodData.endDate;
+  });
+  const bestContents = analyticsService.rankContents(periodContents, selectedSortMetric, false).slice(0, 5);
+  const bestIds = new Set(bestContents.map((c) => c.id));
+  // Pontos de ajuste só fazem sentido com base de comparação (6+ posts no período).
+  const underperformingContents =
+    periodContents.length >= 6
+      ? analyticsService.rankContents(periodContents, selectedSortMetric, true).filter((c) => !bestIds.has(c.id)).slice(0, 3)
+      : [];
+  const formatStats = analyticsService.breakdownByFormat(periodContents);
 
   // Filter snapshots strictly by date for the area chart
   const chartSnapshots = analyticsService.filterSnapshotsByDate(
@@ -63,7 +67,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
     .map(fmt => ({
       label: fmt,
       value: formatStats[fmt].avgViews,
-      sublabel: `${formatStats[fmt].count} posts · eng ${formatStats[fmt].avgEngagement}%`
+      sublabel: `${formatStats[fmt].count} posts · eng ${formatMetric(formatStats[fmt].avgEngagement, { suffix: '%' })}`
     }));
 
   const renderComparison = (comparison: typeof periodData.totalViews) => {
@@ -316,11 +320,11 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
                       </div>
                       <div className="bg-neutral-950 p-1.5 rounded-lg">
                         <span className="text-[10px] text-neutral-500 block">Saves</span>
-                        <span className="text-xs text-purple-400 font-bold">{c.metrics.saves}</span>
+                        <span className="text-xs text-purple-400 font-bold">{formatMetric(c.metrics.saves)}</span>
                       </div>
                       <div className="bg-neutral-950 p-1.5 rounded-lg">
                         <span className="text-[10px] text-neutral-500 block">Engajamento</span>
-                        <span className="text-xs text-emerald-400">{formatMetric(c.metrics.engagementRate, { suffix: '%' })}</span>
+                        <span className="text-xs text-emerald-400">{formatMetric(c.metrics.engagementRate ?? engagementFrom(c.metrics), { suffix: '%' })}</span>
                       </div>
                     </div>
                   </div>
@@ -329,10 +333,31 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
             </div>
           ) : (
             <div className="p-6 bg-neutral-900/40 border border-neutral-800 rounded-xl text-center text-xs text-neutral-400 font-mono">
-              Nenhum conteúdo cadastrado para avaliação.
+              Nenhuma publicação neste período. Escolha um período maior ou importe o CSV na aba Métricas.
             </div>
           )}
         </div>
+
+        {underperformingContents.length > 0 && (
+          <div className="space-y-3">
+            <div className="text-xs font-mono uppercase text-rose-300 tracking-wider font-semibold">Abaixo da média: pontos de ajuste</div>
+            <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {underperformingContents.map((c) => (
+                <li key={c.id} className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">{c.format}</span>
+                    <span className="text-neutral-500">{new Date(c.publishedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })}</span>
+                  </div>
+                  <h4 className="text-xs font-semibold text-neutral-100 line-clamp-2">{c.title}</h4>
+                  <p className="text-[11px] text-neutral-400">
+                    {formatMetric(c.metrics.views)} views · {formatMetric(c.metrics.saves)} salvos · eng. {formatMetric(c.metrics.engagementRate ?? engagementFrom(c.metrics), { suffix: '%' })}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-neutral-500">Compare gancho, formato e horário destes posts com os do topo antes de repetir o tema.</p>
+          </div>
+        )}
       </div>
     </div>
   );

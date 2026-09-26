@@ -86,3 +86,11 @@ describe('variáveis de ambiente', () => {
     delete process.env.GEMINI_API_KEY;
   });
 });
+
+describe('cookie de sessão malformado', () => {
+  it('é tratado como sem sessão, sem lançar erro', async () => {
+    const { readCookie } = await import('../server/auth/session');
+    const req = new Request('http://localhost/api/session', { headers: { cookie: 'gs_session=%E0%A4%A' } });
+    expect(readCookie(req, 'gs_session')).toBeNull();
+  });
+});

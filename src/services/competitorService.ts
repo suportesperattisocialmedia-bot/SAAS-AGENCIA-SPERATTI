@@ -7,7 +7,9 @@
  * Similarity score and metrics default to null until real evidence is verified.
  */
 
-import { Client, Competitor, CompetitorStatus, ContentFormat } from '../types';
+import { formatDateBR } from '../utils/dates';
+
+import { Client, Competitor, ContentFormat } from '../types';
 import { storageService } from './storageService';
 import { logger } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
@@ -238,7 +240,7 @@ export const competitorService = {
             recentThemes: [],
             notes: c.evidence ? `Evidência: ${c.evidence}` : '',
             status: 'candidate',
-            candidateReason: `Encontrado em ${c.source} em ${new Date(c.retrievedAt).toLocaleDateString('pt-BR')}.`,
+            candidateReason: `Encontrado em ${c.source} em ${formatDateBR(c.retrievedAt)}.`,
             evidenceUrl: c.sourceUrl
           })
         );

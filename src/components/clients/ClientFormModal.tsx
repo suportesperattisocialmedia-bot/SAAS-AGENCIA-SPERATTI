@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { Client, ContentFormat, HealthStatus } from '../../types';
-import { Plus, X, Check, AlertCircle } from 'lucide-react';
+import { Plus, Check, AlertCircle } from 'lucide-react';
 
 interface ClientFormModalProps {
   isOpen: boolean;

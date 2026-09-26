@@ -27,7 +27,6 @@ interface ClientOverviewTabProps {
 }
 
 export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
-  client,
   snapshots,
   contents,
   alerts,

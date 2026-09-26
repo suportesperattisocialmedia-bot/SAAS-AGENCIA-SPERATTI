@@ -9,14 +9,9 @@ import {
   Swords,
   Search,
   Plus,
-  CheckCircle2,
-  XCircle,
   ExternalLink,
   Sparkles,
-  TrendingUp,
-  AlertCircle,
-  Clock
-} from 'lucide-react';
+  TrendingUp} from 'lucide-react';
 import { formatMetric } from '../../utils/metrics';
 
 interface CompetitorTabProps {

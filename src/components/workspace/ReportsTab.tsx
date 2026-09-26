@@ -1,3 +1,4 @@
+import { formatDateBR } from '../../utils/dates';
 import React, { useState } from 'react';
 import { Client, Report, Content, AccountSnapshot } from '../../types';
 import { reportService } from '../../services/reportService';
@@ -6,9 +7,7 @@ import {
   FileText,
   Printer,
   Download,
-  Calendar,
   Sparkles,
-  TrendingUp,
   CheckCircle2,
   Bookmark,
   Share2,
@@ -163,7 +162,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             </div>
 
             <div className="text-[10px] text-neutral-500 font-mono text-right">
-              Gerado em: {new Date(activeReport.generatedAt).toLocaleDateString('pt-BR')}
+              Gerado em: {formatDateBR(activeReport.generatedAt)}
             </div>
           </div>
 
@@ -251,11 +250,11 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       </span>
                       <span className="flex items-center gap-1">
                         <Bookmark className="w-3 h-3 text-purple-400" />
-                        {content.metrics.saves}
+                        {formatMetric(content.metrics.saves)}
                       </span>
                       <span className="flex items-center gap-1">
                         <Share2 className="w-3 h-3 text-amber-400" />
-                        {content.metrics.shares}
+                        {formatMetric(content.metrics.shares)}
                       </span>
                     </div>
                   </div>

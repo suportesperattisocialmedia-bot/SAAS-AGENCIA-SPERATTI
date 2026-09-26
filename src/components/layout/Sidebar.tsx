@@ -12,7 +12,6 @@ import {
   Settings,
   ShieldCheck,
   LogOut,
-  ChevronRight,
   Database
 } from 'lucide-react';
 import { Client } from '../../types';

@@ -24,7 +24,6 @@ import {
   SyncLog,
   AIAnalysis,
   ResearchInsight,
-  ResearchRun,
   DeliveryTask,
   TaskStatus
 } from '../types';

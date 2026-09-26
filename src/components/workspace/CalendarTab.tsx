@@ -5,14 +5,9 @@ import { notificationService } from '../../services/notificationService';
 import { normalizeWeekDay } from '../../services/storage/migration';
 import { Modal } from '../common/Modal';
 import {
-  Calendar,
   Plus,
   Trash2,
-  Clock,
-  Layers,
-  CheckCircle2,
-  MoveRight
-} from 'lucide-react';
+  Clock} from 'lucide-react';
 
 interface CalendarTabProps {
   client: Client;

@@ -29,7 +29,6 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   height = 240,
   valueFormatter = (v) => v.toLocaleString('pt-BR'),
   lineColor = '#f59e0b', // amber-500
-  fillColor = 'rgba(245, 158, 11, 0.12)',
   primaryLabel = 'Métrica',
   secondaryLabel
 }) => {

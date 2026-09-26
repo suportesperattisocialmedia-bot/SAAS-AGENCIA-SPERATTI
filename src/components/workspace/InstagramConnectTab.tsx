@@ -1,3 +1,4 @@
+import { formatDateTimeBR } from '../../utils/dates';
 import React, { useEffect, useState } from 'react';
 import { Client, InstagramAccount } from '../../types';
 import { instagramService } from '../../services/instagramService';
@@ -26,7 +27,7 @@ const SCOPE_LABELS: Record<string, string> = {
 
 function formatDateTime(value?: string | null): string {
   if (!value) return 'Nunca';
-  return new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return formatDateTimeBR(value);
 }
 
 export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client, account, onRefreshAccount, onSync, isSyncing }) => {

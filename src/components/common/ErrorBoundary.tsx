@@ -4,7 +4,7 @@
  * Prevents white screen and allows graceful recovery
  */
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertOctagon, RotateCcw } from 'lucide-react';
 import { logger } from '../../utils/logger';
 

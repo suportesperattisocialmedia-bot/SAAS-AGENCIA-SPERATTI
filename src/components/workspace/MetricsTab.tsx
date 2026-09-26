@@ -1,3 +1,4 @@
+import { formatDateTimeBR } from '../../utils/dates';
 import React, { useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Circle, Download, ExternalLink, FileUp, Info, Loader2, UserPlus } from 'lucide-react';
 import type { AccountSnapshot, Client, Content } from '../../types';
@@ -353,7 +354,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
                   <tbody className="divide-y divide-neutral-800 text-neutral-300">
                     {preview.posts.slice(0, 8).map((p) => (
                       <tr key={p.key}>
-                        <td className="px-3 py-2 whitespace-nowrap">{p.publishedAt ? new Date(p.publishedAt).toLocaleDateString('pt-BR') : 'n/d'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{p.publishedAt ? formatDateTimeBR(p.publishedAt) : 'n/d'}</td>
                         <td className="px-3 py-2">{p.format}</td>
                         <td className="px-3 py-2 max-w-[220px] truncate">{p.caption || '(sem legenda)'}</td>
                         {[p.views, p.reach, p.likes, p.comments, p.saves, p.shares].map((v, i) => (

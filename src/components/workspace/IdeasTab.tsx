@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Client, ContentIdea, PipelineStatus, Content, HookTemplate, WeekDay } from '../../types';
+import { Client, ContentIdea, PipelineStatus, Content} from '../../types';
 import { HOOK_CATEGORIES, HOOK_TEMPLATES } from '../../data/hookBank';
 import { buildIdeasPrompt, parseIdeasResponse } from '../../ai/manualPrompts';
 import { ManualAiModal } from '../common/ManualAiModal';
@@ -8,18 +8,9 @@ import { notificationService } from '../../services/notificationService';
 import { normalizeWeekDay, weekDayLabel } from '../../services/storage/migration';
 import { Modal } from '../common/Modal';
 import {
-  Lightbulb,
   Sparkles,
-  Plus,
-  ArrowRight,
   BookOpen,
-  CheckCircle2,
-  Copy,
-  Clock,
-  Calendar,
-  Layers,
-  Target
-} from 'lucide-react';
+  Copy} from 'lucide-react';
 
 interface IdeasTabProps {
   client: Client;

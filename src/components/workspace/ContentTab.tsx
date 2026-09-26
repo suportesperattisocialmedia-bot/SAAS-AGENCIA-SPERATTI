@@ -2,20 +2,11 @@ import React, { useState } from 'react';
 import { Client, Content } from '../../types';
 import { Modal } from '../common/Modal';
 import {
-  Layers,
   Sparkles,
   Eye,
   Bookmark,
   Share2,
-  Heart,
-  MessageSquare,
-  Filter,
-  CheckCircle2,
-  AlertCircle,
-  Lightbulb,
-  ExternalLink,
-  Plus
-} from 'lucide-react';
+  CheckCircle2} from 'lucide-react';
 import { formatMetric } from '../../utils/metrics';
 
 interface ContentTabProps {
@@ -25,9 +16,7 @@ interface ContentTabProps {
 }
 
 export const ContentTab: React.FC<ContentTabProps> = ({
-  client,
-  contents,
-  onAddContent
+  contents
 }) => {
   const [selectedFormat, setSelectedFormat] = useState<string>('all');
   const [selectedPillar, setSelectedPillar] = useState<string>('all');

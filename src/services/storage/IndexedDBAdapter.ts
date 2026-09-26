@@ -17,6 +17,11 @@ export class IndexedDBAdapter implements StorageAdapter {
   private isSupported = false;
   private initPromise: Promise<void> | null = null;
 
+  /** Resolve quando o cache em memória foi carregado do IndexedDB (ou quando não há IndexedDB). */
+  ready(): Promise<void> {
+    return this.initPromise ?? Promise.resolve();
+  }
+
   constructor() {
     this.isSupported = typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
     if (this.isSupported) {

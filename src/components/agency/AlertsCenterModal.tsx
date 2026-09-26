@@ -1,17 +1,12 @@
+import { formatDateBR } from '../../utils/dates';
 import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
-import { Alert, Client, AlertSeverity, AlertStatus } from '../../types';
+import { Alert, Client, AlertSeverity} from '../../types';
 import { storageService } from '../../services/storageService';
 import { alertEngine } from '../../services/alerts/alertEngine';
 import {
-  AlertTriangle,
   CheckCircle2,
-  Trash2,
-  ExternalLink,
-  ShieldCheck,
-  TrendingUp,
-  Clock
-} from 'lucide-react';
+  Trash2} from 'lucide-react';
 
 interface AlertsCenterModalProps {
   isOpen: boolean;
@@ -119,7 +114,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
                 <div>
                   <div className="flex items-center justify-between text-[10px] font-mono mb-1">
                     <span className="font-bold uppercase tracking-wider">{alert.type.replace('_', ' ')}</span>
-                    <span className="text-neutral-400">{new Date(alert.createdAt).toLocaleDateString('pt-BR')}</span>
+                    <span className="text-neutral-400">{formatDateBR(alert.createdAt)}</span>
                   </div>
 
                   <h5 className="text-xs font-bold text-neutral-100">
