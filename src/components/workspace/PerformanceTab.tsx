@@ -118,7 +118,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-amber-400" />
-              <span>Análise de Performance & Métricas Rigorosas</span>
+              <span>Performance do período</span>
             </h2>
             <ProvenanceBadge type="CALCULATED_DATA" />
           </div>
@@ -276,10 +276,10 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
           <div>
             <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>Ranqueamento de Publicações</span>
+              <span>Ranking de publicações</span>
             </h3>
             <p className="text-xs text-neutral-400 mt-0.5">
-              Identificação matemática de conteúdos com maior tração e pontos de ajuste
+              Posts com melhor e pior resultado no período escolhido
             </p>
           </div>
 

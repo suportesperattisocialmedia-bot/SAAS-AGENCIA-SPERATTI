@@ -161,6 +161,8 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
           );
         })}
       </div>
+      {/* Título da aba aberta para leitores de tela (hierarquia h1 > h2 > h3). */}
+      <h2 className="sr-only">{tabs.find((t) => t.id === activeTab)?.label}</h2>
     </div>
   );
 };

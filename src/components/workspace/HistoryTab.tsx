@@ -52,7 +52,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
             </span>
           </h3>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Dados preservados cronologicamente sem sobrescrita de datas passadas
+            Todos os registros do cliente, do mais antigo ao mais recente
           </p>
         </div>
 

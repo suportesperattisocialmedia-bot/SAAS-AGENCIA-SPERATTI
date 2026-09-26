@@ -8,6 +8,8 @@ interface LoginScreenProps {
   status: BackendStatus | null;
   onLogin: (email: string, password: string) => Promise<void>;
   onExploreDemo: () => void;
+  /** Aviso extra (ex.: sessão expirada). */
+  sessionNotice?: string | null;
 }
 
 function backendNotice(status: BackendStatus | null): string | null {
@@ -20,14 +22,14 @@ function backendNotice(status: BackendStatus | null): string | null {
   return null;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExploreDemo }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExploreDemo, sessionNotice }) => {
   const reduceMotion = useReducedMotion();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const notice = backendNotice(status);
+  const notice = sessionNotice ?? backendNotice(status);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

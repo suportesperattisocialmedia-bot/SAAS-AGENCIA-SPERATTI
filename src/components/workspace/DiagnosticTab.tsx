@@ -33,14 +33,14 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-neutral-100">
-              Diagnóstico Estratégico Profundo da Conta
+              Diagnóstico da conta
             </h3>
             <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-purple-500/30 text-purple-400 bg-purple-950/20">
               ANÁLISE POR IA EXTERNA
             </span>
           </div>
           <p className="text-xs text-neutral-400 mt-1">
-            Auditoria multidimensional do perfil {client.instagram}: Perfil, Conteúdo, Performance e Estratégia
+            Perfil, conteúdo, performance e estratégia de {client.instagram}
           </p>
         </div>
 

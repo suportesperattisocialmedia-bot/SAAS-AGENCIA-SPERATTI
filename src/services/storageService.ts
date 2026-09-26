@@ -294,6 +294,29 @@ export const storageService = {
       return this.create(contentData);
     },
 
+    /** Grava vários posts com uma única leitura e uma única escrita (importações grandes). */
+    upsertMany(list: Array<Omit<Content, 'id'> & { id?: string }>): { created: number; updated: number } {
+      const all = this.getAll();
+      const index = new Map(all.map((c, i) => [`${c.clientId}|${c.instagramMediaId ?? ''}`, i]));
+      const now = new Date().toISOString();
+      const fresh: Content[] = [];
+      let updated = 0;
+      for (const data of list) {
+        const i = data.instagramMediaId ? index.get(`${data.clientId}|${data.instagramMediaId}`) : undefined;
+        if (i === -1) continue; // mesmo post repetido neste lote
+        if (i !== undefined) {
+          all[i] = ContentSchema.parse({ ...all[i], ...data, id: all[i].id, updatedAt: now }) as Content;
+          updated++;
+        } else {
+          const created = ContentSchema.parse({ ...data, id: data.id || `content-${generateUUID()}`, createdAt: data.createdAt || now, updatedAt: now }) as Content;
+          fresh.push(created);
+          if (created.instagramMediaId) index.set(`${created.clientId}|${created.instagramMediaId}`, -1);
+        }
+      }
+      storageFactory.getAdapter('contents').setCollection(KEYS.CONTENTS, [...fresh, ...all]);
+      return { created: fresh.length, updated };
+    },
+
     update(id: string, updates: Partial<Content>): Content | null {
       const all = this.getAll();
       const index = all.findIndex(c => c.id === id);

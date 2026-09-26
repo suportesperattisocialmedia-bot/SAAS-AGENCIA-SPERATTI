@@ -52,23 +52,23 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
     const matchedClients = clients.filter(
       c => c.name.toLowerCase().includes(q) || c.instagram.toLowerCase().includes(q) || c.segment.toLowerCase().includes(q)
-    );
+    ).slice(0, 20);
 
     const matchedContents = contents.filter(
       c => c.title.toLowerCase().includes(q) || c.hook.toLowerCase().includes(q) || c.pillar.toLowerCase().includes(q)
-    );
+    ).slice(0, 20);
 
     const matchedIdeas = ideas.filter(
       i => i.title.toLowerCase().includes(q) || i.hook.toLowerCase().includes(q) || i.pillar.toLowerCase().includes(q)
-    );
+    ).slice(0, 20);
 
     const matchedCompetitors = competitors.filter(
       c => c.name.toLowerCase().includes(q) || c.instagram.toLowerCase().includes(q)
-    );
+    ).slice(0, 20);
 
     const matchedReports = reports.filter(
       r => r.title.toLowerCase().includes(q) || r.clientName.toLowerCase().includes(q)
-    );
+    ).slice(0, 20);
 
     const clientName = new Map(clients.map((c) => [c.id, c.name.toLowerCase()]));
     const matchedTasks = tasks.filter(

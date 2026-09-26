@@ -69,7 +69,7 @@ export const BootLoader: React.FC<BootLoaderProps> = ({ error, onRetry }) => {
 
         <div className="flex items-center justify-center gap-1.5 text-[10px] text-neutral-500 tabular-nums pt-4 border-t border-white/[0.04]">
           <Shield className="w-3 h-3 text-emerald-400/70" />
-          <span>Storage Schema v2 · Separação Rigorosa de Dados</span>
+          <span>Carregando seus dados</span>
         </div>
       </div>
     </div>

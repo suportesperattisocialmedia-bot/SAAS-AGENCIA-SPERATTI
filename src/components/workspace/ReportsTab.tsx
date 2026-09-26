@@ -84,10 +84,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
         <div>
           <h2 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
             <FileText className="w-4 h-4 text-amber-400" />
-            <span>Gerador de Relatórios Executivos</span>
+            <span>Relatórios para o cliente</span>
           </h2>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Documentos consolidados de inteligência de marketing para apresentação a clientes
+            Gere o relatório do período e baixe em PDF ou CSV
           </p>
         </div>
 

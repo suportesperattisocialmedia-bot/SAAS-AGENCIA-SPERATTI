@@ -148,13 +148,13 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#161618] border border-white/[0.06] rounded-[24px] p-4">
         <div>
           <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-            <span>Inteligência Competitiva & Benchmarking</span>
+            <span>Concorrentes</span>
             <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-white/[0.1] text-neutral-400 bg-white/[0.03]">
               {approvedCompetitors.length} monitorados
             </span>
           </h3>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Mapeamento analítico de players diretos no segmento de {client.segment}
+            Concorrentes diretos no segmento de {client.segment}
           </p>
         </div>
 
@@ -251,11 +251,11 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
           <div className="flex items-center gap-2">
             <Swords className="w-4 h-4 text-amber-400" />
             <h4 className="text-sm font-bold text-neutral-200">
-              Matriz Comparativa de Mercado (Cliente vs Concorrentes)
+              Comparativo: cliente x concorrentes
             </h4>
           </div>
           <span className="text-[10px] tabular-nums text-neutral-400">
-            Dados Fatuais · Sem métricas arbitrariamente inventadas
+            Campos sem dado aparecem como n/d
           </span>
         </div>
 

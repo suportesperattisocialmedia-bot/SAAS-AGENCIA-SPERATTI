@@ -113,9 +113,9 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
           <ChartArea
             data={chartData}
             title="Crescimento Histórico de Seguidores"
-            subtitle="Snapshots diários consolidados sem sobrescrita de dados"
-            primaryLabel="Seguidores Reais"
-            valueFormatter={(val) => `${val.toLocaleString('pt-BR')} seg.`}
+            subtitle="Evolução dos seguidores registrados"
+            primaryLabel="Seguidores"
+            valueFormatter={(val) => val.toLocaleString('pt-BR')}
             height={240}
             lineColor="#f59e0b"
           />

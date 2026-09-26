@@ -112,7 +112,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#161618] border border-white/[0.06] rounded-[24px] p-4">
         <div>
           <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-            <span>Banco de Ideias & Pipeline de Produção</span>
+            <span>Banco de ideias</span>
             <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-white/[0.1] text-neutral-400 bg-white/[0.03]">
               {ideas.length} ideias no pipeline
             </span>

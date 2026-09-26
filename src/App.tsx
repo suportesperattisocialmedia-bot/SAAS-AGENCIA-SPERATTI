@@ -6,7 +6,7 @@
  * Aplicação Interna de Inteligência, Estratégia e Operação de Marketing Digital
  */
 
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import {
   Client,
   InstagramAccount,
@@ -28,7 +28,7 @@ import { migrationEngine } from './services/storage/migration';
 import { indexedDBAdapter } from './services/storage/IndexedDBAdapter';
 import { logger } from './utils/logger';
 import { sessionService, type BackendStatus, type SessionUser } from './services/sessionService';
-import { describeApiError } from './services/api/apiClient';
+import { describeApiError, onSessionExpired } from './services/api/apiClient';
 import { DemoProvider } from './services/demo/DemoProvider';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { ManualAiModal } from './components/common/ManualAiModal';
@@ -114,6 +114,21 @@ export default function App() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [dashboardKey, setDashboardKey] = useState(0);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+
+  // Sessão expirou no meio do uso: volta ao login com aviso (os dados deste navegador ficam salvos).
+  const sessionUserRef = useRef<SessionUser | null>(null);
+  sessionUserRef.current = sessionUser;
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        if (!sessionUserRef.current) return;
+        setSessionNotice('Sua sessão expirou. Entre novamente para continuar; os dados deste navegador estão salvos.');
+        setSessionUser(null);
+        setActiveClient(null);
+      }),
+    []
+  );
   const [alertsModalOpen, setAlertsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
@@ -545,12 +560,14 @@ export default function App() {
       <>
         <LoginScreen
           status={backendStatus}
+          sessionNotice={sessionNotice}
           onLogin={async (email, password) => {
             try {
               await sessionService.login(email, password);
             } catch (err) {
               throw new Error(describeApiError(err, 'Não foi possível entrar.'));
             }
+            setSessionNotice(null);
             await initializeApplication();
           }}
           onExploreDemo={() => {

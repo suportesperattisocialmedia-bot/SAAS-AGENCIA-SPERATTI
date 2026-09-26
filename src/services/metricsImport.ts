@@ -165,6 +165,8 @@ export function parseNumber(raw: string | undefined): number | null {
   if (!v || /^(-|—|n\/?d|na|null|--)$/i.test(v)) return null;
   const multiplier = /mil$/i.test(v) ? 1000 : /k$/i.test(v) ? 1000 : /m$/i.test(v) ? 1_000_000 : 1;
   v = v.replace(/(mil|k|m)$/i, '');
+  // Texto que não é número (ex.: "abc", "1e9") vira n/d; nunca um 0 ou valor inventado.
+  if (!/\d/.test(v) || /[a-z]/i.test(v)) return null;
   const hasComma = v.includes(',');
   const hasDot = v.includes('.');
   if (hasComma && hasDot) {
@@ -240,16 +242,24 @@ export function buildPreview(text: string, mappingOverride?: ColumnMapping): Imp
   else if (missing.length) warnings.push(`Colunas não encontradas (ficarão como n/d): ${missing.map((f) => FIELD_LABELS[f]).join(', ')}.`);
 
   let skipped = 0;
+  let skippedNoDate = 0;
   const posts: ParsedPost[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
     const publishedAt = parseDate(cell(row, 'publishedAt'), dayFirst);
-    const permalink = cell(row, 'permalink')?.trim() || null;
+    // Só links web (http/https); qualquer outra coisa é descartada.
+    const rawLink = cell(row, 'permalink')?.trim() || null;
+    const permalink = rawLink && /^https?:\/\//i.test(rawLink) ? rawLink : null;
     const externalId = cell(row, 'externalId')?.trim() || null;
     const caption = (cell(row, 'caption') ?? '').trim();
     // Linhas de total/resumo ou sem identificação mínima são ignoradas.
     if (!publishedAt && !permalink && !externalId) {
       skipped++;
+      continue;
+    }
+    // Sem data válida o post não entra: inventar "hoje" distorceria as métricas da semana.
+    if (!publishedAt) {
+      skippedNoDate++;
       continue;
     }
     const key = externalId || permalink || `${publishedAt}-${hashKey(caption)}`;
@@ -273,42 +283,45 @@ export function buildPreview(text: string, mappingOverride?: ColumnMapping): Imp
       saves: parseNumber(cell(row, 'saves'))
     });
   }
-  if (posts.length > 0 && posts.every((p) => !p.publishedAt)) warnings.push('Nenhuma data válida encontrada; os posts serão salvos com a data de hoje.');
+  if (skippedNoDate > 0) {
+    warnings.push(
+      `${skippedNoDate} linha(s) sem data de publicação válida foram ignoradas. ${mapping.publishedAt === undefined ? 'Escolha a coluna de data abaixo.' : 'Confira a coluna de data.'}`
+    );
+  }
+  skipped += skippedNoDate;
   return { headers, rows, mapping, posts, skipped, warnings };
 }
 
 /** Grava os posts no workspace do cliente. Idempotente: reimportar atualiza em vez de duplicar. */
 export function importPosts(client: Client, posts: ParsedPost[]): { created: number; updated: number } {
-  let created = 0;
-  let updated = 0;
   const existing = storageService.contents.getByClient(client.id);
-  const now = new Date().toISOString();
-  for (const p of posts) {
-    const mediaKey = `import:${p.key}`;
-    const current = existing.find((c) => c.instagramMediaId === mediaKey || (p.externalId && c.instagramMediaId === p.externalId));
-    const firstLine = p.caption.split('\n')[0]?.trim() ?? '';
-    const metrics = { views: p.views, reach: p.reach, likes: p.likes, comments: p.comments, shares: p.shares, saves: p.saves };
-    const content: Omit<Content, 'id'> & { id?: string } = {
-      id: current?.id,
-      clientId: client.id,
-      instagramMediaId: current?.instagramMediaId ?? mediaKey,
-      permalink: p.permalink ?? undefined,
-      title: firstLine.length > 3 ? firstLine.slice(0, 80) : `Publicação (${p.format})`,
-      caption: p.caption,
-      publishedAt: p.publishedAt ?? now,
-      format: p.format,
-      pillar: current?.pillar ?? 'Geral',
-      objective: current?.objective ?? 'Engajamento',
-      hook: current?.hook || firstLine.slice(0, 120),
-      cta: current?.cta ?? '',
-      aiAnalysis: current?.aiAnalysis,
-      metrics: { ...metrics, engagementRate: engagementFrom(metrics) }
-    };
-    storageService.contents.upsert(content);
-    if (current) updated++;
-    else created++;
-  }
-  return { created, updated };
+  const byExternal = new Map(existing.filter((c) => c.instagramMediaId).map((c) => [c.instagramMediaId as string, c]));
+  const list = posts
+    .filter((p) => p.publishedAt)
+    .map((p) => {
+      const mediaKey = `import:${p.key}`;
+      const current = byExternal.get(mediaKey) ?? (p.externalId ? byExternal.get(p.externalId) : undefined);
+      const firstLine = p.caption.split('\n')[0]?.trim() ?? '';
+      const metrics = { views: p.views, reach: p.reach, likes: p.likes, comments: p.comments, shares: p.shares, saves: p.saves };
+      const content: Omit<Content, 'id'> & { id?: string } = {
+        id: current?.id,
+        clientId: client.id,
+        instagramMediaId: current?.instagramMediaId ?? mediaKey,
+        permalink: p.permalink ?? undefined,
+        title: firstLine.length > 3 ? firstLine.slice(0, 80) : `Publicação (${p.format})`,
+        caption: p.caption,
+        publishedAt: p.publishedAt as string,
+        format: p.format,
+        pillar: current?.pillar ?? 'Geral',
+        objective: current?.objective ?? 'Engajamento',
+        hook: current?.hook || firstLine.slice(0, 120),
+        cta: current?.cta ?? '',
+        aiAnalysis: current?.aiAnalysis,
+        metrics: { ...metrics, engagementRate: engagementFrom(metrics) }
+      };
+      return content;
+    });
+  return storageService.contents.upsertMany(list);
 }
 
 export const TEMPLATE_CSV =

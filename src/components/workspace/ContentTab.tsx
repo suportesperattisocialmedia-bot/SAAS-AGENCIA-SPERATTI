@@ -21,6 +21,9 @@ export const ContentTab: React.FC<ContentTabProps> = ({
   const [selectedFormat, setSelectedFormat] = useState<string>('all');
   const [selectedPillar, setSelectedPillar] = useState<string>('all');
   const [activeContent, setActiveContent] = useState<Content | null>(null);
+  // Contas com muitos posts: renderiza em blocos para a aba abrir rápido.
+  const PAGE = 60;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
 
   const filteredContents = contents.filter(c => {
     if (selectedFormat !== 'all' && c.format !== selectedFormat) return false;
@@ -50,7 +53,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
             <span className="text-neutral-500 text-[11px]">Formato:</span>
             <select aria-label="Filtrar por formato"
               value={selectedFormat}
-              onChange={(e) => setSelectedFormat(e.target.value)}
+              onChange={(e) => { setSelectedFormat(e.target.value); setVisibleCount(PAGE); }}
               className="bg-transparent text-amber-300 font-semibold focus:outline-hidden cursor-pointer"
             >
               {formats.map(f => (
@@ -66,7 +69,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
             <span className="text-neutral-500 text-[11px]">Pilar:</span>
             <select aria-label="Filtrar por pilar"
               value={selectedPillar}
-              onChange={(e) => setSelectedPillar(e.target.value)}
+              onChange={(e) => { setSelectedPillar(e.target.value); setVisibleCount(PAGE); }}
               className="bg-transparent text-amber-300 font-semibold focus:outline-hidden cursor-pointer"
             >
               {pillars.map(p => (
@@ -81,7 +84,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
 
       {/* Contents Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredContents.map(content => (
+        {filteredContents.slice(0, visibleCount).map(content => (
           <div
             key={content.id}
             onClick={() => setActiveContent(content)}
@@ -165,6 +168,18 @@ export const ContentTab: React.FC<ContentTabProps> = ({
           </div>
         ))}
       </div>
+
+      {filteredContents.length > visibleCount && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((n) => n + PAGE)}
+            className="rounded-full bg-white/[0.06] px-5 py-2.5 text-sm font-medium text-neutral-200 transition-colors hover:bg-white/[0.1]"
+          >
+            Mostrar mais ({filteredContents.length - visibleCount} restantes)
+          </button>
+        </div>
+      )}
 
       {/* Content AI Diagnosis Modal */}
       {activeContent && (

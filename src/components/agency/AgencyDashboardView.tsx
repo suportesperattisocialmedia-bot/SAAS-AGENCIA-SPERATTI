@@ -244,6 +244,9 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Título da seção para leitores de tela (h1 > h2 > h3). */}
+      <h2 className="sr-only">{mode === 'tasks' ? 'Minhas tarefas' : 'Resumo'}</h2>
+
       {allClients.length > 0 && !isDemo && (backupDays === null || backupDays > 7) && (
         <div className="flex flex-col gap-3 rounded-[22px] border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-3 text-sm text-neutral-200">

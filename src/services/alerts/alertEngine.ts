@@ -114,58 +114,67 @@ export const alertEngine = {
       }
     }
 
-    // Rule 2: Period Comparisons (only if we have >= 14 days of snapshots)
-    if (snapshots.length >= 14) {
-      const summary = analyticsService.calculatePeriod(snapshots, 7);
+    // Regra 2: comparação semanal (últimos 7 dias vs 7 anteriores).
+    // Usa snapshots da conta ou, no fluxo por CSV, a soma dos posts importados e os seguidores registrados.
+    const summary = analyticsService.calculatePeriod(snapshots, 7, undefined, contents);
+    const postsNow = summary.postsPublished.current ?? 0;
+    const postsBefore = summary.postsPublished.previous ?? 0;
+    const fromPosts = !snapshots.some((s) => s.views !== null);
 
-      // Performance Drop
-      if (summary.hasPreviousPeriod && summary.totalViews.percentDiff !== null && summary.totalViews.percentDiff < -25) {
-        const title = `Queda de visualizações de ${summary.totalViews.percentDiff}% nos últimos 7 dias`;
-        if (!existing.some(a => a.title === title && a.status !== 'RESOLVED')) {
-          generated.push(
-            this.createAlert({
-              clientId: client.id,
-              clientName: client.name,
-              type: 'QUEDA DE PERFORMANCE',
-              severity: 'high',
-              title,
-              message: `As visualizações caíram de ${summary.totalViews.previous?.toLocaleString('pt-BR')} para ${summary.totalViews.current?.toLocaleString('pt-BR')}.`,
-              calculatedMetricComparison: `${summary.totalViews.percentDiff}% em relação ao período anterior`,
-              evidence: 'Cálculo determinístico com base nos snapshots diários da Meta API.'
-            })
-          );
-        }
-      }
-
-      // Growth
-      if (summary.hasPreviousPeriod && summary.followersGrowth.percentDiff !== null && summary.followersGrowth.percentDiff > 5) {
-        const title = `Crescimento expressivo de seguidores (+${summary.followersGrowth.percentDiff}%)`;
-        if (!existing.some(a => a.title === title && a.status !== 'RESOLVED')) {
-          generated.push(
-            this.createAlert({
-              clientId: client.id,
-              clientName: client.name,
-              type: 'CRESCIMENTO',
-              severity: 'medium',
-              title,
-              message: `Ganho líquido de ${summary.followersGrowth.absoluteDiff?.toLocaleString('pt-BR')} seguidores nos últimos 7 dias.`,
-              calculatedMetricComparison: `+${summary.followersGrowth.percentDiff}% no período`,
-              evidence: 'Cálculo determinístico com base na contagem de seguidores.'
-            })
-          );
-        }
+    // Queda: só com base mínima nas duas semanas (evita alarme por semana sem post).
+    if (
+      summary.totalViews.percentDiff !== null &&
+      summary.totalViews.percentDiff < -25 &&
+      (!fromPosts || (postsNow >= 2 && postsBefore >= 2))
+    ) {
+      const title = `Queda de visualizações de ${summary.totalViews.percentDiff}% nos últimos 7 dias`;
+      if (!existing.some(a => a.title === title)) {
+        generated.push(
+          this.createAlert({
+            clientId: client.id,
+            clientName: client.name,
+            type: 'QUEDA DE PERFORMANCE',
+            severity: 'high',
+            title,
+            message: `As visualizações caíram de ${summary.totalViews.previous?.toLocaleString('pt-BR')} para ${summary.totalViews.current?.toLocaleString('pt-BR')}${fromPosts ? ` (${postsBefore} posts na semana anterior, ${postsNow} nesta)` : ''}.`,
+            calculatedMetricComparison: `${summary.totalViews.percentDiff}% em relação à semana anterior`,
+            evidence: fromPosts ? 'Soma das visualizações dos posts importados, por data de publicação.' : 'Snapshots diários da conta.'
+          })
+        );
       }
     }
 
-    // Rule 3: Content above average
-    if (contents.length >= 4) {
-      const withSaves = contents.filter((c): c is typeof c & { metrics: { saves: number } } => typeof c.metrics.saves === 'number');
-      const avgSaves = withSaves.length > 0 ? withSaves.reduce((acc, c) => acc + c.metrics.saves, 0) / withSaves.length : 0;
+    // Crescimento de seguidores (snapshots da API ou registros manuais).
+    if (summary.followersGrowth.previous !== null && summary.followersGrowth.percentDiff !== null && summary.followersGrowth.percentDiff > 5) {
+      const title = `Crescimento expressivo de seguidores (+${summary.followersGrowth.percentDiff}%)`;
+      if (!existing.some(a => a.title === title)) {
+        generated.push(
+          this.createAlert({
+            clientId: client.id,
+            clientName: client.name,
+            type: 'CRESCIMENTO',
+            severity: 'medium',
+            title,
+            message: `Ganho líquido de ${summary.followersGrowth.absoluteDiff?.toLocaleString('pt-BR')} seguidores na última semana.`,
+            calculatedMetricComparison: `+${summary.followersGrowth.percentDiff}% no período`,
+            evidence: 'Comparação entre os registros de seguidores.'
+          })
+        );
+      }
+    }
 
-      withSaves.forEach(c => {
-        if (withSaves.length >= 4 && c.metrics.saves > avgSaves * 2.5 && c.metrics.saves >= 50) {
+    // Regra 3: posts recentes (30 dias) muito acima da média de salvamentos. No máximo 3 por avaliação.
+    const withSaves = contents.filter((c): c is typeof c & { metrics: { saves: number } } => typeof c.metrics.saves === 'number');
+    if (withSaves.length >= 4) {
+      const avgSaves = withSaves.reduce((acc, c) => acc + c.metrics.saves, 0) / withSaves.length;
+      const since = Date.now() - 30 * 24 * 3600 * 1000;
+      withSaves
+        .filter((c) => Date.parse(c.publishedAt) >= since && c.metrics.saves > avgSaves * 2.5 && c.metrics.saves >= 50)
+        .sort((x, y) => y.metrics.saves - x.metrics.saves)
+        .slice(0, 3)
+        .forEach((c) => {
           const title = `Conteúdo "${c.title}" superou média de salvamentos`;
-          if (!existing.some(a => a.title === title && a.status !== 'RESOLVED')) {
+          if (!existing.some(a => a.title === title)) {
             generated.push(
               this.createAlert({
                 clientId: client.id,
@@ -178,8 +187,7 @@ export const alertEngine = {
               })
             );
           }
-        }
-      });
+        });
     }
 
     return generated;
