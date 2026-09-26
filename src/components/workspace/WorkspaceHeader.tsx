@@ -15,8 +15,7 @@ import {
   FileText,
   History,
   Activity,
-  Link2
-} from 'lucide-react';
+  Link2, BookMarked } from 'lucide-react';
 import { ConnectionBadge } from '../common/ConnectionBadge';
 
 export type WorkspaceSubTab =
@@ -29,6 +28,7 @@ export type WorkspaceSubTab =
   | 'competitors'
   | 'research'
   | 'ideas'
+  | 'library'
   | 'calendar'
   | 'reports'
   | 'history';
@@ -69,6 +69,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
     { id: 'competitors', label: 'Concorrentes', icon: <Swords className="w-3.5 h-3.5" /> },
     { id: 'research', label: 'Pesquisa', icon: <Search className="w-3.5 h-3.5" /> },
     { id: 'ideas', label: 'Banco de Ideias', icon: <Lightbulb className="w-3.5 h-3.5" /> },
+    { id: 'library', label: 'Biblioteca', icon: <BookMarked className="w-3.5 h-3.5" /> },
     { id: 'calendar', label: 'Calendário', icon: <Calendar className="w-3.5 h-3.5" /> },
     { id: 'reports', label: 'Relatórios', icon: <FileText className="w-3.5 h-3.5" /> },
     { id: 'history', label: 'Histórico', icon: <History className="w-3.5 h-3.5" /> }

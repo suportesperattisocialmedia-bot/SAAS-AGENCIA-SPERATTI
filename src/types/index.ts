@@ -508,4 +508,31 @@ export interface DeliveryTask {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  /** Legenda/texto que o cliente vê no portal de aprovação (as notas continuam internas). */
+  clientCopy?: string;
+  /** Link da arte/vídeo (Drive, Canva...) mostrado no portal. Só https. */
+  previewUrl?: string;
+  /** Decisões do cliente no portal de aprovação. */
+  approvals?: TaskApproval[];
+}
+
+export interface TaskApproval {
+  at: string;
+  decision: 'approved' | 'changes';
+  comment?: string;
+}
+
+export type SnippetKind = 'legenda' | 'hashtags' | 'cta' | 'gancho';
+
+/** Biblioteca de textos reutilizáveis (legendas, grupos de hashtags, CTAs, ganchos). */
+export interface Snippet {
+  id: string;
+  /** Ausente = vale para todos os clientes. */
+  clientId?: string;
+  kind: SnippetKind;
+  title: string;
+  text: string;
+  uses: number;
+  createdAt: string;
+  updatedAt: string;
 }

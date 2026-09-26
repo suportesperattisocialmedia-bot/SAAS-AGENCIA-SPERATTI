@@ -364,5 +364,21 @@ export const DeliveryTaskSchema = z.object({
   orderIndex: z.number().default(0),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
-  completedAt: z.string().optional()
+  completedAt: z.string().optional(),
+  clientCopy: z.string().max(5000).optional(),
+  previewUrl: z.string().url().regex(/^https:\/\//i, 'Use um link https://').optional(),
+  approvals: z
+    .array(z.object({ at: z.string().min(1), decision: z.enum(['approved', 'changes']), comment: z.string().optional() }))
+    .optional()
+});
+
+export const SnippetSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1).optional(),
+  kind: z.enum(['legenda', 'hashtags', 'cta', 'gancho']),
+  title: z.string().trim().min(1, 'Dê um nome curto').max(80),
+  text: z.string().trim().min(1, 'Escreva o texto').max(5000),
+  uses: z.number().int().min(0).default(0),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1)
 });

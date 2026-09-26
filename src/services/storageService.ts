@@ -25,7 +25,8 @@ import {
   AIAnalysis,
   ResearchInsight,
   DeliveryTask,
-  TaskStatus
+  TaskStatus,
+  Snippet
 } from '../types';
 import { storageFactory } from './storage/StorageFactory';
 import { defaultStorageAdapter } from './storage/LocalStorageAdapter';
@@ -44,7 +45,8 @@ import {
   SyncLogSchema,
   AIAnalysisRecordSchema,
   ResearchInsightSchema,
-  DeliveryTaskSchema
+  DeliveryTaskSchema,
+  SnippetSchema
 } from '../schemas';
 import { logger } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
@@ -66,7 +68,8 @@ const KEYS = {
   AI_ANALYSES: 'gs_intel_ai_analyses',
   RESEARCH_INSIGHTS: 'gs_intel_research_insights',
   RESEARCH_RUNS: 'gs_intel_research_runs',
-  TASKS: 'gs_intel_tasks'
+  TASKS: 'gs_intel_tasks',
+  SNIPPETS: 'gs_intel_snippets'
 };
 
 /** Chave de armazenamento -> tipo de entidade (define o adaptador). Usado pelo backup. */
@@ -86,7 +89,8 @@ export const BACKUP_COLLECTIONS: Array<{ key: string; entity: Parameters<typeof 
   { key: KEYS.AI_ANALYSES, entity: 'ai_analysis' },
   { key: KEYS.RESEARCH_INSIGHTS, entity: 'research_insights' },
   { key: KEYS.RESEARCH_RUNS, entity: 'research_runs' },
-  { key: KEYS.TASKS, entity: 'tasks' }
+  { key: KEYS.TASKS, entity: 'tasks' },
+  { key: KEYS.SNIPPETS, entity: 'snippets' }
 ];
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -825,6 +829,48 @@ export const storageService = {
     }
   },
 
+  // BIBLIOTECA (legendas, hashtags, CTAs, ganchos)
+  snippets: {
+    getAll(): Snippet[] {
+      return storageFactory.getAdapter('snippets').getCollection<Snippet>(KEYS.SNIPPETS);
+    },
+
+    save(data: Pick<Snippet, 'kind' | 'title' | 'text'> & Partial<Pick<Snippet, 'id' | 'clientId'>>): Snippet {
+      const all = this.getAll();
+      const now = new Date().toISOString();
+      const existing = data.id ? all.find((s) => s.id === data.id) : undefined;
+      const snippet = SnippetSchema.parse({
+        ...existing,
+        ...data,
+        id: existing?.id ?? `snip-${generateUUID()}`,
+        clientId: data.clientId || undefined,
+        uses: existing?.uses ?? 0,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now
+      }) as Snippet;
+      const next = existing ? all.map((s) => (s.id === snippet.id ? snippet : s)) : [snippet, ...all];
+      storageFactory.getAdapter('snippets').setCollection(KEYS.SNIPPETS, next);
+      return snippet;
+    },
+
+    /** Conta um uso (copiar). Não mexe em updatedAt para não "ganhar" mesclagens por isso. */
+    markUsed(id: string): void {
+      const all = this.getAll();
+      storageFactory
+        .getAdapter('snippets')
+        .setCollection(KEYS.SNIPPETS, all.map((s) => (s.id === id ? { ...s, uses: s.uses + 1 } : s)));
+    },
+
+    delete(id: string): void {
+      storageFactory.getAdapter('snippets').setCollection(KEYS.SNIPPETS, this.getAll().filter((s) => s.id !== id));
+    },
+
+    restore(snippet: Snippet): void {
+      const all = this.getAll().filter((s) => s.id !== snippet.id);
+      storageFactory.getAdapter('snippets').setCollection(KEYS.SNIPPETS, [SnippetSchema.parse(snippet) as Snippet, ...all]);
+    }
+  },
+
   // CASCADE DELETE GUARANTEE (FASE 17)
   deleteClientCascade(clientId: string): boolean {
     logger.warn(`Executing complete cascade delete for client ${clientId}...`);
@@ -884,6 +930,9 @@ export const storageService = {
 
     // 14. Delete Tasks (CRM de entregas)
     storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, this.tasks.getAll().filter(t => t.clientId !== clientId));
+
+    // 15. Biblioteca do cliente (textos gerais ficam)
+    storageFactory.getAdapter('snippets').setCollection(KEYS.SNIPPETS, this.snippets.getAll().filter(s => s.clientId !== clientId));
 
     logger.info(`Cascade delete completed cleanly for client ${clientId}.`);
     return true;

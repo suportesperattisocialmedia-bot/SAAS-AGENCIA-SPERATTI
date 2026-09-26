@@ -41,7 +41,7 @@ import { ProfileDiagnosticResponseSchema } from './schemas/aiSchemas';
 import { Sidebar, MainNavSection } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { GlobalSearchModal, type CommandAction } from './components/layout/GlobalSearchModal';
-import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText } from 'lucide-react';
+import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked } from 'lucide-react';
 import { backupStats, downloadBackup } from './services/backupService';
 import { BootLoader } from './components/common/BootLoader';
 import { DemoBanner } from './components/common/DemoBanner';
@@ -66,6 +66,7 @@ const ContentTab = lazy(() => import('./components/workspace/ContentTab').then((
 const CompetitorTab = lazy(() => import('./components/workspace/CompetitorTab').then((m) => ({ default: m.CompetitorTab })));
 const AudienceTab = lazy(() => import('./components/workspace/AudienceTab').then((m) => ({ default: m.AudienceTab })));
 const IdeasTab = lazy(() => import('./components/workspace/IdeasTab').then((m) => ({ default: m.IdeasTab })));
+const LibraryTab = lazy(() => import('./components/workspace/LibraryTab').then((m) => ({ default: m.LibraryTab })));
 const CalendarTab = lazy(() => import('./components/workspace/CalendarTab').then((m) => ({ default: m.CalendarTab })));
 const ReportsTab = lazy(() => import('./components/workspace/ReportsTab').then((m) => ({ default: m.ReportsTab })));
 const HistoryTab = lazy(() => import('./components/workspace/HistoryTab').then((m) => ({ default: m.HistoryTab })));
@@ -486,7 +487,8 @@ export default function App() {
       list.push(
         { id: 'import', label: `Importar métricas: ${activeClient.name}`, hint: 'CSV do Meta Business Suite', keywords: 'csv importar metricas meta', icon: Upload, run: () => openTab('metrics') },
         { id: 'diagnostic', label: `Gerar análise completa: ${activeClient.name}`, keywords: 'diagnostico analise ia prompt', icon: Sparkles, run: () => { openTab('diagnostic'); handleAnalyzeProfile(); } },
-        { id: 'report', label: `Relatório: ${activeClient.name}`, keywords: 'relatorio pdf', icon: FileText, run: () => openTab('reports') }
+        { id: 'report', label: `Relatório: ${activeClient.name}`, keywords: 'relatorio pdf', icon: FileText, run: () => openTab('reports') },
+        { id: 'library', label: `Biblioteca de legendas: ${activeClient.name}`, hint: 'Legendas, hashtags, CTAs e ganchos', keywords: 'legenda hashtag cta gancho copiar texto biblioteca', icon: BookMarked, run: () => openTab('library') }
       );
     }
     return list;
@@ -868,6 +870,8 @@ export default function App() {
                       onRefresh={() => loadClientData(activeClient)}
                     />
                   )}
+
+                  {workspaceTab === 'library' && <LibraryTab key={activeClient.id} client={activeClient} />}
 
                   {workspaceTab === 'calendar' && (
                     <CalendarTab
