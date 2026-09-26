@@ -773,6 +773,7 @@ export default function App() {
                   calendarItems={storageService.calendar.getAll()}
                   alerts={alerts}
                   userName={sessionUser?.name}
+                  isDemo={isDemoLoaded}
                   onOpenWorkspace={(client) => {
                     setActiveClient(client);
                     loadClientData(client);

@@ -1,5 +1,9 @@
-import React, { useMemo } from 'react';
-import { Client, Alert, AccountSnapshot, Content, CalendarItem } from '../../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Client, Alert, AccountSnapshot, Content, CalendarItem, DeliveryTask } from '../../types';
+import { storageService } from '../../services/storageService';
+import { summarizeTasks, upcomingTasks } from '../../services/taskInsights';
+import { TasksBoard } from '../tasks/TasksBoard';
+import { ScopePicker } from './ScopePicker';
 import type { WorkspaceSubTab } from '../workspace/WorkspaceHeader';
 import { analyticsService } from '../../services/analyticsService';
 import {
@@ -20,10 +24,11 @@ import {
   KpiCard,
   RoutinePanel,
   TopPostsPanel,
+  UpcomingTasksPanel,
   WeekPanel,
   WeeklyViewsChart
 } from './DashboardPanels';
-import { AlertTriangle, CalendarDays, FileText, Plus, Users, Database } from 'lucide-react';
+import { AlertTriangle, CalendarDays, FileText, ListChecks, Plus, Database, LayoutDashboard, Users } from 'lucide-react';
 
 interface AgencyDashboardViewProps {
   clients: Client[];
@@ -32,6 +37,8 @@ interface AgencyDashboardViewProps {
   calendarItems: CalendarItem[];
   alerts: Alert[];
   userName?: string;
+  /** Modo demonstração: esconde tarefas gerais (reais) do painel fictício. */
+  isDemo?: boolean;
   onOpenWorkspace: (client: Client) => void;
   onOpenClientTab: (client: Client, tab: WorkspaceSubTab) => void;
   onOpenNewClient: () => void;
@@ -48,12 +55,13 @@ function greeting(now: Date): string {
 }
 
 export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
-  clients,
+  clients: allClients,
   snapshots: allSnapshots,
   contents: allContents,
   calendarItems: allCalendar,
   alerts,
   userName,
+  isDemo = false,
   onOpenWorkspace,
   onOpenClientTab,
   onOpenNewClient,
@@ -64,9 +72,51 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   onSeedDemoData
 }) => {
   const now = new Date();
+  const readPref = (key: string, fallback: string) => {
+    try {
+      return localStorage.getItem(key) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  const writePref = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* preferência opcional */
+    }
+  };
+  const [mode, setModeState] = useState<'summary' | 'tasks'>(() => (readPref('gs_dash_mode', 'summary') === 'tasks' ? 'tasks' : 'summary'));
+  const [scope, setScopeState] = useState<string>(() => readPref('gs_dash_scope', 'all'));
+  const setMode = (m: 'summary' | 'tasks') => {
+    setModeState(m);
+    writePref('gs_dash_mode', m);
+  };
+  const setScope = (v: string) => {
+    setScopeState(v);
+    writePref('gs_dash_scope', v);
+  };
+  const [allTasks, setAllTasks] = useState<DeliveryTask[]>(() => storageService.tasks.getAll());
+  const reloadTasks = () => setAllTasks(storageService.tasks.getAll());
+
+  // Escopo inválido (cliente excluído, troca demo/produção) volta para "todos".
+  const scopeValid = scope === 'all' || (scope === 'general' && mode === 'tasks') || allClients.some((c) => c.id === scope);
+  useEffect(() => {
+    if (!scopeValid && scope !== 'general') setScope('all');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeValid, scope]);
+  const effectiveScope = scopeValid ? scope : 'all';
+  const selectedClient = allClients.find((c) => c.id === effectiveScope);
+
+  // Resumo: todos os clientes ou só o escolhido.
+  const clients = selectedClient ? [selectedClient] : allClients;
   // Só dados dos clientes visíveis (demo e produção nunca se misturam).
   const ids = useMemo(() => new Set(clients.map((c) => c.id)), [clients]);
-  const clientsById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
+  const allIds = useMemo(() => new Set(allClients.map((c) => c.id)), [allClients]);
+  const clientsById = useMemo(() => new Map(allClients.map((c) => [c.id, c])), [allClients]);
+  const visibleTasks = allTasks.filter((t) => (t.clientId ? allIds.has(t.clientId) : !isDemo));
+  const scopedTasks = selectedClient ? visibleTasks.filter((t) => t.clientId === selectedClient.id) : visibleTasks;
+  const taskSummary = summarizeTasks(scopedTasks, now);
   const snapshots = allSnapshots.filter((s) => ids.has(s.clientId));
   const contents = allContents.filter((c) => ids.has(c.clientId));
   const calendar = allCalendar.filter((c) => ids.has(c.clientId));
@@ -102,7 +152,6 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   const freshness = clientFreshness(clients, contents, snapshots, now);
   const plan = weekPlan(calendar);
   const today = weekDayOf(now);
-  const pending = freshness.filter((f) => f.status !== 'ok');
   const unhandledAlerts = alerts.filter((a) => a.status === 'NEW');
   const firstName = userName?.trim().split(/\s+/)[0];
   const dateLabel = now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'America/Sao_Paulo' });
@@ -122,23 +171,63 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
             {greeting(now)}{firstName ? `, ${firstName}` : ''}!
           </h1>
           <p className="text-sm text-neutral-400">
-            {clients.length === 0
+            {allClients.length === 0
               ? 'Cadastre o primeiro cliente para começar.'
-              : 'Resumo dos seus clientes nos últimos 30 dias.'}
+              : mode === 'tasks'
+                ? taskSummary.overdue > 0
+                  ? `${taskSummary.open} ${taskSummary.open === 1 ? 'entrega em aberto' : 'entregas em aberto'}, ${taskSummary.overdue} atrasada${taskSummary.overdue > 1 ? 's' : ''}.`
+                  : `${taskSummary.open} ${taskSummary.open === 1 ? 'entrega em aberto' : 'entregas em aberto'}.`
+                : selectedClient
+                  ? `Resumo de ${selectedClient.name} nos últimos 30 dias.`
+                  : 'Resumo dos seus clientes nos últimos 30 dias.'}
           </p>
         </div>
-        {unhandledAlerts.length > 0 && (
-          <button
-            onClick={onOpenAlerts}
-            className="inline-flex items-center gap-2 self-start rounded-full bg-rose-500/10 px-4 py-2 text-xs font-medium text-rose-300 transition-colors hover:bg-rose-500/20 sm:self-auto"
-          >
-            <AlertTriangle className="h-4 w-4" />
-            {unhandledAlerts.length} {unhandledAlerts.length === 1 ? 'alerta novo' : 'alertas novos'}
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {unhandledAlerts.length > 0 && (
+            <button
+              onClick={onOpenAlerts}
+              className="inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-xs font-medium text-rose-300 transition-colors hover:bg-rose-500/20"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              {unhandledAlerts.length} {unhandledAlerts.length === 1 ? 'alerta novo' : 'alertas novos'}
+            </button>
+          )}
+          {allClients.length > 0 && (
+            <>
+              <ScopePicker clients={allClients} value={effectiveScope} onChange={setScope} allowGeneral={mode === 'tasks'} />
+              <div className="flex rounded-full bg-[#161618] p-1" role="tablist" aria-label="Seção do painel">
+                {([
+                  ['summary', 'Resumo', LayoutDashboard],
+                  ['tasks', 'Tarefas', ListChecks]
+                ] as const).map(([id, label, Icon]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === id}
+                    onClick={() => setMode(id)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      mode === id ? 'bg-neutral-50 text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                    {id === 'tasks' && taskSummary.overdue > 0 && (
+                      <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white tabular-nums">{taskSummary.overdue}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      {clients.length > 0 && (
+      {allClients.length > 0 && mode === 'tasks' && (
+        <TasksBoard tasks={visibleTasks} clients={allClients} scope={effectiveScope} onChanged={reloadTasks} />
+      )}
+
+      {clients.length > 0 && mode === 'summary' && (
         <>
           {/* KPIs + visualizações semanais */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -184,15 +273,16 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
             <BigNumberPair
               delay={0.2}
               left={{
-                value: clients.length,
-                unit: clients.length === 1 ? 'cliente' : 'clientes',
-                icon: Users,
+                value: taskSummary.open,
+                unit: taskSummary.open === 1 ? 'entrega' : 'entregas',
+                icon: ListChecks,
                 text:
-                  pending.length === 0 ? (
-                    'Todos com métricas da última semana.'
+                  taskSummary.open === 0 ? (
+                    'Nenhuma tarefa em aberto.'
                   ) : (
                     <>
-                      <span className="text-amber-400">{pending.length}</span> {pending.length === 1 ? 'aguardando' : 'aguardando'} atualização de métricas.
+                      {taskSummary.overdue > 0 && <><span className="text-rose-400">{taskSummary.overdue} atrasada{taskSummary.overdue > 1 ? 's' : ''}</span>, </>}
+                      <span className="text-amber-400">{taskSummary.today}</span> para hoje.
                     </>
                   )
               }}
@@ -202,8 +292,8 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                 icon: FileText,
                 text: followers !== null ? <>Base somada de <span className="text-neutral-200">{formatMetric(followers)}</span> seguidores.</> : 'Registre os seguidores na aba Métricas.'
               }}
-              onCenter={() => pending[0] ? onOpenClientTab(pending[0].client, 'metrics') : onOpenClientTab(clients[0], 'calendar')}
-              centerLabel={pending[0] ? `Atualizar métricas de ${pending[0].client.name}` : 'Abrir calendário'}
+              onCenter={() => setMode('tasks')}
+              centerLabel="Abrir minhas tarefas"
             />
             <FormatDonut rows={formats} delay={0.25} />
           </div>
@@ -215,13 +305,14 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+            <UpcomingTasksPanel tasks={upcomingTasks(scopedTasks, 5, now)} clientsById={clientsById} onOpenTasks={() => setMode('tasks')} delay={0.4} />
             <WeekPanel plan={plan} today={today} clientsById={clientsById} onOpen={(c) => onOpenClientTab(c, 'calendar')} delay={0.4} />
           </div>
         </>
       )}
 
       {/* Clients Management Grid */}
-      <div className="space-y-4">
+      <div className={`space-y-4 ${mode === 'tasks' && allClients.length > 0 ? 'hidden' : ''}`}>
         <div className="flex items-end justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-neutral-50">
@@ -232,7 +323,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           </div>
         </div>
 
-        {clients.length === 0 ? (
+        {allClients.length === 0 ? (
           <div className="rounded-[28px] bg-[#161618] border border-white/[0.04] p-8 sm:p-12 text-center space-y-4">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
               <Users className="w-7 h-7" />

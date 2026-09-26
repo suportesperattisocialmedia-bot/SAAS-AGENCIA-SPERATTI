@@ -18,6 +18,7 @@ export type EntityStorageType =
   | 'audience_insights'
   | 'content_ideas'
   | 'calendar_items'
+  | 'tasks'
   | 'alerts'
   | 'reports'
   | 'sync_logs'

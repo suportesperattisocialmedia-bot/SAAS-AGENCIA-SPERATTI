@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowDown, ArrowUp, ArrowUpRight, CalendarDays, Eye, Heart, LayoutGrid, Radar, Trophy, Upload } from 'lucide-react';
-import type { CalendarItem, Client, Content, ContentFormat, Metric } from '../../types';
+import { ArrowDown, ArrowUp, ArrowUpRight, CalendarDays, Eye, Heart, LayoutGrid, ListChecks, Radar, Trophy, Upload } from 'lucide-react';
+import type { CalendarItem, Client, Content, ContentFormat, DeliveryTask, Metric } from '../../types';
+import { TASK_STATUSES, dueLabel, dueState } from '../../services/taskInsights';
 import { engagementFrom, formatCompact, formatMetric, isMetric } from '../../utils/metrics';
 import { weekDayLabel } from '../../services/storage/migration';
 import type { ClientFreshness, FormatRow, WeekPoint } from '../../services/dashboardInsights';
@@ -464,7 +465,7 @@ export const WeekPanel: React.FC<{
   const total = plan.reduce((acc, d) => acc + d.items.length, 0);
   const dayItems = plan.find((d) => d.day === selected)?.items ?? [];
   return (
-    <Card delay={delay} className="p-5 lg:col-span-5">
+    <Card delay={delay} className="p-5 lg:col-span-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-full bg-white/[0.07] text-neutral-300">
@@ -503,7 +504,7 @@ export const WeekPanel: React.FC<{
         {dayItems.length === 0 ? (
           <p className="text-xs text-neutral-500">{weekDayLabel(selected)}: nenhuma publicação planejada.</p>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="grid gap-2 sm:grid-cols-2">
             {dayItems.map((item) => {
               const client = clientsById.get(item.clientId);
               return (
@@ -531,3 +532,69 @@ export const WeekPanel: React.FC<{
 
 export const KPI_ICONS = { views: Eye, reach: Radar, engagement: Heart, posts: LayoutGrid };
 export type { Metric };
+
+/* ------------------------------------------------------------------ */
+/* Próximas entregas (CRM)                                              */
+/* ------------------------------------------------------------------ */
+
+const DUE_PILL = {
+  overdue: 'bg-rose-500/15 text-rose-300',
+  today: 'bg-amber-500 text-neutral-950',
+  soon: 'bg-amber-500/15 text-amber-300',
+  later: 'bg-white/[0.06] text-neutral-300',
+  none: 'bg-white/[0.04] text-neutral-500',
+  done: 'bg-white/[0.04] text-neutral-500'
+} as const;
+
+export const UpcomingTasksPanel: React.FC<{
+  tasks: DeliveryTask[];
+  clientsById: Map<string, Client>;
+  onOpenTasks: () => void;
+  delay?: number;
+}> = ({ tasks, clientsById, onOpenTasks, delay }) => (
+  <Card delay={delay} className="p-5 lg:col-span-2">
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-white/[0.07] text-neutral-300">
+          <ListChecks className="h-4 w-4" />
+        </span>
+        <div>
+          <h3 className="text-lg font-semibold text-neutral-50">Próximas entregas</h3>
+          <p className="text-xs text-neutral-500">Suas tarefas em aberto, por prazo</p>
+        </div>
+      </div>
+      <RoundAction onClick={onOpenTasks} label="Abrir minhas tarefas" />
+    </div>
+    {tasks.length === 0 ? (
+      <div className="mt-6">
+        <p className="text-sm text-neutral-500">Nenhuma tarefa em aberto.</p>
+        <button type="button" onClick={onOpenTasks} className="mt-3 rounded-full bg-white/[0.06] px-4 py-2 text-xs font-medium text-neutral-200 hover:bg-white/[0.1]">
+          Criar tarefa
+        </button>
+      </div>
+    ) : (
+      <ul className="mt-4 space-y-1">
+        {tasks.map((t) => {
+          const client = t.clientId ? clientsById.get(t.clientId) : undefined;
+          const state = dueState(t);
+          return (
+            <li key={t.id}>
+              <button type="button" onClick={onOpenTasks} className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-white/[0.03]">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/[0.07] text-xs font-semibold text-neutral-200">
+                  {client ? client.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() : 'AG'}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-neutral-100">{t.title}</span>
+                  <span className="block truncate text-[11px] text-neutral-500">
+                    {client?.name ?? 'Geral'} · {t.type} · {TASK_STATUSES.find((s) => s.id === t.status)?.label}
+                  </span>
+                </span>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${DUE_PILL[state]}`}>{dueLabel(t)?.split(' · ')[0] ?? 'Sem prazo'}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </Card>
+);

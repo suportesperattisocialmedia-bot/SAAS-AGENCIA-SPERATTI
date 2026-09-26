@@ -349,3 +349,19 @@ export const ReportSchema = z.object({
   nextSteps: z.array(z.string()).default([]),
   generatedAt: z.string().default(() => new Date().toISOString())
 });
+
+export const DeliveryTaskSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1).optional(),
+  title: z.string().trim().min(1),
+  type: z.enum(['Post', 'Reels', 'Carrossel', 'Stories', 'Roteiro', 'Relatório', 'Reunião', 'Outro']).default('Post'),
+  status: z.enum(['todo', 'doing', 'review', 'approved', 'done']).default('todo'),
+  priority: z.enum(['low', 'normal', 'high']).default('normal'),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  notes: z.string().optional(),
+  checklist: z.array(z.object({ id: z.string().min(1), text: z.string(), done: z.boolean() })).default([]),
+  orderIndex: z.number().default(0),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  completedAt: z.string().optional()
+});
