@@ -52,7 +52,7 @@ export const TasksBoard: React.FC<{
   });
   const [search, setSearch] = useState('');
   const [quick, setQuick] = useState<QuickFilter>('all');
-  const [modal, setModal] = useState<{ open: boolean; draft: TaskDraft }>({ open: false, draft: emptyDraft() });
+  const [modal, setModal] = useState<{ open: boolean; draft: TaskDraft; seq: number }>({ open: false, draft: emptyDraft(), seq: 0 });
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
 
@@ -71,7 +71,7 @@ export const TasksBoard: React.FC<{
   };
 
   const defaultClient = scope !== 'all' && scope !== 'general' ? scope : '';
-  const openNew = (status: TaskStatus = 'todo') => setModal({ open: true, draft: emptyDraft({ status, clientId: defaultClient }) });
+  const openNew = (status: TaskStatus = 'todo') => setModal((m) => ({ open: true, draft: emptyDraft({ status, clientId: defaultClient }), seq: m.seq + 1 }));
 
   const save = (d: TaskDraft) => {
     storageService.tasks.save({
@@ -138,7 +138,7 @@ export const TasksBoard: React.FC<{
         }}
         className={`group rounded-2xl border border-white/[0.05] bg-[#1d1d20] p-3.5 transition-all hover:border-white/[0.12] ${dragId === task.id ? 'opacity-40' : ''}`}
       >
-        <button type="button" onClick={() => setModal({ open: true, draft: draftFromTask(task) })} className="block w-full text-left">
+        <button type="button" onClick={() => setModal((m) => ({ open: true, draft: draftFromTask(task), seq: m.seq + 1 }))} className="block w-full text-left">
           <span className="flex items-center gap-2">
             <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/[0.08] text-[10px] font-semibold text-neutral-200">
               {client ? initials(client.name) : 'AG'}
@@ -359,7 +359,7 @@ export const TasksBoard: React.FC<{
                 return (
                   <tr key={t.id} className="border-t border-white/[0.04] hover:bg-white/[0.02]">
                     <td className="max-w-[320px] px-4 py-3">
-                      <button type="button" onClick={() => setModal({ open: true, draft: draftFromTask(t) })} className="block w-full truncate text-left text-neutral-100 hover:text-amber-300">
+                      <button type="button" onClick={() => setModal((m) => ({ open: true, draft: draftFromTask(t), seq: m.seq + 1 }))} className="block w-full truncate text-left text-neutral-100 hover:text-amber-300">
                         {t.title}
                       </button>
                     </td>
@@ -391,6 +391,7 @@ export const TasksBoard: React.FC<{
       )}
 
       <TaskModal
+        key={modal.seq}
         open={modal.open}
         initial={modal.draft}
         clients={clients}

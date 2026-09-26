@@ -6,7 +6,7 @@
  * Aplicação Interna de Inteligência, Estratégia e Operação de Marketing Digital
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   Client,
   InstagramAccount,
@@ -51,18 +51,19 @@ import { ToastContainer } from './components/common/ToastContainer';
 
 // Workspace Components
 import { WorkspaceHeader, WorkspaceSubTab } from './components/workspace/WorkspaceHeader';
-import { ClientOverviewTab } from './components/workspace/ClientOverviewTab';
-import { InstagramConnectTab } from './components/workspace/InstagramConnectTab';
-import { MetricsTab } from './components/workspace/MetricsTab';
-import { DiagnosticTab } from './components/workspace/DiagnosticTab';
-import { PerformanceTab } from './components/workspace/PerformanceTab';
-import { ContentTab } from './components/workspace/ContentTab';
-import { CompetitorTab } from './components/workspace/CompetitorTab';
-import { AudienceTab } from './components/workspace/AudienceTab';
-import { IdeasTab } from './components/workspace/IdeasTab';
-import { CalendarTab } from './components/workspace/CalendarTab';
-import { ReportsTab } from './components/workspace/ReportsTab';
-import { HistoryTab } from './components/workspace/HistoryTab';
+// Abas do workspace carregadas sob demanda (bundle inicial menor).
+const ClientOverviewTab = lazy(() => import('./components/workspace/ClientOverviewTab').then((m) => ({ default: m.ClientOverviewTab })));
+const InstagramConnectTab = lazy(() => import('./components/workspace/InstagramConnectTab').then((m) => ({ default: m.InstagramConnectTab })));
+const MetricsTab = lazy(() => import('./components/workspace/MetricsTab').then((m) => ({ default: m.MetricsTab })));
+const DiagnosticTab = lazy(() => import('./components/workspace/DiagnosticTab').then((m) => ({ default: m.DiagnosticTab })));
+const PerformanceTab = lazy(() => import('./components/workspace/PerformanceTab').then((m) => ({ default: m.PerformanceTab })));
+const ContentTab = lazy(() => import('./components/workspace/ContentTab').then((m) => ({ default: m.ContentTab })));
+const CompetitorTab = lazy(() => import('./components/workspace/CompetitorTab').then((m) => ({ default: m.CompetitorTab })));
+const AudienceTab = lazy(() => import('./components/workspace/AudienceTab').then((m) => ({ default: m.AudienceTab })));
+const IdeasTab = lazy(() => import('./components/workspace/IdeasTab').then((m) => ({ default: m.IdeasTab })));
+const CalendarTab = lazy(() => import('./components/workspace/CalendarTab').then((m) => ({ default: m.CalendarTab })));
+const ReportsTab = lazy(() => import('./components/workspace/ReportsTab').then((m) => ({ default: m.ReportsTab })));
+const HistoryTab = lazy(() => import('./components/workspace/HistoryTab').then((m) => ({ default: m.HistoryTab })));
 
 /** Itens do menu lateral que abrem uma aba do workspace do cliente. */
 const SECTION_TO_TAB: Partial<Record<MainNavSection, WorkspaceSubTab>> = {
@@ -332,6 +333,28 @@ export default function App() {
       setIsBooting(false);
     }
   }, [loadClientData, visibleClients, syncClientsWithServer]);
+
+  // Depois do login, baixa as abas do workspace em segundo plano (troca de aba instantânea).
+  useEffect(() => {
+    if (isBooting || !sessionUser) return;
+    const load = () => {
+      void import('./components/workspace/ClientOverviewTab');
+      void import('./components/workspace/MetricsTab');
+      void import('./components/workspace/InstagramConnectTab');
+      void import('./components/workspace/DiagnosticTab');
+      void import('./components/workspace/PerformanceTab');
+      void import('./components/workspace/ContentTab');
+      void import('./components/workspace/CompetitorTab');
+      void import('./components/workspace/AudienceTab');
+      void import('./components/workspace/IdeasTab');
+      void import('./components/workspace/CalendarTab');
+      void import('./components/workspace/ReportsTab');
+      void import('./components/workspace/HistoryTab');
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(load);
+    else setTimeout(load, 1500);
+  }, [isBooting, sessionUser]);
 
   // Retorno do OAuth tratado após o boot, com a interface (e os toasts) já montada.
   useEffect(() => {
@@ -653,6 +676,14 @@ export default function App() {
                   />
 
                   {/* Subtab Views */}
+                  <Suspense
+                    fallback={
+                      <div className="mt-6 space-y-4" aria-busy="true" aria-label="Carregando aba">
+                        <div className="h-24 animate-pulse rounded-[28px] bg-white/[0.04]" />
+                        <div className="h-64 animate-pulse rounded-[28px] bg-white/[0.04]" />
+                      </div>
+                    }
+                  >
                   {workspaceTab === 'overview' && (
                     <ClientOverviewTab
                       client={activeClient}
@@ -763,6 +794,7 @@ export default function App() {
                       snapshots={snapshots}
                     />
                   )}
+                  </Suspense>
                 </div>
               ) : (
                 /* Agency Dashboard / All Clients */
@@ -774,6 +806,7 @@ export default function App() {
                   alerts={alerts}
                   userName={sessionUser?.name}
                   isDemo={isDemoLoaded}
+                  onDataChanged={reloadAllData}
                   onOpenWorkspace={(client) => {
                     setActiveClient(client);
                     loadClientData(client);
@@ -863,6 +896,9 @@ export default function App() {
       />
 
       <SettingsModal
+        onRestored={() => {
+          void syncClientsWithServer().then(reloadAllData);
+        }}
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
         onResetAllData={() => {

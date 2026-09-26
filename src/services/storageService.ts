@@ -70,6 +70,26 @@ const KEYS = {
   TASKS: 'gs_intel_tasks'
 };
 
+/** Chave de armazenamento -> tipo de entidade (define o adaptador). Usado pelo backup. */
+export const BACKUP_COLLECTIONS: Array<{ key: string; entity: Parameters<typeof storageFactory.getAdapter>[0] }> = [
+  { key: KEYS.CLIENTS, entity: 'clients' },
+  { key: KEYS.INSTAGRAM, entity: 'instagram_accounts' },
+  { key: KEYS.SNAPSHOTS, entity: 'account_snapshots' },
+  { key: KEYS.CONTENTS, entity: 'contents' },
+  { key: KEYS.CONTENT_METRIC_SNAPSHOTS, entity: 'content_metric_snapshots' },
+  { key: KEYS.COMPETITORS, entity: 'competitors' },
+  { key: KEYS.AUDIENCE, entity: 'audience_insights' },
+  { key: KEYS.IDEAS, entity: 'content_ideas' },
+  { key: KEYS.CALENDAR, entity: 'calendar_items' },
+  { key: KEYS.ALERTS, entity: 'alerts' },
+  { key: KEYS.REPORTS, entity: 'reports' },
+  { key: KEYS.SYNC_LOGS, entity: 'sync_logs' },
+  { key: KEYS.AI_ANALYSES, entity: 'ai_analysis' },
+  { key: KEYS.RESEARCH_INSIGHTS, entity: 'research_insights' },
+  { key: KEYS.RESEARCH_RUNS, entity: 'research_runs' },
+  { key: KEYS.TASKS, entity: 'tasks' }
+];
+
 const DEFAULT_SETTINGS: AppSettings = {
   instagramApiConfigured: false,
   aiApiConfigured: true,

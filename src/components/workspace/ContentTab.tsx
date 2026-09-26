@@ -59,7 +59,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
           {/* Format Filter */}
           <div className="flex items-center gap-1.5 bg-neutral-950 px-2.5 py-1 rounded-lg border border-neutral-800">
             <span className="text-neutral-500 text-[11px]">Formato:</span>
-            <select
+            <select aria-label="Filtrar por formato"
               value={selectedFormat}
               onChange={(e) => setSelectedFormat(e.target.value)}
               className="bg-transparent text-amber-300 font-semibold focus:outline-hidden cursor-pointer"
@@ -75,7 +75,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
           {/* Pillar Filter */}
           <div className="flex items-center gap-1.5 bg-neutral-950 px-2.5 py-1 rounded-lg border border-neutral-800">
             <span className="text-neutral-500 text-[11px]">Pilar:</span>
-            <select
+            <select aria-label="Filtrar por pilar"
               value={selectedPillar}
               onChange={(e) => setSelectedPillar(e.target.value)}
               className="bg-transparent text-amber-300 font-semibold focus:outline-hidden cursor-pointer"

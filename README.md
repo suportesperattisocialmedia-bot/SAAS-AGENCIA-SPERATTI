@@ -13,6 +13,21 @@ Cada cliente tem a aba **Métricas** com:
 
 Código: `src/services/metricsImport.ts` e `src/components/workspace/MetricsTab.tsx`. Células vazias viram `n/d` (nunca 0).
 
+## Piloto da Semana
+
+Botão **Piloto da semana** no dashboard (ou "Planejar a próxima semana" com um cliente selecionado):
+1. Calcula os **padrões vencedores** do cliente com os posts importados (últimos 90 dias): melhor dia, faixa de horário, formato campeão e ritmo. Amostra pequena é sinalizada; CSV sem horário não gera "melhor horário".
+2. Gera o prompt da semana (padrões + melhores posts + banco de ideias + público) para colar em qualquer IA.
+3. A resposta é validada e revisada; os posts escolhidos viram itens no **Calendário** e tarefas de produção em **Minhas tarefas** (prazo na véspera, checklist do formato, roteiro e legenda nas notas).
+
+Código: `src/services/winningPatterns.ts`, `src/ai/weeklyPilot.ts`, `src/components/pilot/WeeklyPilotModal.tsx`.
+
+## Backup
+
+Configurações → **Backup dos dados**: baixa um `.json` com tudo que fica no navegador (posts, métricas, ideias, calendário, tarefas, diagnósticos, relatórios) e restaura em qualquer computador. O dashboard avisa quando o último backup tem mais de 7 dias.
+
+Código: `src/services/backupService.ts`.
+
 ## Dashboard: resumo por cliente e Minhas tarefas
 
 - Seletor no topo do dashboard: **Todos os clientes** ou um cliente específico (todo o resumo passa a mostrar só ele).

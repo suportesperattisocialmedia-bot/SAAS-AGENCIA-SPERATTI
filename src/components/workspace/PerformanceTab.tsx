@@ -270,7 +270,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
 
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className="text-neutral-500">Ordenar por:</span>
-            <select
+            <select aria-label="Ordenar conteúdos por"
               value={selectedSortMetric}
               onChange={e => setSelectedSortMetric(e.target.value as any)}
               className="bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-1.5 text-neutral-200 focus:outline-hidden focus:border-amber-500 cursor-pointer"

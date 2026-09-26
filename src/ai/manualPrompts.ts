@@ -19,7 +19,7 @@ export interface PromptContext {
 
 const line = (label: string, value: string | undefined | null) => `- ${label}: ${value && value.trim() ? value.trim() : 'não informado'}`;
 
-function clientBlock(c: Client): string {
+export function clientBlock(c: Client): string {
   return [
     line('Nome', c.name),
     line('Instagram', c.instagram),
@@ -68,7 +68,7 @@ function metricsBlock(contents: Content[], snapshots: AccountSnapshot[]): string
   ].join('\n');
 }
 
-function postsBlock(contents: Content[], limit = 12): string {
+export function postsBlock(contents: Content[], limit = 12): string {
   if (contents.length === 0) return 'Nenhuma publicação catalogada ainda.';
   const recent = [...contents].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, limit);
   return recent
@@ -88,7 +88,7 @@ function postsBlock(contents: Content[], limit = 12): string {
     .join('\n');
 }
 
-function competitorsBlock(competitors: Competitor[]): string {
+export function competitorsBlock(competitors: Competitor[]): string {
   const approved = competitors.filter((c) => c.status === 'approved');
   if (approved.length === 0) return 'Nenhum concorrente cadastrado.';
   return approved
@@ -99,7 +99,7 @@ function competitorsBlock(competitors: Competitor[]): string {
     .join('\n');
 }
 
-function audienceBlock(insights: AudienceInsight[]): string {
+export function audienceBlock(insights: AudienceInsight[]): string {
   if (insights.length === 0) return 'Nenhum insight de público registrado.';
   return insights
     .slice(0, 25)
@@ -107,7 +107,7 @@ function audienceBlock(insights: AudienceInsight[]): string {
     .join('\n');
 }
 
-const HONESTY_RULES = `REGRAS OBRIGATÓRIAS:
+export const HONESTY_RULES = `REGRAS OBRIGATÓRIAS:
 1. Use SOMENTE os dados fornecidos acima. Não invente números, porcentagens, seguidores, alcance, resultados de concorrentes ou estatísticas de mercado.
 2. Onde aparecer "n/d" ou "não disponível", o dado não existe: diga que falta dado, não estime.
 3. Quando algo for inferência sua, deixe claro no texto que é uma hipótese.

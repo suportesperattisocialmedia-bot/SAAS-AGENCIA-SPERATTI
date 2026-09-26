@@ -16,7 +16,7 @@ export const ToastContainer: React.FC = () => {
   useEffect(() => {
     const unsub = notificationService.subscribeToast(({ message, type }) => {
       const id = `toast-${generateUUID()}`;
-      setToasts(prev => [...prev, { id, message, type }]);
+      setToasts(prev => [...prev, { id, message, type }].slice(-3));
 
       setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== id));
@@ -46,7 +46,7 @@ export const ToastContainer: React.FC = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
+    <div role="region" aria-label="Avisos" aria-live="polite" className="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-5 z-50 flex flex-col gap-2 sm:max-w-sm pointer-events-none">
       {toasts.map(toast => (
         <div
           key={toast.id}
@@ -57,7 +57,9 @@ export const ToastContainer: React.FC = () => {
             <span>{toast.message}</span>
           </div>
           <button
+            type="button"
             onClick={() => removeToast(toast.id)}
+            aria-label="Fechar aviso"
             className="text-neutral-400 hover:text-neutral-200 p-0.5"
           >
             <X className="w-3.5 h-3.5" />

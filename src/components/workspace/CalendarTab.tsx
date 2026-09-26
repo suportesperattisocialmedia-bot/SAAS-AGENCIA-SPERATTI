@@ -177,8 +177,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
 
                       <div className="flex items-center justify-between pt-1 border-t border-neutral-900 text-[10px] font-mono text-neutral-500">
                         <span>{item.pillar}</span>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <select
+                        <div className="flex items-center gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+                          <select aria-label="Mover de dia"
                             onChange={(e) => handleMoveDay(item, e.target.value)}
                             value=""
                             title="Mover de dia"
@@ -190,7 +190,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                             ))}
                           </select>
                           <button
+                            type="button"
                             onClick={() => handleDeleteItem(item.id)}
+                            aria-label={`Excluir ${item.title}`}
+                            title="Excluir"
                             className="text-neutral-500 hover:text-rose-400 p-0.5"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -244,7 +247,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-neutral-400 mb-1">Formato</label>
-                <select
+                <select aria-label="Formato"
                   value={newItemForm.format}
                   onChange={(e) => setNewItemForm({ ...newItemForm, format: e.target.value as any })}
                   className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
@@ -259,7 +262,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
 
               <div>
                 <label className="block text-neutral-400 mb-1">Pilar de Conteúdo</label>
-                <select
+                <select aria-label="Pilar de conteúdo"
                   value={newItemForm.pillar}
                   onChange={(e) => setNewItemForm({ ...newItemForm, pillar: e.target.value as any })}
                   className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
@@ -288,7 +291,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
 
               <div>
                 <label className="block text-neutral-400 mb-1">Dia da Semana</label>
-                <select
+                <select aria-label="Dia da semana"
                   value={targetDay}
                   onChange={(e) => setTargetDay(e.target.value)}
                   className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"

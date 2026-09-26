@@ -239,7 +239,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
           <form onSubmit={handleCreate} className="space-y-4 text-xs font-mono">
             <div>
               <label className="block text-neutral-400 mb-1">Categoria de Insight *</label>
-              <select
+              <select aria-label="Categoria do insight"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value as any })}
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
@@ -287,7 +287,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
 
               <div>
                 <label className="block text-neutral-400 mb-1">Tipo de Dado</label>
-                <select
+                <select aria-label="Tipo de dado"
                   value={form.isHypothesis ? 'hipotese' : 'real'}
                   onChange={(e) => setForm({ ...form, isHypothesis: e.target.value === 'hipotese' })}
                   className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"

@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
           
           {activeClient ? (
             <div className="flex items-center gap-1.5 truncate">
-              <select
+              <select aria-label="Cliente ativo"
                 value={activeClient.id}
                 onChange={(e) => {
                   const found = clients.find(c => c.id === e.target.value);

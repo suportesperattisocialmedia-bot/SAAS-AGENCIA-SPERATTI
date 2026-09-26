@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Check, Plus, Trash2, X } from 'lucide-react';
 import type { Client, DeliveryTask, TaskChecklistItem, TaskPriority, TaskStatus, TaskType } from '../../types';
 import { Modal } from '../common/Modal';
@@ -58,14 +58,7 @@ export const TaskModal: React.FC<{
   const [newItem, setNewItem] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (open) {
-      setDraft(initial);
-      setNewItem('');
-      setError(null);
-    }
-  }, [open, initial]);
-
+  // O componente é remontado a cada abertura (key no pai): o estado nasce com a tarefa certa.
   const set = <K extends keyof TaskDraft>(key: K, value: TaskDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
   const addItem = () => {

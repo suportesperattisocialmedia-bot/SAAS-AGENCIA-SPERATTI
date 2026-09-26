@@ -98,7 +98,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
 
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className="text-neutral-500">Métrica:</span>
-            <select
+            <select aria-label="Métrica do gráfico"
               value={activeChartMetric}
               onChange={(e) => setActiveChartMetric(e.target.value as any)}
               className="bg-neutral-900 border border-neutral-800 text-amber-300 px-2 py-1 rounded focus:outline-hidden"

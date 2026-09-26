@@ -4,6 +4,10 @@ import { storageService } from '../../services/storageService';
 import { summarizeTasks, upcomingTasks } from '../../services/taskInsights';
 import { TasksBoard } from '../tasks/TasksBoard';
 import { ScopePicker } from './ScopePicker';
+import { PatternCards, WeeklyPilotModal } from '../pilot/WeeklyPilotModal';
+import { computeWinningPatterns } from '../../services/winningPatterns';
+import { backupStats, daysSinceBackup, downloadBackup } from '../../services/backupService';
+import { notificationService } from '../../services/notificationService';
 import type { WorkspaceSubTab } from '../workspace/WorkspaceHeader';
 import { analyticsService } from '../../services/analyticsService';
 import {
@@ -28,7 +32,7 @@ import {
   WeekPanel,
   WeeklyViewsChart
 } from './DashboardPanels';
-import { AlertTriangle, CalendarDays, FileText, ListChecks, Plus, Database, LayoutDashboard, Users } from 'lucide-react';
+import { AlertTriangle, HardDriveDownload, Rocket, CalendarDays, FileText, ListChecks, Plus, Database, LayoutDashboard, Users } from 'lucide-react';
 
 interface AgencyDashboardViewProps {
   clients: Client[];
@@ -47,6 +51,8 @@ interface AgencyDashboardViewProps {
   onDeleteClient: (client: Client) => void;
   onOpenAlerts: () => void;
   onSeedDemoData?: () => void;
+  /** Recarregar dados do App (calendário etc.) depois de mudanças feitas aqui. */
+  onDataChanged?: () => void;
 }
 
 function greeting(now: Date): string {
@@ -69,8 +75,10 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   onDuplicateClient,
   onDeleteClient,
   onOpenAlerts,
-  onSeedDemoData
+  onSeedDemoData,
+  onDataChanged
 }) => {
+  const [pilotOpen, setPilotOpen] = useState(false);
   const now = new Date();
   const readPref = (key: string, fallback: string) => {
     try {
@@ -96,6 +104,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
     setScopeState(v);
     writePref('gs_dash_scope', v);
   };
+  const [backupDays, setBackupDays] = useState<number | null>(() => daysSinceBackup());
   const [allTasks, setAllTasks] = useState<DeliveryTask[]>(() => storageService.tasks.getAll());
   const reloadTasks = () => setAllTasks(storageService.tasks.getAll());
 
@@ -107,6 +116,10 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   }, [scopeValid, scope]);
   const effectiveScope = scopeValid ? scope : 'all';
   const selectedClient = allClients.find((c) => c.id === effectiveScope);
+  const selectedPatterns = useMemo(
+    () => (selectedClient ? computeWinningPatterns(allContents.filter((c) => c.clientId === selectedClient.id)) : null),
+    [selectedClient, allContents]
+  );
 
   // Resumo: todos os clientes ou só o escolhido.
   const clients = selectedClient ? [selectedClient] : allClients;
@@ -194,6 +207,14 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           )}
           {allClients.length > 0 && (
             <>
+              <button
+                type="button"
+                onClick={() => setPilotOpen(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-amber-400 active:scale-[0.98]"
+              >
+                <Rocket className="h-4 w-4" />
+                Piloto da semana
+              </button>
               <ScopePicker clients={allClients} value={effectiveScope} onChange={setScope} allowGeneral={mode === 'tasks'} />
               <div className="flex rounded-full bg-[#161618] p-1" role="tablist" aria-label="Seção do painel">
                 {([
@@ -222,6 +243,28 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           )}
         </div>
       </div>
+
+      {allClients.length > 0 && !isDemo && (backupDays === null || backupDays > 7) && (
+        <div className="flex flex-col gap-3 rounded-[22px] border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-center gap-3 text-sm text-neutral-200">
+            <HardDriveDownload className="h-5 w-5 shrink-0 text-amber-400" />
+            {backupDays === null
+              ? 'Você ainda não fez backup. Métricas, tarefas e planejamento ficam só neste navegador.'
+              : `Último backup há ${backupDays} dias. Baixe um novo para não perder nada.`}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const file = downloadBackup();
+              setBackupDays(0);
+              notificationService.showToast(`Backup baixado (${backupStats(file).total} registros).`, 'success');
+            }}
+            className="shrink-0 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-neutral-950 hover:bg-amber-400 active:scale-[0.98]"
+          >
+            Baixar backup agora
+          </button>
+        </div>
+      )}
 
       {allClients.length > 0 && mode === 'tasks' && (
         <TasksBoard tasks={visibleTasks} clients={allClients} scope={effectiveScope} onChanged={reloadTasks} />
@@ -267,6 +310,30 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
               onOpen={firstForPerformance ? () => onOpenClientTab(firstForPerformance, 'performance') : undefined}
             />
           </div>
+
+          {selectedClient && (
+            <section className="rounded-[28px] border border-white/[0.04] bg-[#161618] p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-50">Padrões vencedores</h3>
+                  <p className="text-xs text-neutral-500">O que mais funcionou para {selectedClient.name} nos últimos 90 dias</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPilotOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-full bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-white active:scale-[0.98]"
+                >
+                  <Rocket className="h-4 w-4" />
+                  Planejar a próxima semana
+                </button>
+              </div>
+              {selectedPatterns && selectedPatterns.sample > 0 ? (
+                <PatternCards p={selectedPatterns} compact />
+              ) : (
+                <p className="text-sm text-neutral-500">Importe o CSV do Meta Business Suite na aba Métricas para descobrir os padrões deste cliente.</p>
+              )}
+            </section>
+          )}
 
           {/* Números grandes + formatos */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
@@ -379,6 +446,21 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           </div>
         )}
       </div>
+      {pilotOpen && (
+      <WeeklyPilotModal
+        open={pilotOpen}
+        onClose={() => setPilotOpen(false)}
+        clients={allClients}
+        initialClientId={selectedClient?.id}
+        onApplied={(client, count) => {
+          reloadTasks();
+          onDataChanged?.();
+          setScope(client.id);
+          setMode('tasks');
+          notificationService.showToast(`${count} ${count === 1 ? 'post planejado' : 'posts planejados'} no calendário e ${count} ${count === 1 ? 'tarefa criada' : 'tarefas criadas'} para ${client.name}.`, 'success');
+        }}
+      />
+      )}
     </div>
   );
 };

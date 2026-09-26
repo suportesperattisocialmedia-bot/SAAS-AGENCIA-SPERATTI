@@ -426,7 +426,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               <label className="block text-xs font-medium text-neutral-300 mb-1">
                 Etapa do Onboarding (1 a 10)
               </label>
-              <select
+              <select aria-label="Etapa do onboarding"
                 value={formData.onboardingStep}
                 onChange={e => handleChange('onboardingStep', parseInt(e.target.value, 10))}
                 className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-hidden focus:border-amber-500 font-mono cursor-pointer"

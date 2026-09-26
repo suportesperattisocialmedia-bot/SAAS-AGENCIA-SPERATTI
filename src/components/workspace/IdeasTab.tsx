@@ -195,7 +195,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
                   {idea.format} · {idea.pillar}
                 </span>
 
-                <select
+                <select aria-label="Status da ideia"
                   value={idea.status}
                   onChange={(e) => handleUpdateStatus(idea.id, e.target.value as PipelineStatus)}
                   className="bg-neutral-950 border border-neutral-800 text-amber-300 text-[10px] font-mono px-1.5 py-0.5 rounded focus:outline-hidden cursor-pointer"
@@ -240,7 +240,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
 
               <div className="flex items-center gap-2">
                 {!idea.calendarDay && (
-                  <select
+                  <select aria-label="Agendar no calendário"
                     onChange={(e) => {
                       if (e.target.value) handleScheduleToCalendar(idea, e.target.value);
                     }}
