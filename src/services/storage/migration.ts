@@ -10,6 +10,21 @@ export const STORAGE_SCHEMA_VERSION = 2;
 
 const SCHEMA_VERSION_KEY = 'gs_intel_schema_version';
 
+const WEEK_DAY_LABELS = {
+  segunda: 'Segunda-feira',
+  terca: 'Terça-feira',
+  quarta: 'Quarta-feira',
+  quinta: 'Quinta-feira',
+  sexta: 'Sexta-feira',
+  sabado: 'Sábado',
+  domingo: 'Domingo'
+} as const;
+
+/** Rótulo legível de um dia salvo no formato normalizado ('terca' -> 'Terça-feira'). */
+export function weekDayLabel(val: unknown): string {
+  return WEEK_DAY_LABELS[normalizeWeekDay(val)];
+}
+
 export function normalizeWeekDay(val: unknown): 'segunda' | 'terca' | 'quarta' | 'quinta' | 'sexta' | 'sabado' | 'domingo' {
   if (typeof val !== 'string') return 'segunda';
   const clean = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');

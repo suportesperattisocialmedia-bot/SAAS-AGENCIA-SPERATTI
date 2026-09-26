@@ -61,111 +61,66 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
 
       {diagnostic ? (
         <div className="space-y-6">
-          {/* Section 1: PERFIL */}
-          <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
-              <User className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-bold font-mono uppercase text-neutral-200 tracking-wider">
-                01. Diagnóstico do Perfil e Apresentação
-              </h4>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Foto & Identidade Visual</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.profileSection.photoAnalysis}</p>
+          {([
+            {
+              icon: User,
+              title: '01. Diagnóstico do Perfil e Apresentação',
+              fields: [
+                ['Foto & Identidade Visual', diagnostic.profileSection.photoAnalysis],
+                ['Nome & Nome de Usuário', diagnostic.profileSection.usernameAndName],
+                ['Clareza da Bio', diagnostic.profileSection.bioClarity],
+                ['Proposta de Valor', diagnostic.profileSection.valueProposition],
+                ['CTA & Link da Bio', diagnostic.profileSection.ctaAndLink],
+                ['Estrutura de Destaques', diagnostic.profileSection.highlightsStructure],
+                ['Autoridade Percebida', diagnostic.profileSection.perceivedAuthority]
+              ]
+            },
+            {
+              icon: Layers,
+              title: '02. Diagnóstico de Conteúdo e Formatos',
+              fields: [
+                ['Frequência de Postagem', diagnostic.contentSection.publishingFrequency],
+                ['Formatos Predominantes', diagnostic.contentSection.predominantFormats],
+                ['Pilares Editoriais', diagnostic.contentSection.editorialPillars],
+                ['Identidade Visual', diagnostic.contentSection.visualIdentityAndAesthetics],
+                ['Uso de Ganchos', diagnostic.contentSection.hookUsage],
+                ['Qualidade das Legendas', diagnostic.contentSection.captionQuality],
+                ['Eficácia dos CTAs', diagnostic.contentSection.ctaEffectiveness],
+                ['Temas de Melhor Desempenho', diagnostic.contentSection.topPerformingThemes]
+              ]
+            },
+            {
+              icon: TrendingUp,
+              title: '03. Diagnóstico de Performance Real',
+              fields: [
+                ['Engajamento', diagnostic.performanceSection.engagementAnalysis],
+                ['Alcance e Visualizações', diagnostic.performanceSection.reachAndImpressions],
+                ['Salvamentos e Compartilhamentos', diagnostic.performanceSection.savesAndShares],
+                ['Retenção do Público', diagnostic.performanceSection.audienceRetention],
+                ['Conteúdos de Melhor Resultado', diagnostic.performanceSection.bestContentObservations],
+                ['Conteúdos de Pior Resultado', diagnostic.performanceSection.worstContentObservations]
+              ]
+            }
+          ] as Array<{ icon: typeof User; title: string; fields: Array<[string, string]> }>).map(({ icon: Icon, title, fields }) => (
+            <div key={title} className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
+              <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
+                <Icon className="w-4 h-4 text-amber-400" />
+                <h4 className="text-xs font-bold font-mono uppercase text-neutral-200 tracking-wider">{title}</h4>
               </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Nome & Nome de Usuário</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.profileSection.usernameAndName}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Clareza da Bio</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.profileSection.bioClarity}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">CTA & Link da Bio</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.profileSection.ctaAndLink}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Estrutura de Destaques</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.profileSection.highlightsStructure}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Autoridade Percebida</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.profileSection.perceivedAuthority}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: CONTEÚDO */}
-          <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
-              <Layers className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-bold font-mono uppercase text-neutral-200 tracking-wider">
-                02. Diagnóstico de Conteúdo e Formatos
-              </h4>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Frequência de Postagem</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.contentSection.publishingFrequency}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Formatos Predominantes</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.contentSection.predominantFormats}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Uso de Ganchos</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.contentSection.hookUsage}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Qualidade das Legendas</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.contentSection.captionQuality}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                {fields.map(([label, value]) => (
+                  <div key={label} className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
+                    <span className="text-[10px] font-mono text-neutral-500 uppercase">{label}</span>
+                    {value?.trim() ? (
+                      <p className="text-neutral-300 leading-relaxed whitespace-pre-line">{value}</p>
+                    ) : (
+                      <p className="text-neutral-600 italic">Não abordado nesta análise.</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-
-          {/* Section 3: PERFORMANCE */}
-          <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
-              <TrendingUp className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-bold font-mono uppercase text-neutral-200 tracking-wider">
-                03. Diagnóstico de Performance Real
-              </h4>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Engajamento</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.engagementAnalysis}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Alcance e Impressões</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.reachAndImpressions}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Salvamentos e Compartilhamentos</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.savesAndShares}</p>
-              </div>
-
-              <div className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase">Conteúdos de Melhor Resultado</span>
-                <p className="text-neutral-300 leading-relaxed">{diagnostic.performanceSection.bestContentObservations}</p>
-              </div>
-            </div>
-          </div>
+          ))}
 
           {/* Section 4: ESTRATÉGIA */}
           <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
@@ -181,7 +136,9 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
                 ['Forças', diagnostic.strategySection.strengths],
                 ['Vulnerabilidades', diagnostic.strategySection.vulnerabilities],
                 ['Oportunidades Imediatas', diagnostic.strategySection.immediateOpportunities],
-                ['Formatos Recomendados', diagnostic.strategySection.recommendedFormats]
+                ['Pilares de Alto Impacto', diagnostic.strategySection.highImpactPillars],
+                ['Formatos Recomendados', diagnostic.strategySection.recommendedFormats],
+                ['Próximas Ações', diagnostic.nextActions]
               ] as Array<[string, string[]]>).map(([label, items]) => (
                 <div key={label} className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1.5">
                   <span className="text-[10px] font-mono text-neutral-500 uppercase">{label}</span>

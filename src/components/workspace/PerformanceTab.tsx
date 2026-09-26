@@ -39,7 +39,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
     ? { startDate: customStartDate, endDate: customEndDate }
     : undefined;
 
-  const periodData = analyticsService.calculatePeriod(snapshots, selectedPeriod, customRange);
+  const periodData = analyticsService.calculatePeriod(snapshots, selectedPeriod, customRange, contents);
 
   const bestContents = analyticsService.rankContents(contents, selectedSortMetric, false).slice(0, 5);
   const underperformingContents = analyticsService.rankContents(contents, selectedSortMetric, true).slice(0, 3);

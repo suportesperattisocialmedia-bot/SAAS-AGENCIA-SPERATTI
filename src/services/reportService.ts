@@ -12,6 +12,7 @@ import { storageService } from './storageService';
 import { analyticsService } from './analyticsService';
 import { aiService } from './aiService';
 import { formatMetric } from '../utils/metrics';
+import { weekDayLabel } from './storage/migration';
 
 export const reportService = {
   /**
@@ -20,32 +21,44 @@ export const reportService = {
   async generateReport(client: Client, periodDays: 7 | 14 | 30 | 90 = 30): Promise<Report> {
     const snapshots = storageService.history.getByClient(client.id);
     const contents = storageService.contents.getByClient(client.id);
-    const period = analyticsService.calculatePeriod(snapshots, periodDays);
+    const period = analyticsService.calculatePeriod(snapshots, periodDays, undefined, contents);
 
     const ranked = analyticsService.rankContents(contents, 'score', false);
     const topContents = ranked.slice(0, 3);
     const worstContents = ranked.length > 3 ? ranked.slice(-2) : [];
 
-    const periodLabel = `${period.startDate} até ${period.endDate} (${periodDays} dias)`;
+    const br = (iso: string) => iso.split('-').reverse().join('/');
+    const periodLabel = `${br(period.startDate)} a ${br(period.endDate)} (${periodDays} dias)`;
+    const pct = (v: number | null) => (v === null ? null : `${v >= 0 ? '+' : ''}${v}%`);
+    const postsInPeriod = period.postsPublished.current ?? 0;
 
-    // Construct honest executive summary
-    const curFollowers = formatMetric(period.followersGrowth.current, { fallback: 'número não disponível de' });
-    const followersDiff = period.followersGrowth.percentDiff !== null
-      ? `${period.followersGrowth.percentDiff >= 0 ? '+' : ''}${period.followersGrowth.percentDiff}%`
-      : 'sem base comparativa anterior';
+    // Resumo honesto: só cita o que existe; nada de "valor não disponível" no meio da frase.
+    const summaryParts: string[] = [];
+    if (period.followersGrowth.current !== null) {
+      const diff = pct(period.followersGrowth.percentDiff);
+      summaryParts.push(`a conta ${client.instagram} chegou a ${formatMetric(period.followersGrowth.current)} seguidores${diff ? ` (${diff} vs. período anterior)` : ''}`);
+    }
+    if (period.totalViews.current !== null) {
+      const diff = pct(period.totalViews.percentDiff);
+      summaryParts.push(`${formatMetric(period.totalViews.current)} visualizações${diff ? ` (${diff})` : ''}`);
+    }
+    if (period.totalReach.current !== null) {
+      summaryParts.push(`${formatMetric(period.totalReach.current)} de alcance`);
+    }
 
-    const totalViews = formatMetric(period.totalViews.current, { fallback: 'valor não disponível' });
-    const viewsDiff = period.totalViews.percentDiff !== null
-      ? `${period.totalViews.percentDiff >= 0 ? '+' : ''}${period.totalViews.percentDiff}%`
-      : 'sem base anterior';
-
-    const executiveSummary = snapshots.length === 0
-      ? `Relatório inicial para o cliente ${client.name} (${client.instagram}) no segmento ${client.segment}. Dados históricos ainda em coleta para comparação de períodos.`
-      : `No período analisado de ${periodDays} dias (${periodLabel}), a conta ${client.instagram} registrou ${curFollowers} seguidores (${followersDiff}). O volume total de visualizações somou ${totalViews} (${viewsDiff}), com ${contents.length} publicações catalogadas no workspace.`;
+    const executiveSummary = snapshots.length === 0 && contents.length === 0
+      ? `Relatório inicial para o cliente ${client.name} (${client.instagram}) no segmento ${client.segment}. Importe as métricas do Meta Business Suite na aba Métricas para habilitar os indicadores.`
+      : `Período de ${periodLabel}: ${postsInPeriod} ${postsInPeriod === 1 ? 'publicação' : 'publicações'} no período${summaryParts.length ? `; ${summaryParts.join(', ')}` : ''}. ` +
+        (summaryParts.length < 3 ? 'Indicadores sem dado aparecem como n/d (não informado na importação).' : '');
 
     const analysisText = contents.length === 0
       ? 'Ainda não existem conteúdos catalogados para avaliar distribuição por pilares e retenção.'
-      : `O catálogo de publicações ativas no segmento de ${client.segment} destaca os formatos ${client.formats.join(', ')} nos pilares ${client.pillars.join(', ')}. Os conteúdos com maior índice de salvamentos e compartilhamentos demonstram maior valor percebido pela persona (${client.persona || 'Geral'}).`;
+      : [
+          `${contents.length} ${contents.length === 1 ? 'publicação catalogada' : 'publicações catalogadas'} no segmento de ${client.segment}.`,
+          client.formats.length ? `Formatos trabalhados: ${client.formats.join(', ')}.` : '',
+          client.pillars.length ? `Pilares editoriais: ${client.pillars.join(', ')}.` : '',
+          'Conteúdos com mais salvamentos e compartilhamentos indicam maior valor percebido pelo público.'
+        ].filter(Boolean).join(' ');
 
     const reportData: Omit<Report, 'id' | 'generatedAt'> = {
       clientId: client.id,
@@ -65,7 +78,7 @@ export const reportService = {
         reachDiffPct: period.totalReach.percentDiff,
         engagementRate: period.avgEngagementRate.current,
         engagementDiffPct: period.avgEngagementRate.percentDiff,
-        postsCount: contents.filter((c) => c.publishedAt.slice(0, 10) >= period.startDate && c.publishedAt.slice(0, 10) <= period.endDate).length
+        postsCount: postsInPeriod
       },
       topContents,
       worstContents,
@@ -394,7 +407,7 @@ export const reportService = {
       CategoriaGancho: i.hookCategory,
       CTA: i.cta,
       PorQueFazer: i.whyDoThis,
-      DiaSugerido: i.calendarDay || ''
+      DiaSugerido: i.calendarDay ? weekDayLabel(i.calendarDay) : ''
     }));
     this.exportToCsv(`banco_ideias_${clientId}`, rows);
   },
@@ -402,7 +415,7 @@ export const reportService = {
   exportCalendarCsv(clientId: string): void {
     const calendar = storageService.calendar.getByClient(clientId);
     const rows = calendar.map(c => ({
-      DiaDaSemana: c.dayOfWeek,
+      DiaDaSemana: weekDayLabel(c.dayOfWeek),
       Horario: c.timeSlot || '',
       Titulo: c.title,
       Formato: c.format,

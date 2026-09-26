@@ -22,6 +22,8 @@ interface ClientOverviewTabProps {
   alerts: Alert[];
   onNavigateTab: (tab: any) => void;
   nextActions: string[];
+  /** true quando as ações vêm do último diagnóstico importado (IA externa). */
+  actionsFromAi?: boolean;
 }
 
 export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
@@ -30,9 +32,10 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
   contents,
   alerts,
   onNavigateTab,
-  nextActions
+  nextActions,
+  actionsFromAi = false
 }) => {
-  const periodSummary = analyticsService.calculatePeriod(snapshots, 30);
+  const periodSummary = analyticsService.calculatePeriod(snapshots, 30, undefined, contents);
   const sortedContents = analyticsService.rankContents(contents, 'views', false);
   const topContent = sortedContents[0];
 
@@ -98,9 +101,9 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
 
         <StatCard
           label="Conteúdos no Período"
-          value={contents.length}
+          value={periodSummary.postsPublished.current ?? 0}
           typeTag="DADO REAL"
-          subtext="Cadência regular"
+          subtext="Últimos 30 dias"
           periodLabel="Feed & Reels"
         />
       </div>
@@ -205,12 +208,20 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
             <div>
               <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
                 Próximas Ações Estratégicas
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-purple-500/30 text-purple-400 bg-purple-950/20">
-                  INSIGHT DA IA
-                </span>
+                {actionsFromAi ? (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-purple-500/30 text-purple-400 bg-purple-950/20">
+                    DO DIAGNÓSTICO
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-900">
+                    CHECKLIST
+                  </span>
+                )}
               </h3>
               <p className="text-xs text-neutral-400 mt-0.5">
-                Passos concretos priorizados com base na performance real e no comportamento da persona
+                {actionsFromAi
+                  ? 'Ações recomendadas no último diagnóstico importado.'
+                  : 'Próximos passos com base no que já foi cadastrado. Gere a análise completa para ações personalizadas.'}
               </p>
             </div>
           </div>

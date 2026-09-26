@@ -85,8 +85,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
     onRefresh();
   };
 
-  const handleMoveDay = (item: CalendarItem, newDay: any) => {
-    storageService.calendar.saveItem({ ...item, dayOfWeek: newDay });
+  const handleMoveDay = (item: CalendarItem, newDay: string) => {
+    storageService.calendar.saveItem({ ...item, dayOfWeek: normalizeWeekDay(newDay) });
     notificationService.showToast(`Movido para ${newDay}`, 'info');
     onRefresh();
   };
@@ -99,7 +99,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
           <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
             <span>Planejamento Editorial Semanal</span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-950">
-              {calendarItems.length} publicações programadas
+              {calendarItems.length} {calendarItems.length === 1 ? 'publicação programada' : 'publicações programadas'}
             </span>
           </h3>
           <p className="text-xs text-neutral-400 mt-0.5">
@@ -119,7 +119,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
       {/* 7-Days Weekly Columns Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
         {DAYS_OF_WEEK.map(day => {
-          const dayItems = calendarItems.filter(i => i.dayOfWeek === day);
+          const dayItems = calendarItems.filter(i => normalizeWeekDay(i.dayOfWeek) === normalizeWeekDay(day));
 
           return (
             <div

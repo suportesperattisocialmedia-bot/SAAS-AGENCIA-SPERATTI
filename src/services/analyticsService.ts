@@ -23,6 +23,12 @@ function formatISODate(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
+/** Data (YYYY-MM-DD) de publicação no fuso de Brasília (UTC-3). */
+function brasiliaDate(iso: string): string {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? iso.slice(0, 10) : new Date(t - 3 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 function getDayDiff(d1: Date, d2: Date): number {
   return Math.round(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -81,18 +87,24 @@ export const analyticsService = {
   /**
    * Calculate deterministic analytics for a defined period (7, 14, 30, 90 or custom)
    */
+  /**
+   * Métricas do período. Quando os snapshots da conta não trazem um total (ex.: métricas
+   * importadas do Meta Business Suite por post), usa a soma dos posts publicados no período.
+   */
   calculatePeriod(
     snapshots: AccountSnapshot[],
     periodDaysOrCustom: 7 | 14 | 30 | 90 | 'custom',
-    customRange?: DateRange
+    customRange?: DateRange,
+    contents: Content[] = []
   ): PeriodAnalytics {
-    if (!snapshots || snapshots.length === 0) {
+    if ((!snapshots || snapshots.length === 0) && contents.length === 0) {
       return this.getEmptyPeriodAnalytics(typeof periodDaysOrCustom === 'number' ? periodDaysOrCustom : 30);
     }
+    snapshots = snapshots ?? [];
 
-    // Determine actual start and end date
+    // Fim do período: último snapshot disponível; sem snapshots, hoje.
     const sortedAll = [...snapshots].sort((a, b) => a.date.localeCompare(b.date));
-    const latestAvailableDate = sortedAll[sortedAll.length - 1].date;
+    const latestAvailableDate = sortedAll.length > 0 ? sortedAll[sortedAll.length - 1].date : formatISODate(new Date());
 
     let startDate: string;
     let endDate: string;
@@ -135,10 +147,29 @@ export const analyticsService = {
     const followersGrowth = this.createComparison(lastFollowers(currentSnaps), hasPrevious ? lastFollowers(previousSnaps) : null);
 
     // 2. Totais do período: soma apenas de valores disponíveis; null se nenhum.
-    const total = (list: AccountSnapshot[], key: 'views' | 'reach' | 'likes' | 'comments' | 'shares' | 'saves' | 'postsPublished'): Metric =>
+    type TotalKey = 'views' | 'reach' | 'likes' | 'comments' | 'shares' | 'saves' | 'postsPublished';
+    const total = (list: AccountSnapshot[], key: TotalKey): Metric =>
       sumMetric(list.map((snap) => snap[key]));
-    const compare = (key: 'views' | 'reach' | 'likes' | 'comments' | 'shares' | 'saves' | 'postsPublished') =>
-      this.createComparison(total(currentSnaps, key), hasPrevious ? total(previousSnaps, key) : null);
+
+    // Posts publicados em cada janela (fallback quando a conta não tem o total).
+    const postsIn = (from: string, to: string) =>
+      contents.filter((c) => {
+        const d = brasiliaDate(c.publishedAt);
+        return d >= from && d <= to;
+      });
+    const currentPosts = postsIn(startDate, endDate);
+    const previousPosts = postsIn(prevStartDateStr, prevEndDateStr);
+    const hasPreviousPosts = contents.some((c) => brasiliaDate(c.publishedAt) < startDate);
+    const postsTotal = (list: Content[], key: TotalKey): Metric =>
+      key === 'postsPublished' ? list.length : sumMetric(list.map((c) => c.metrics[key]));
+
+    const compare = (key: TotalKey) => {
+      const fromSnaps = total(currentSnaps, key);
+      if (isMetric(fromSnaps) || contents.length === 0) {
+        return this.createComparison(fromSnaps, hasPrevious ? total(previousSnaps, key) : null);
+      }
+      return this.createComparison(postsTotal(currentPosts, key), hasPreviousPosts ? postsTotal(previousPosts, key) : null);
+    };
 
     const totalViews = compare('views');
     const totalReach = compare('reach');
@@ -155,8 +186,18 @@ export const analyticsService = {
       if (isMetric(reach) && reach > 0 && isMetric(interactions)) return Number(((interactions / reach) * 100).toFixed(2));
       return avgMetric(list.map((snap) => snap.engagementRate), 2);
     };
-    const curAvgEng = engagementOf(currentSnaps);
-    const prevAvgEng = hasPrevious ? engagementOf(previousSnaps) : null;
+    const engagementOfPosts = (list: Content[]): Metric => {
+      const withReach = list.filter((c) => isMetric(c.metrics.reach) && c.metrics.reach > 0);
+      const reach = sumMetric(withReach.map((c) => c.metrics.reach));
+      const interactions = sumMetric(withReach.flatMap((c) => [c.metrics.likes, c.metrics.comments, c.metrics.shares, c.metrics.saves]));
+      return isMetric(reach) && reach > 0 && isMetric(interactions) ? Number(((interactions / reach) * 100).toFixed(2)) : null;
+    };
+    const snapEng = engagementOf(currentSnaps);
+    const usePostsEng = !isMetric(snapEng) && contents.length > 0;
+    const curAvgEng = usePostsEng ? engagementOfPosts(currentPosts) : snapEng;
+    const prevAvgEng = usePostsEng
+      ? (hasPreviousPosts ? engagementOfPosts(previousPosts) : null)
+      : (hasPrevious ? engagementOf(previousSnaps) : null);
 
     const avgEngagementRate = this.createComparison(curAvgEng, prevAvgEng);
 
@@ -173,7 +214,7 @@ export const analyticsService = {
       totalShares,
       totalSaves,
       postsPublished,
-      hasPreviousPeriod: hasPrevious
+      hasPreviousPeriod: hasPrevious || hasPreviousPosts
     };
   },
 
