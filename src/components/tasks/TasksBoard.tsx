@@ -1,11 +1,12 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowRight, CheckSquare, Columns3, Flag, List, Plus, Search } from 'lucide-react';
+import { ArrowRight, CheckSquare, Columns3, Flag, Link2, List, MessageSquareWarning, Plus, Search, ThumbsUp } from 'lucide-react';
 import type { Client, DeliveryTask, TaskStatus } from '../../types';
 import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
 import { TASK_STATUSES, dueLabel, dueState, filterTasks, summarizeTasks, type QuickFilter } from '../../services/taskInsights';
 import { TaskModal, TaskDraft, draftFromTask, emptyDraft } from './TaskModal';
+import { ApprovalLinkModal } from './ApprovalLinkModal';
 
 /** Cor de cada etapa (faixa superior dos cards de resumo e marcador das colunas). */
 export const STATUS_COLOR: Record<TaskStatus, string> = {
@@ -56,6 +57,7 @@ export const TasksBoard: React.FC<{
   const [quick, setQuick] = useState<QuickFilter>('all');
   const [modal, setModal] = useState<{ open: boolean; draft: TaskDraft; seq: number }>({ open: false, draft: emptyDraft(), seq: 0 });
   const [dragId, setDragId] = useState<string | null>(null);
+  const [approvalOpen, setApprovalOpen] = useState(0);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
 
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.name])), [clients]);
@@ -90,7 +92,9 @@ export const TasksBoard: React.FC<{
       priority: d.priority,
       dueDate: d.dueDate || undefined,
       notes: d.notes || undefined,
-      checklist: d.checklist
+      checklist: d.checklist,
+      clientCopy: d.clientCopy.trim() || undefined,
+      previewUrl: d.previewUrl || undefined
     });
     notificationService.showToast(d.id ? 'Tarefa atualizada.' : 'Tarefa criada.', 'success');
     setModal((m) => ({ ...m, open: false }));
@@ -128,6 +132,7 @@ export const TasksBoard: React.FC<{
     const label = dueLabel(task);
     const done = task.checklist.filter((i) => i.done).length;
     const next = nextStatus(task.status);
+    const lastDecision = task.approvals?.[task.approvals.length - 1];
     return (
       // Card desliza para a nova posição/coluna ao mudar de etapa (layoutId compartilhado).
       <motion.div
@@ -177,6 +182,16 @@ export const TasksBoard: React.FC<{
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-neutral-300">{task.type}</span>
           {label && <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${DUE_STYLE[state]}`}>{label}</span>}
+          {lastDecision?.decision === 'changes' && task.status !== 'done' && task.status !== 'approved' && (
+            <span title={lastDecision.comment} className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+              <MessageSquareWarning className="h-3 w-3" /> Cliente pediu ajuste
+            </span>
+          )}
+          {lastDecision?.decision === 'approved' && task.status === 'approved' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+              <ThumbsUp className="h-3 w-3" /> Aprovado pelo cliente
+            </span>
+          )}
           {task.checklist.length > 0 && (
             <span className={`inline-flex items-center gap-1 text-[10px] ${done === task.checklist.length ? 'text-emerald-400' : 'text-neutral-500'}`}>
               <CheckSquare className="h-3 w-3" />
@@ -262,6 +277,17 @@ export const TasksBoard: React.FC<{
               </button>
             ))}
           </div>
+          {clients.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setApprovalOpen((n) => n + 1)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#161618] px-4 py-2 text-sm text-neutral-200 hover:bg-white/[0.08]"
+            >
+              <Link2 className="h-4 w-4" />
+              Link de aprovação
+              {summary.byStatus.review > 0 && <span className="rounded-full bg-orange-300 px-1.5 text-[10px] font-semibold tabular-nums text-neutral-950">{summary.byStatus.review}</span>}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => openNew()}
@@ -420,6 +446,15 @@ export const TasksBoard: React.FC<{
         onClose={() => setModal((m) => ({ ...m, open: false }))}
         onSave={save}
         onDelete={remove}
+      />
+
+      <ApprovalLinkModal
+        key={`approval-${approvalOpen}`}
+        open={approvalOpen > 0}
+        onClose={() => setApprovalOpen(0)}
+        clients={clients}
+        tasks={tasks}
+        initialClientId={defaultClient || tasks.find((t) => t.status === 'review' && t.clientId)?.clientId}
       />
     </div>
   );

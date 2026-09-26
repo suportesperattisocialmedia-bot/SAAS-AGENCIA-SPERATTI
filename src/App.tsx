@@ -29,6 +29,7 @@ import { indexedDBAdapter } from './services/storage/IndexedDBAdapter';
 import { logger } from './utils/logger';
 import { sessionService, type BackendStatus, type SessionUser } from './services/sessionService';
 import { syncService } from './services/sync/syncService';
+import { onStorageWrite } from './services/storage/changeBus';
 import { describeApiError, onSessionExpired } from './services/api/apiClient';
 import { motion, useReducedMotion } from 'motion/react';
 import { DemoProvider } from './services/demo/DemoProvider';
@@ -239,6 +240,42 @@ export default function App() {
   // Dados que chegaram da nuvem (outro aparelho, portal do cliente) recarregam a tela.
   useEffect(() => syncService.onRemoteChange(() => reloadAllData()), [reloadAllData]);
 
+  // Avisa quando o cliente responde pelo link de aprovação. A referência acompanha as escritas
+  // locais; só dados vindos da nuvem geram aviso (e não o histórico inteiro num aparelho novo).
+  const approvalsSeen = useRef<Map<string, number> | null>(null);
+  const firstPullFresh = useRef(false);
+  useEffect(() => {
+    const snapshot = () => new Map(storageService.tasks.getAll().map((t) => [t.id, t.approvals?.length ?? 0]));
+    const offLocal = onStorageWrite((key) => {
+      if (key === 'gs_intel_tasks') approvalsSeen.current = snapshot();
+    });
+    const offStatus = syncService.onStatus((st) => {
+      if (st.state === 'saved' || st.state === 'offline' || st.state === 'error') firstPullFresh.current = false;
+    });
+    const offRemote = syncService.onRemoteChange((keys) => {
+      if (!keys.includes('gs_intel_tasks')) return;
+      const before = approvalsSeen.current;
+      approvalsSeen.current = snapshot();
+      if (!before || firstPullFresh.current) return;
+      storageService.tasks.getAll().forEach((t) => {
+        const last = t.approvals?.[t.approvals.length - 1];
+        if (!last || (t.approvals?.length ?? 0) <= (before.get(t.id) ?? 0)) return;
+        if (Date.now() - Date.parse(last.at) > 7 * 24 * 3600 * 1000) return;
+        const who = t.clientId ? storageService.clients.getById(t.clientId)?.name ?? 'Cliente' : 'Cliente';
+        const title = last.decision === 'approved' ? `${who} aprovou` : `${who} pediu ajuste`;
+        const body = last.decision === 'approved' ? `"${t.title}" foi aprovado pelo link.` : `"${t.title}": ${last.comment ?? ''}`;
+        notificationStore.notify(title, body, last.decision === 'approved' ? 'success' : 'warning');
+        notificationService.showToast(`${title}: ${t.title}`, last.decision === 'approved' ? 'success' : 'warning');
+      });
+    });
+    return () => {
+      offLocal();
+      offStatus();
+      offRemote();
+    };
+  }, []);
+
+
   /** Sincroniza o cadastro local de clientes com o servidor (necessário para OAuth, sync e IA). */
   const syncClientsWithServer = useCallback(async () => {
     const demoId = DemoProvider.getDemoClientId();
@@ -351,6 +388,9 @@ export default function App() {
       if (session.user && !isDemo) {
         // Dados da nuvem primeiro (tarefas, métricas, calendário...), sem travar a abertura
         // se a rede estiver lenta: o que chegar depois recarrega a tela sozinho.
+        // Referência para avisar das respostas do cliente que chegarem (inclusive nesta abertura).
+        approvalsSeen.current = new Map(storageService.tasks.getAll().map((t) => [t.id, t.approvals?.length ?? 0]));
+        firstPullFresh.current = approvalsSeen.current.size === 0;
         await Promise.race([syncService.start(session.user.agencyId), new Promise((r) => setTimeout(r, 5000))]);
         await syncClientsWithServer();
       } else {
