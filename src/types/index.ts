@@ -475,3 +475,35 @@ export interface AppNotification {
   read: boolean;
   actionUrl?: string;
 }
+
+// ---------------------------------------------------------------------------
+// CRM de entregas (Minhas tarefas)
+// ---------------------------------------------------------------------------
+
+export type TaskStatus = 'todo' | 'doing' | 'review' | 'approved' | 'done';
+export type TaskType = 'Post' | 'Reels' | 'Carrossel' | 'Stories' | 'Roteiro' | 'Relatório' | 'Reunião' | 'Outro';
+export type TaskPriority = 'low' | 'normal' | 'high';
+
+export interface TaskChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface DeliveryTask {
+  id: string;
+  /** Ausente = tarefa geral da agência (sem cliente). */
+  clientId?: string;
+  title: string;
+  type: TaskType;
+  status: TaskStatus;
+  priority: TaskPriority;
+  /** Prazo (YYYY-MM-DD). */
+  dueDate?: string;
+  notes?: string;
+  checklist: TaskChecklistItem[];
+  orderIndex: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}

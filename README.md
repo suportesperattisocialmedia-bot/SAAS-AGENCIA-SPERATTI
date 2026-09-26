@@ -13,6 +13,15 @@ Cada cliente tem a aba **Métricas** com:
 
 Código: `src/services/metricsImport.ts` e `src/components/workspace/MetricsTab.tsx`. Células vazias viram `n/d` (nunca 0).
 
+## Dashboard: resumo por cliente e Minhas tarefas
+
+- Seletor no topo do dashboard: **Todos os clientes** ou um cliente específico (todo o resumo passa a mostrar só ele).
+- Alternância **Resumo | Tarefas**. Tarefas é um CRM de entregas em quadro: A fazer, Em produção, Aprovação do cliente, Aprovado, Entregue.
+  Cada tarefa tem cliente (ou "Geral"), tipo, prazo, prioridade, notas e checklist; arrastar entre colunas, seta para avançar, visão em lista, filtros (atrasadas, hoje, 7 dias, prioridade alta) e busca.
+- As tarefas ficam no armazenamento local do navegador, como ideias e calendário. Excluir um cliente exclui as tarefas dele.
+
+Código: `src/components/agency/`, `src/components/tasks/`, `src/services/dashboardInsights.ts`, `src/services/taskInsights.ts`.
+
 ## IA sem chave de API (fluxo manual)
 
 Diagnóstico ("Gerar análise completa") e Banco de Ideias ("Gerar prompt de ideias") funcionam assim:

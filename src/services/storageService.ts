@@ -24,7 +24,9 @@ import {
   SyncLog,
   AIAnalysis,
   ResearchInsight,
-  ResearchRun
+  ResearchRun,
+  DeliveryTask,
+  TaskStatus
 } from '../types';
 import { storageFactory } from './storage/StorageFactory';
 import { defaultStorageAdapter } from './storage/LocalStorageAdapter';
@@ -42,7 +44,8 @@ import {
   ReportSchema,
   SyncLogSchema,
   AIAnalysisRecordSchema,
-  ResearchInsightSchema
+  ResearchInsightSchema,
+  DeliveryTaskSchema
 } from '../schemas';
 import { logger } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
@@ -63,7 +66,8 @@ const KEYS = {
   SYNC_LOGS: 'gs_intel_sync_logs',
   AI_ANALYSES: 'gs_intel_ai_analyses',
   RESEARCH_INSIGHTS: 'gs_intel_research_insights',
-  RESEARCH_RUNS: 'gs_intel_research_runs'
+  RESEARCH_RUNS: 'gs_intel_research_runs',
+  TASKS: 'gs_intel_tasks'
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -718,6 +722,61 @@ export const storageService = {
     }
   },
 
+  // CRM DE ENTREGAS (Minhas tarefas)
+  tasks: {
+    getAll(): DeliveryTask[] {
+      return storageFactory
+        .getAdapter('tasks')
+        .getCollection<DeliveryTask>(KEYS.TASKS)
+        .sort((a, b) => a.orderIndex - b.orderIndex);
+    },
+
+    save(data: Omit<DeliveryTask, 'id' | 'createdAt' | 'updatedAt' | 'orderIndex' | 'checklist'> & Partial<Pick<DeliveryTask, 'id' | 'createdAt' | 'orderIndex' | 'checklist'>>): DeliveryTask {
+      const all = this.getAll();
+      const now = new Date().toISOString();
+      const existing = data.id ? all.find((t) => t.id === data.id) : undefined;
+      const status = data.status ?? 'todo';
+      const task = DeliveryTaskSchema.parse({
+        ...existing,
+        ...data,
+        id: existing?.id ?? `task-${generateUUID()}`,
+        clientId: data.clientId || undefined,
+        dueDate: data.dueDate || undefined,
+        checklist: data.checklist ?? existing?.checklist ?? [],
+        orderIndex: data.orderIndex ?? existing?.orderIndex ?? all.filter((t) => t.status === status).length,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        completedAt: status === 'done' ? existing?.completedAt ?? now : undefined
+      }) as DeliveryTask;
+      const next = existing ? all.map((t) => (t.id === task.id ? task : t)) : [...all, task];
+      storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, next);
+      return task;
+    },
+
+    /** Move a tarefa para outra etapa (posição no fim da coluna ou antes de `beforeId`). */
+    move(id: string, status: TaskStatus, beforeId?: string): void {
+      const all = this.getAll();
+      const task = all.find((t) => t.id === id);
+      if (!task) return;
+      const column = all.filter((t) => t.status === status && t.id !== id);
+      const index = beforeId ? Math.max(0, column.findIndex((t) => t.id === beforeId)) : column.length;
+      column.splice(index, 0, task);
+      const now = new Date().toISOString();
+      const reordered = new Map(column.map((t, i) => [t.id, i]));
+      const next = all.map((t) => {
+        if (t.id === id) {
+          return { ...t, status, orderIndex: reordered.get(id) ?? 0, updatedAt: now, completedAt: status === 'done' ? t.completedAt ?? now : undefined };
+        }
+        return reordered.has(t.id) ? { ...t, orderIndex: reordered.get(t.id) ?? t.orderIndex } : t;
+      });
+      storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, next);
+    },
+
+    delete(id: string): void {
+      storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, this.getAll().filter((t) => t.id !== id));
+    }
+  },
+
   // CASCADE DELETE GUARANTEE (FASE 17)
   deleteClientCascade(clientId: string): boolean {
     logger.warn(`Executing complete cascade delete for client ${clientId}...`);
@@ -774,6 +833,9 @@ export const storageService = {
     // 13. Delete Research
     const research = storageFactory.getAdapter('research_insights').getCollection<ResearchInsight>(KEYS.RESEARCH_INSIGHTS).filter(r => r.clientId !== clientId);
     storageFactory.getAdapter('research_insights').setCollection(KEYS.RESEARCH_INSIGHTS, research);
+
+    // 14. Delete Tasks (CRM de entregas)
+    storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, this.tasks.getAll().filter(t => t.clientId !== clientId));
 
     logger.info(`Cascade delete completed cleanly for client ${clientId}.`);
     return true;

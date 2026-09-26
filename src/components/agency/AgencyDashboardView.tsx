@@ -1,29 +1,46 @@
-import React from 'react';
-import { Client, Alert, AccountSnapshot, Content } from '../../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Client, Alert, AccountSnapshot, Content, CalendarItem, DeliveryTask } from '../../types';
+import { storageService } from '../../services/storageService';
+import { summarizeTasks, upcomingTasks } from '../../services/taskInsights';
+import { TasksBoard } from '../tasks/TasksBoard';
+import { ScopePicker } from './ScopePicker';
+import type { WorkspaceSubTab } from '../workspace/WorkspaceHeader';
 import { analyticsService } from '../../services/analyticsService';
+import {
+  clientFreshness,
+  formatBreakdown,
+  percentChange,
+  topPosts,
+  weekDayOf,
+  weekPlan,
+  weeklyViews
+} from '../../services/dashboardInsights';
 import { ClientCard } from '../clients/ClientCard';
-import { StatCard } from '../common/StatCard';
-import { ASSETS } from '../../data/assets';
 import { formatMetric, isMetric, sumMetric } from '../../utils/metrics';
 import {
-  Users,
-  Eye,
-  TrendingUp,
-  AlertTriangle,
-  Plus,
-  Sparkles,
-  ShieldCheck,
-  Building,
-  CheckCircle2,
-  Database
-} from 'lucide-react';
+  BigNumberPair,
+  FormatDonut,
+  KPI_ICONS,
+  KpiCard,
+  RoutinePanel,
+  TopPostsPanel,
+  UpcomingTasksPanel,
+  WeekPanel,
+  WeeklyViewsChart
+} from './DashboardPanels';
+import { AlertTriangle, CalendarDays, FileText, ListChecks, Plus, Database, LayoutDashboard, Users } from 'lucide-react';
 
 interface AgencyDashboardViewProps {
   clients: Client[];
   snapshots: AccountSnapshot[];
   contents: Content[];
+  calendarItems: CalendarItem[];
   alerts: Alert[];
+  userName?: string;
+  /** Modo demonstração: esconde tarefas gerais (reais) do painel fictício. */
+  isDemo?: boolean;
   onOpenWorkspace: (client: Client) => void;
+  onOpenClientTab: (client: Client, tab: WorkspaceSubTab) => void;
   onOpenNewClient: () => void;
   onEditClient: (client: Client) => void;
   onDuplicateClient: (client: Client) => void;
@@ -32,12 +49,21 @@ interface AgencyDashboardViewProps {
   onSeedDemoData?: () => void;
 }
 
+function greeting(now: Date): string {
+  const h = Number(now.toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Sao_Paulo' }));
+  return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+}
+
 export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
-  clients,
-  snapshots,
-  contents,
+  clients: allClients,
+  snapshots: allSnapshots,
+  contents: allContents,
+  calendarItems: allCalendar,
   alerts,
+  userName,
+  isDemo = false,
   onOpenWorkspace,
+  onOpenClientTab,
   onOpenNewClient,
   onEditClient,
   onDuplicateClient,
@@ -45,15 +71,57 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   onOpenAlerts,
   onSeedDemoData
 }) => {
-  // Estatísticas consolidadas apenas de snapshots reais (métricas ausentes não viram zero).
-  const latestByClient = new Map<string, AccountSnapshot>();
-  [...snapshots]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .forEach((s) => {
-      if (isMetric(s.followers)) latestByClient.set(s.clientId, s);
-    });
-  const totalFollowers = sumMetric([...latestByClient.values()].map((s) => s.followers));
-  // Últimos 30 dias de cada cliente: snapshots da conta ou, na falta, soma dos posts importados.
+  const now = new Date();
+  const readPref = (key: string, fallback: string) => {
+    try {
+      return localStorage.getItem(key) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  const writePref = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* preferência opcional */
+    }
+  };
+  const [mode, setModeState] = useState<'summary' | 'tasks'>(() => (readPref('gs_dash_mode', 'summary') === 'tasks' ? 'tasks' : 'summary'));
+  const [scope, setScopeState] = useState<string>(() => readPref('gs_dash_scope', 'all'));
+  const setMode = (m: 'summary' | 'tasks') => {
+    setModeState(m);
+    writePref('gs_dash_mode', m);
+  };
+  const setScope = (v: string) => {
+    setScopeState(v);
+    writePref('gs_dash_scope', v);
+  };
+  const [allTasks, setAllTasks] = useState<DeliveryTask[]>(() => storageService.tasks.getAll());
+  const reloadTasks = () => setAllTasks(storageService.tasks.getAll());
+
+  // Escopo inválido (cliente excluído, troca demo/produção) volta para "todos".
+  const scopeValid = scope === 'all' || (scope === 'general' && mode === 'tasks') || allClients.some((c) => c.id === scope);
+  useEffect(() => {
+    if (!scopeValid && scope !== 'general') setScope('all');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeValid, scope]);
+  const effectiveScope = scopeValid ? scope : 'all';
+  const selectedClient = allClients.find((c) => c.id === effectiveScope);
+
+  // Resumo: todos os clientes ou só o escolhido.
+  const clients = selectedClient ? [selectedClient] : allClients;
+  // Só dados dos clientes visíveis (demo e produção nunca se misturam).
+  const ids = useMemo(() => new Set(clients.map((c) => c.id)), [clients]);
+  const allIds = useMemo(() => new Set(allClients.map((c) => c.id)), [allClients]);
+  const clientsById = useMemo(() => new Map(allClients.map((c) => [c.id, c])), [allClients]);
+  const visibleTasks = allTasks.filter((t) => (t.clientId ? allIds.has(t.clientId) : !isDemo));
+  const scopedTasks = selectedClient ? visibleTasks.filter((t) => t.clientId === selectedClient.id) : visibleTasks;
+  const taskSummary = summarizeTasks(scopedTasks, now);
+  const snapshots = allSnapshots.filter((s) => ids.has(s.clientId));
+  const contents = allContents.filter((c) => ids.has(c.clientId));
+  const calendar = allCalendar.filter((c) => ids.has(c.clientId));
+
+  // KPIs: mesmo cálculo do workspace (snapshots da conta ou soma dos posts importados).
   const periods = clients.map((c) =>
     analyticsService.calculatePeriod(
       snapshots.filter((s) => s.clientId === c.id),
@@ -62,120 +130,201 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
       contents.filter((ct) => ct.clientId === c.id)
     )
   );
-  const totalViews = sumMetric(periods.map((p) => p.totalViews.current));
-  const totalReach = sumMetric(periods.map((p) => p.totalReach.current));
-  // Engajamento ponderado pelo alcance de cada cliente.
-  const weighted = periods.filter((p) => isMetric(p.avgEngagementRate.current) && isMetric(p.totalReach.current) && p.totalReach.current > 0);
-  const weightedReach = weighted.reduce((acc, p) => acc + (p.totalReach.current ?? 0), 0);
-  const engagement = weightedReach > 0
-    ? weighted.reduce((acc, p) => acc + (p.avgEngagementRate.current ?? 0) * (p.totalReach.current ?? 0), 0) / weightedReach
-    : null;
-  const calculatedEngagementRate = formatMetric(engagement, { suffix: '%', digits: 1, fallback: 'Sem dados' });
+  const sumOf = (pick: (p: (typeof periods)[number]) => number | null) => sumMetric(periods.map(pick));
+  const views = sumOf((p) => p.totalViews.current);
+  const viewsPrev = sumOf((p) => p.totalViews.previous);
+  const reach = sumOf((p) => p.totalReach.current);
+  const reachPrev = sumOf((p) => p.totalReach.previous);
+  const posts = sumOf((p) => p.postsPublished.current) ?? 0;
+  const postsPrev = sumOf((p) => p.postsPublished.previous);
+  const followers = sumOf((p) => p.followersGrowth.current);
+  const weightedEngagement = (key: 'current' | 'previous') => {
+    const list = periods.filter((p) => isMetric(p.avgEngagementRate[key]) && isMetric(p.totalReach[key]) && (p.totalReach[key] ?? 0) > 0);
+    const base = list.reduce((acc, p) => acc + (p.totalReach[key] ?? 0), 0);
+    return base > 0 ? list.reduce((acc, p) => acc + (p.avgEngagementRate[key] ?? 0) * (p.totalReach[key] ?? 0), 0) / base : null;
+  };
+  const engagement = weightedEngagement('current');
+  const engagementPrev = weightedEngagement('previous');
 
-  const unhandledAlerts = alerts.filter(a => a.status === 'NEW');
+  const weeks = weeklyViews(contents, 8, now);
+  const formats = formatBreakdown(contents, 30, now);
+  const top = topPosts(contents, 5, 30, now);
+  const freshness = clientFreshness(clients, contents, snapshots, now);
+  const plan = weekPlan(calendar);
+  const today = weekDayOf(now);
+  const unhandledAlerts = alerts.filter((a) => a.status === 'NEW');
+  const firstName = userName?.trim().split(/\s+/)[0];
+  const dateLabel = now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'America/Sao_Paulo' });
+  const plannedThisWeek = plan.reduce((acc, d) => acc + d.items.length, 0);
+  const firstForPerformance = clients.find((c) => contents.some((ct) => ct.clientId === c.id)) ?? clients[0];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Editorial Agency Ambient Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900">
-        <div className="absolute inset-0 z-0 opacity-20">
-          <img
-            src={ASSETS.agencyHero}
-            alt="Gabriel Speratti Intelligence Agency"
-            className="w-full h-full object-cover grayscale contrast-125"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-neutral-950 via-neutral-950/90 to-transparent" />
+    <div className="space-y-6">
+      {/* Saudação */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1.5">
+          <p className="inline-flex items-center gap-2 rounded-full bg-white/[0.05] px-3 py-1 text-xs text-neutral-400">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Hoje, {dateLabel}
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-50 sm:text-4xl">
+            {greeting(now)}{firstName ? `, ${firstName}` : ''}!
+          </h1>
+          <p className="text-sm text-neutral-400">
+            {allClients.length === 0
+              ? 'Cadastre o primeiro cliente para começar.'
+              : mode === 'tasks'
+                ? taskSummary.overdue > 0
+                  ? `${taskSummary.open} ${taskSummary.open === 1 ? 'entrega em aberto' : 'entregas em aberto'}, ${taskSummary.overdue} atrasada${taskSummary.overdue > 1 ? 's' : ''}.`
+                  : `${taskSummary.open} ${taskSummary.open === 1 ? 'entrega em aberto' : 'entregas em aberto'}.`
+                : selectedClient
+                  ? `Resumo de ${selectedClient.name} nos últimos 30 dias.`
+                  : 'Resumo dos seus clientes nos últimos 30 dias.'}
+          </p>
         </div>
-
-        <div className="relative z-10 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <h1 className="text-2xl sm:text-3xl font-bold text-neutral-50 tracking-tight">Visão geral da agência</h1>
-            <p className="text-sm text-neutral-400 leading-relaxed max-w-[60ch]">
-              Acompanhe clientes, conexões com o Instagram e alertas. Todos os números vêm de dados sincronizados ou registrados pela equipe.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {unhandledAlerts.length > 0 && (
-              <button
-                onClick={onOpenAlerts}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium hover:bg-rose-500/20 transition-all"
-              >
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
-                <span>{unhandledAlerts.length} Alerta(s) Ativo(s)</span>
-              </button>
-            )}
-
+        <div className="flex flex-wrap items-center gap-2">
+          {unhandledAlerts.length > 0 && (
             <button
-              onClick={onOpenNewClient}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold transition-all active:scale-[0.98]"
+              onClick={onOpenAlerts}
+              className="inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-xs font-medium text-rose-300 transition-colors hover:bg-rose-500/20"
             >
-              <Plus className="w-4 h-4 stroke-[3]" />
-              <span>Novo Cliente</span>
+              <AlertTriangle className="h-4 w-4" />
+              {unhandledAlerts.length} {unhandledAlerts.length === 1 ? 'alerta novo' : 'alertas novos'}
             </button>
-          </div>
+          )}
+          {allClients.length > 0 && (
+            <>
+              <ScopePicker clients={allClients} value={effectiveScope} onChange={setScope} allowGeneral={mode === 'tasks'} />
+              <div className="flex rounded-full bg-[#161618] p-1" role="tablist" aria-label="Seção do painel">
+                {([
+                  ['summary', 'Resumo', LayoutDashboard],
+                  ['tasks', 'Tarefas', ListChecks]
+                ] as const).map(([id, label, Icon]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === id}
+                    onClick={() => setMode(id)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      mode === id ? 'bg-neutral-50 text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                    {id === 'tasks' && taskSummary.overdue > 0 && (
+                      <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white tabular-nums">{taskSummary.overdue}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* KPI Global Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Clientes ativos"
-          value={clients.length}
-          typeTag="DADO REAL"
-          subtext="Contas em operação ativa"
-          icon={<Users className="w-4 h-4 text-amber-400" />}
-        />
+      {allClients.length > 0 && mode === 'tasks' && (
+        <TasksBoard tasks={visibleTasks} clients={allClients} scope={effectiveScope} onChanged={reloadTasks} />
+      )}
 
-        <StatCard
-          label="Seguidores monitorados"
-          value={formatMetric(totalFollowers, { fallback: 'Sem dados' })}
-          typeTag="DADO REAL"
-          subtext="Base combinada da agência"
-          icon={<TrendingUp className="w-4 h-4 text-emerald-400" />}
-        />
+      {clients.length > 0 && mode === 'summary' && (
+        <>
+          {/* KPIs + visualizações semanais */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+              <KpiCard
+                highlight
+                label="Visualizações"
+                value={formatMetric(views, { fallback: 'Sem dados' })}
+                delta={percentChange(views, viewsPrev)}
+                icon={KPI_ICONS.views}
+              />
+              <KpiCard
+                label="Alcance"
+                value={formatMetric(reach, { fallback: 'Sem dados' })}
+                delta={percentChange(reach, reachPrev)}
+                icon={KPI_ICONS.reach}
+                delay={0.05}
+              />
+              <KpiCard
+                label="Engajamento"
+                value={formatMetric(engagement, { suffix: '%', digits: 1, fallback: 'Sem dados' })}
+                delta={percentChange(engagement, engagementPrev)}
+                icon={KPI_ICONS.engagement}
+                delay={0.1}
+              />
+              <KpiCard
+                label="Publicações"
+                value={String(posts)}
+                delta={percentChange(posts, postsPrev)}
+                icon={KPI_ICONS.posts}
+                delay={0.15}
+              />
+            </div>
+            <WeeklyViewsChart
+              weeks={weeks}
+              delay={0.1}
+              onOpen={firstForPerformance ? () => onOpenClientTab(firstForPerformance, 'performance') : undefined}
+            />
+          </div>
 
-        <StatCard
-          label="Visualizações (30 dias)"
-          value={formatMetric(totalViews, { fallback: 'Sem dados' })}
-          typeTag="DADO REAL"
-          subtext="Soma dos clientes no período"
-          icon={<Eye className="w-4 h-4 text-sky-400" />}
-        />
+          {/* Números grandes + formatos */}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            <BigNumberPair
+              delay={0.2}
+              left={{
+                value: taskSummary.open,
+                unit: taskSummary.open === 1 ? 'entrega' : 'entregas',
+                icon: ListChecks,
+                text:
+                  taskSummary.open === 0 ? (
+                    'Nenhuma tarefa em aberto.'
+                  ) : (
+                    <>
+                      {taskSummary.overdue > 0 && <><span className="text-rose-400">{taskSummary.overdue} atrasada{taskSummary.overdue > 1 ? 's' : ''}</span>, </>}
+                      <span className="text-amber-400">{taskSummary.today}</span> para hoje.
+                    </>
+                  )
+              }}
+              right={{
+                value: plannedThisWeek,
+                unit: plannedThisWeek === 1 ? 'post planejado' : 'posts planejados',
+                icon: FileText,
+                text: followers !== null ? <>Base somada de <span className="text-neutral-200">{formatMetric(followers)}</span> seguidores.</> : 'Registre os seguidores na aba Métricas.'
+              }}
+              onCenter={() => setMode('tasks')}
+              centerLabel="Abrir minhas tarefas"
+            />
+            <FormatDonut rows={formats} delay={0.25} />
+          </div>
 
-        <StatCard
-          label="Engajamento médio (30 dias)"
-          value={calculatedEngagementRate}
-          typeTag="DADO CALCULADO"
-          subtext={isMetric(totalReach) && totalReach > 0 ? 'Ponderada por alcance real' : 'Sem alcance para ponderação'}
-          icon={<Sparkles className="w-4 h-4 text-purple-400" />}
-        />
-      </div>
+          {/* Destaques + rotina */}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+            <TopPostsPanel posts={top} clientsById={clientsById} onOpen={(c) => onOpenClientTab(c, 'content')} delay={0.3} />
+            <RoutinePanel rows={freshness} onImport={(c) => onOpenClientTab(c, 'metrics')} delay={0.35} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+            <UpcomingTasksPanel tasks={upcomingTasks(scopedTasks, 5, now)} clientsById={clientsById} onOpenTasks={() => setMode('tasks')} delay={0.4} />
+            <WeekPanel plan={plan} today={today} clientsById={clientsById} onOpen={(c) => onOpenClientTab(c, 'calendar')} delay={0.4} />
+          </div>
+        </>
+      )}
 
       {/* Clients Management Grid */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
+      <div className={`space-y-4 ${mode === 'tasks' && allClients.length > 0 ? 'hidden' : ''}`}>
+        <div className="flex items-end justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-neutral-100 flex items-center gap-2">
-              <span>Workspaces dos Clientes</span>
-              <span className="text-xs font-mono text-neutral-400">({clients.length})</span>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-neutral-50">
+              Clientes
+              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium text-neutral-400 tabular-nums">{clients.length}</span>
             </h2>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              Abra um cliente para ver métricas, conteúdo, pesquisa e planejamento.
-            </p>
+            <p className="mt-0.5 text-xs text-neutral-500">Abra um cliente para ver métricas, conteúdo, pesquisa e planejamento.</p>
           </div>
-
-          <button
-            onClick={onOpenNewClient}
-            className="text-xs font-mono text-amber-400 hover:text-amber-300 flex items-center gap-1 font-medium"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Adicionar Cliente</span>
-          </button>
         </div>
 
-        {clients.length === 0 ? (
-          <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-8 sm:p-12 text-center space-y-4">
+        {allClients.length === 0 ? (
+          <div className="rounded-[28px] bg-[#161618] border border-white/[0.04] p-8 sm:p-12 text-center space-y-4">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
               <Users className="w-7 h-7" />
             </div>
@@ -207,7 +356,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {clients.map((client, idx) => {
               const latestSnap = snapshots
                 .filter((s) => s.clientId === client.id)

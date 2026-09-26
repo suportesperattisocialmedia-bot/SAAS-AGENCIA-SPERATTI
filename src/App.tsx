@@ -770,12 +770,22 @@ export default function App() {
                   clients={clients}
                   snapshots={storageService.history.getAll()}
                   contents={storageService.contents.getAll()}
+                  calendarItems={storageService.calendar.getAll()}
                   alerts={alerts}
+                  userName={sessionUser?.name}
+                  isDemo={isDemoLoaded}
                   onOpenWorkspace={(client) => {
                     setActiveClient(client);
                     loadClientData(client);
                     setCurrentSection('performance');
                     setWorkspaceTab('overview');
+                  }}
+                  onOpenClientTab={(client, tab) => {
+                    setActiveClient(client);
+                    loadClientData(client);
+                    const section = (Object.keys(SECTION_TO_TAB) as MainNavSection[]).find((k) => SECTION_TO_TAB[k] === tab);
+                    setCurrentSection(section ?? 'performance');
+                    setWorkspaceTab(tab);
                   }}
                   onOpenNewClient={() => {
                     setEditingClient(null);
