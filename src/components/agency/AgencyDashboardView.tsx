@@ -193,7 +193,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   const formats = formatBreakdown(contents, 30, now);
   const top = topPosts(contents, 5, 30, now);
   const freshness = clientFreshness(clients, contents, snapshots, now);
-  const plan = weekPlan(calendar);
+  const plan = weekPlan(calendar, now);
   const today = weekDayOf(now);
   const unhandledAlerts = alerts.filter((a) => a.status === 'NEW');
   const firstName = userName?.trim().split(/\s+/)[0];

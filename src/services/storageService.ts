@@ -50,6 +50,7 @@ import {
 } from '../schemas';
 import { logger } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
+import { weekDayOfDate } from '../utils/calendarDates';
 
 const KEYS = {
   CLIENTS: 'gs_intel_clients',
@@ -560,8 +561,12 @@ export const storageService = {
 
       const newItem: CalendarItem = {
         ...itemData,
+        // Com data real, o dia da semana sempre acompanha a data.
+        dayOfWeek: itemData.date ? weekDayOfDate(itemData.date) : itemData.dayOfWeek,
+        date: itemData.date || undefined,
         id,
-        orderIndex: order
+        orderIndex: order,
+        updatedAt: new Date().toISOString()
       };
 
       const validated = CalendarItemSchema.parse(newItem);

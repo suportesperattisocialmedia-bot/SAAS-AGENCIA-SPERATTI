@@ -8,6 +8,8 @@ import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
 import { normalizeWeekDay, weekDayLabel } from '../../services/storage/migration';
 import { Modal } from '../common/Modal';
+import { nextDateForWeekDay } from '../../utils/calendarDates';
+import { brasiliaDay } from '../../services/dashboardInsights';
 import {
   Sparkles,
   BookOpen,
@@ -87,11 +89,13 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
       calendarDay: validDay
     });
 
+    const date = nextDateForWeekDay(validDay, brasiliaDay(new Date()));
     storageService.calendar.saveItem({
       clientId: client.id,
       title: idea.title,
       format: idea.format,
       dayOfWeek: validDay,
+      date,
       pillar: idea.pillar,
       status: 'PLANEJADO',
       hook: idea.hook,
@@ -100,7 +104,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
 
     notificationService.addNotification(
       'Conteúdo Agendado no Calendário',
-      `"${idea.title}" agendado para ${day} no planejamento semanal.`,
+      `"${idea.title}" agendado para ${day}, ${date.slice(8, 10)}/${date.slice(5, 7)}.`,
       'success'
     );
     onRefresh();

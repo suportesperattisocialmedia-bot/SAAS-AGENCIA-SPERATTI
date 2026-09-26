@@ -293,7 +293,9 @@ export const CalendarItemSchema = z.object({
   cta: z.string().optional(),
   status: PipelineStatusSchema.optional().default('PLANEJADO'),
   notes: z.string().optional(),
-  orderIndex: z.number().int().default(0)
+  orderIndex: z.number().int().default(0),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  updatedAt: z.string().optional()
 });
 
 export const AlertSchema = z.object({

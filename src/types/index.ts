@@ -343,6 +343,9 @@ export interface CalendarItem {
   status?: PipelineStatus;
   notes?: string;
   orderIndex: number;
+  /** Data real da publicação (YYYY-MM-DD). Sem data = modelo semanal (dayOfWeek). */
+  date?: string;
+  updatedAt?: string;
 }
 
 export type HookCategory = 

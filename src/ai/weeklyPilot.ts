@@ -179,6 +179,7 @@ export function applyWeeklyPlan(client: Client, posts: PlannedPost[], now = new 
     storageService.calendar.saveItem({
       clientId: client.id,
       dayOfWeek: weekdayOfDate(p.date),
+      date: p.date,
       timeSlot: p.time,
       title: p.title,
       format: p.format,
