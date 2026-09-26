@@ -28,6 +28,7 @@ import { migrationEngine } from './services/storage/migration';
 import { indexedDBAdapter } from './services/storage/IndexedDBAdapter';
 import { logger } from './utils/logger';
 import { sessionService, type BackendStatus, type SessionUser } from './services/sessionService';
+import { syncService } from './services/sync/syncService';
 import { describeApiError, onSessionExpired } from './services/api/apiClient';
 import { motion, useReducedMotion } from 'motion/react';
 import { DemoProvider } from './services/demo/DemoProvider';
@@ -129,6 +130,7 @@ export default function App() {
       onSessionExpired(() => {
         if (!sessionUserRef.current) return;
         setSessionNotice('Sua sessão expirou. Entre novamente para continuar; os dados deste navegador estão salvos.');
+        syncService.stop();
         setSessionUser(null);
         setActiveClient(null);
       }),
@@ -232,6 +234,9 @@ export default function App() {
       setActiveClient(null);
     }
   }, [loadClientData, visibleClients]);
+
+  // Dados que chegaram da nuvem (outro aparelho, portal do cliente) recarregam a tela.
+  useEffect(() => syncService.onRemoteChange(() => reloadAllData()), [reloadAllData]);
 
   /** Sincroniza o cadastro local de clientes com o servidor (necessário para OAuth, sync e IA). */
   const syncClientsWithServer = useCallback(async () => {
@@ -343,7 +348,12 @@ export default function App() {
       setSessionUser(session.user);
 
       if (session.user && !isDemo) {
+        // Dados da nuvem primeiro (tarefas, métricas, calendário...), sem travar a abertura
+        // se a rede estiver lenta: o que chegar depois recarrega a tela sozinho.
+        await Promise.race([syncService.start(session.user.agencyId), new Promise((r) => setTimeout(r, 5000))]);
         await syncClientsWithServer();
+      } else {
+        syncService.stop();
       }
 
       // Step 4: clientes visíveis no modo atual
@@ -634,6 +644,8 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      await syncService.flush().catch(() => undefined);
+      syncService.stop();
       await sessionService.logout();
     } finally {
       setSessionUser(null);

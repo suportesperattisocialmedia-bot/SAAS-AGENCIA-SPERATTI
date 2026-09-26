@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, Plus, Bell, RefreshCw, Menu, ChevronRight } from 'lucide-react';
 import { Client } from '../../types';
+import { CloudStatus } from './CloudStatus';
 
 interface HeaderProps {
   activeClient: Client | null;
@@ -88,6 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Zone 3: Primary Actions */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <CloudStatus />
         <button
           onClick={onOpenSearch}
           className="md:hidden p-1.5 text-neutral-400 hover:text-neutral-200 rounded-2xl hover:bg-white/[0.04]"

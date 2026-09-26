@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Client, Alert, AccountSnapshot, Content, CalendarItem, DeliveryTask } from '../../types';
 import { storageService } from '../../services/storageService';
+import { syncService } from '../../services/sync/syncService';
 import { packageProgress, summarizeTasks, upcomingTasks } from '../../services/taskInsights';
 import { TasksBoard } from '../tasks/TasksBoard';
 import { ScopePicker } from './ScopePicker';
@@ -113,8 +114,18 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
     writePref('gs_dash_scope', v);
   };
   const [backupDays, setBackupDays] = useState<number | null>(() => daysSinceBackup());
+  // Com a nuvem funcionando os dados já estão protegidos; o aviso de backup só aparece sem ela.
+  const [cloudOk, setCloudOk] = useState(() => !['disabled', 'error'].includes(syncService.getStatus().state));
+  useEffect(() => syncService.onStatus((st) => setCloudOk(!['disabled', 'error'].includes(st.state))), []);
   const [allTasks, setAllTasks] = useState<DeliveryTask[]>(() => storageService.tasks.getAll());
   const reloadTasks = () => setAllTasks(storageService.tasks.getAll());
+  useEffect(
+    () =>
+      syncService.onRemoteChange((keys) => {
+        if (keys.includes('gs_intel_tasks')) setAllTasks(storageService.tasks.getAll());
+      }),
+    []
+  );
 
   useEffect(() => {
     if (!pendingAction) return;
@@ -274,7 +285,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
       {/* Título da seção para leitores de tela (h1 > h2 > h3). */}
       <h2 className="sr-only">{mode === 'tasks' ? 'Minhas tarefas' : 'Resumo'}</h2>
 
-      {allClients.length > 0 && !isDemo && (backupDays === null || backupDays > 7) && (
+      {allClients.length > 0 && !isDemo && !cloudOk && (backupDays === null || backupDays > 7) && (
         <div className="flex flex-col gap-3 rounded-[22px] border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-3 text-sm text-neutral-200">
             <HardDriveDownload className="h-5 w-5 shrink-0 text-amber-400" />

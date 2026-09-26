@@ -6,6 +6,7 @@
 
 import { StorageAdapter } from './StorageAdapter';
 import { logger } from '../../utils/logger';
+import { notifyStorageWrite } from './changeBus';
 
 const DB_NAME = 'gs_social_intelligence_db';
 const DB_VERSION = 1;
@@ -147,11 +148,13 @@ export class IndexedDBAdapter implements StorageAdapter {
   set<T>(key: string, value: T): void {
     this.cache.set(key, value);
     this.persistAsync(key, value);
+    notifyStorageWrite(key);
   }
 
   remove(key: string): void {
     this.cache.delete(key);
     this.removeAsync(key);
+    notifyStorageWrite(key);
   }
 
   clear(): void {

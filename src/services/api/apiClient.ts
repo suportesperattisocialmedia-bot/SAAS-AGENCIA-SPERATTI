@@ -11,9 +11,12 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly requestId: string | null;
+  /** Dados extras do envelope de erro (ex.: documento atual num 409 de versão). */
+  readonly data: unknown;
 
-  constructor(message: string, status: number, code = 'UNKNOWN', requestId: string | null = null) {
+  constructor(message: string, status: number, code = 'UNKNOWN', requestId: string | null = null, data: unknown = undefined) {
     super(message);
+    this.data = data;
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
@@ -82,7 +85,8 @@ async function executeRequest<T>(path: string, method: string, body?: unknown, o
           err?.message || (response.status === 404 ? 'Serviço indisponível no momento.' : `Falha na requisição (${response.status}).`),
           response.status,
           err?.code || 'HTTP_ERROR',
-          err?.requestId || response.headers.get('x-request-id')
+          err?.requestId || response.headers.get('x-request-id'),
+          payload && typeof payload === 'object' && 'data' in payload ? (payload as { data: unknown }).data : undefined
         );
       }
 
@@ -113,6 +117,9 @@ export const apiClient = {
   },
   post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
     return executeRequest<T>(path, 'POST', body ?? {}, options);
+  },
+  put<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
+    return executeRequest<T>(path, 'PUT', body, options);
   },
   delete<T>(path: string, options?: RequestOptions): Promise<T> {
     return executeRequest<T>(path, 'DELETE', undefined, options);
