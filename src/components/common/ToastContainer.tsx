@@ -50,7 +50,7 @@ export const ToastContainer: React.FC = () => {
       {toasts.map(toast => (
         <div
           key={toast.id}
-          className="pointer-events-auto bg-neutral-900 border border-neutral-700 text-neutral-100 px-4 py-3 rounded-lg shadow-2xl flex items-center justify-between gap-3 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className="pointer-events-auto bg-[#161618] border border-white/[0.1] text-neutral-100 px-4 py-3 rounded-[24px] shadow-2xl flex items-center justify-between gap-3 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200"
         >
           <div className="flex items-center gap-2.5">
             {getIcon(toast.type)}

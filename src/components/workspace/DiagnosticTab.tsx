@@ -29,13 +29,13 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Header Banner */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-neutral-100">
               Diagnóstico Estratégico Profundo da Conta
             </h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-purple-500/30 text-purple-400 bg-purple-950/20">
+            <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-purple-500/30 text-purple-400 bg-purple-950/20">
               ANÁLISE POR IA EXTERNA
             </span>
           </div>
@@ -47,7 +47,7 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
         <button
           onClick={onRunDiagnostic}
           disabled={isAnalyzing}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60 shadow-xs shrink-0 self-start sm:self-center"
+          className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-full text-xs font-semibold transition-colors disabled:opacity-60 shadow-xs shrink-0 self-start sm:self-center"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
           <span>{diagnostic ? 'Gerar nova análise' : 'Gerar análise completa'}</span>
@@ -97,15 +97,15 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
               ]
             }
           ] as Array<{ icon: typeof User; title: string; fields: Array<[string, string]> }>).map(({ icon: Icon, title, fields }) => (
-            <div key={title} className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
-              <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
+            <div key={title} className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 space-y-4">
+              <div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
                 <Icon className="w-4 h-4 text-amber-400" />
-                <h4 className="text-xs font-bold font-mono uppercase text-neutral-200 tracking-wider">{title}</h4>
+                <h4 className="text-sm font-bold text-neutral-200">{title}</h4>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 {fields.map(([label, value]) => (
-                  <div key={label} className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1">
-                    <span className="text-[10px] font-mono text-neutral-500 uppercase">{label}</span>
+                  <div key={label} className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl space-y-1">
+                    <span className="text-[11px] text-neutral-500">{label}</span>
                     {value?.trim() ? (
                       <p className="text-neutral-300 leading-relaxed whitespace-pre-line">{value}</p>
                     ) : (
@@ -118,10 +118,10 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
           ))}
 
           {/* Section 4: ESTRATÉGIA */}
-          <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
+          <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 space-y-4">
+            <div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
               <Target className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-bold font-mono uppercase text-neutral-200 tracking-wider">
+              <h4 className="text-sm font-bold text-neutral-200">
                 04. Estratégia de Posicionamento, Funil e Vendas
               </h4>
             </div>
@@ -135,8 +135,8 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
                 ['Formatos Recomendados', diagnostic.strategySection.recommendedFormats],
                 ['Próximas Ações', diagnostic.nextActions]
               ] as Array<[string, string[]]>).map(([label, items]) => (
-                <div key={label} className="p-3 bg-neutral-950/60 border border-neutral-800/80 rounded-lg space-y-1.5">
-                  <span className="text-[10px] font-mono text-neutral-500 uppercase">{label}</span>
+                <div key={label} className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl space-y-1.5">
+                  <span className="text-[11px] text-neutral-500">{label}</span>
                   {items.length === 0 ? (
                     <p className="text-neutral-500">Sem itens.</p>
                   ) : (
@@ -156,7 +156,7 @@ export const DiagnosticTab: React.FC<DiagnosticTabProps> = ({
           </div>
         </div>
       ) : (
-        <div className="p-12 text-center bg-neutral-900/40 border border-neutral-800 rounded-xl space-y-3">
+        <div className="p-12 text-center bg-white/[0.02] border border-white/[0.06] rounded-2xl space-y-3">
           <Sparkles className="w-8 h-8 text-neutral-500 mx-auto" />
           <h4 className="text-sm font-semibold text-neutral-300">Nenhum diagnóstico gerado ainda</h4>
           <p className="text-xs text-neutral-500 max-w-sm mx-auto">

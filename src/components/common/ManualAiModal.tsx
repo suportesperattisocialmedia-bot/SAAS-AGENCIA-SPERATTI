@@ -75,12 +75,12 @@ export const ManualAiModal: React.FC<ManualAiModalProps> = ({ isOpen, onClose, t
             readOnly
             value={prompt}
             rows={7}
-            className="w-full rounded-xl bg-neutral-950 border border-neutral-800 p-3 text-xs text-neutral-300 font-mono leading-relaxed resize-y"
+            className="w-full rounded-2xl bg-white/[0.03] border border-white/[0.06] p-3 text-xs text-neutral-300 tabular-nums leading-relaxed resize-y"
             aria-label="Prompt gerado"
           />
           <button
             onClick={copyPrompt}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 font-semibold transition"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 font-semibold transition"
           >
             {copied ? <Check className="w-4 h-4" /> : <ClipboardCopy className="w-4 h-4" />}
             {copied ? 'Prompt copiado' : 'Copiar prompt'}
@@ -96,7 +96,7 @@ export const ManualAiModal: React.FC<ManualAiModalProps> = ({ isOpen, onClose, t
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/[0.1] text-neutral-300 hover:bg-white/[0.07] transition"
               >
                 {link.label}
                 <ExternalLink className="w-3.5 h-3.5 text-neutral-500" />
@@ -113,22 +113,22 @@ export const ManualAiModal: React.FC<ManualAiModalProps> = ({ isOpen, onClose, t
             onChange={(e) => setResponse(e.target.value)}
             rows={7}
             placeholder="Cole aqui a resposta completa da IA..."
-            className="w-full rounded-xl bg-neutral-950 border border-neutral-800 focus:border-amber-500 outline-none p-3 text-xs text-neutral-200 font-mono leading-relaxed resize-y placeholder:text-neutral-600"
+            className="w-full rounded-2xl bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 outline-none p-3 text-xs text-neutral-200 tabular-nums leading-relaxed resize-y placeholder:text-neutral-600"
             aria-label="Resposta da IA"
           />
           {error && (
-            <p role="alert" className="text-sm text-rose-300 bg-rose-950/30 border border-rose-500/20 rounded-lg px-3 py-2">
+            <p role="alert" className="text-sm text-rose-300 bg-rose-950/30 border border-rose-500/20 rounded-2xl px-3 py-2">
               {error}
             </p>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <button onClick={onClose} className="px-4 py-2 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 transition">
+            <button onClick={onClose} className="px-4 py-2 rounded-full border border-white/[0.1] text-neutral-300 hover:bg-white/[0.07] transition">
               Cancelar
             </button>
             <button
               onClick={handleImport}
               disabled={!response.trim() || importing}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardPaste className="w-4 h-4" />}
               {importLabel}

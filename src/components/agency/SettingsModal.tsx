@@ -71,10 +71,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       subtitle="Parâmetros globais do sistema Gabriel Speratti Social Intelligence"
       maxWidth="lg"
     >
-      <form onSubmit={handleSave} className="space-y-5 text-xs font-mono">
+      <form onSubmit={handleSave} className="space-y-5 text-xs tabular-nums">
         {/* Identificação da Agência */}
         <div className="space-y-3">
-          <div className="text-[10px] font-mono uppercase text-amber-400 font-semibold border-b border-neutral-800 pb-1">
+          <div className="text-[11px] text-amber-400 font-semibold border-b border-white/[0.06] pb-1">
             01. Identidade da Agência
           </div>
 
@@ -85,7 +85,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               type="text"
               value={settings.agencyName}
               onChange={(e) => setSettings({ ...settings, agencyName: e.target.value })}
-              className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100 font-bold"
+              className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100 font-bold"
             />
           </div>
 
@@ -96,18 +96,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               type="text"
               value={settings.ownerName}
               onChange={(e) => setSettings({ ...settings, ownerName: e.target.value })}
-              className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100 font-bold"
+              className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100 font-bold"
             />
           </div>
         </div>
 
         {/* Integrações & Arquitetura */}
         <div className="space-y-3">
-          <div className="text-[10px] font-mono uppercase text-amber-400 font-semibold border-b border-neutral-800 pb-1">
+          <div className="text-[11px] text-amber-400 font-semibold border-b border-white/[0.06] pb-1">
             02. Status das Integrações
           </div>
 
-          <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg space-y-2">
+          <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-neutral-300 font-medium">Motor de Inteligência Artificial</span>
               <span className="flex items-center gap-1 text-emerald-400">
@@ -119,7 +119,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg space-y-2">
+          <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-neutral-300 font-medium">Persistência de Dados</span>
               <span className="text-amber-400">Repository Layer (LocalStorage / Supabase Ready)</span>
@@ -132,11 +132,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Gerenciamento de Dados & Demo */}
         <div className="space-y-3">
-          <div className="text-[10px] font-mono uppercase text-amber-400 font-semibold border-b border-neutral-800 pb-1">
+          <div className="text-[11px] text-amber-400 font-semibold border-b border-white/[0.06] pb-1">
             03. Dados de Demonstração e Reset
           </div>
 
-          <div className="flex items-center justify-between p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
+          <div className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
             <div>
               <div className="text-neutral-200 font-semibold">Cliente de demonstração (Clínica Aurora)</div>
               <div className="text-[11px] text-neutral-500 mt-0.5">
@@ -148,7 +148,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={onResetAllData}
-                className="px-3 py-1.5 bg-rose-950/40 border border-rose-500/30 text-rose-400 hover:bg-rose-900/50 rounded transition-colors text-[11px]"
+                className="px-3 py-1.5 bg-rose-950/40 border border-rose-500/30 text-rose-400 hover:bg-rose-900/50 rounded-full transition-colors text-[11px]"
               >
                 Limpar Demo
               </button>
@@ -156,7 +156,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={onSeedDemoData}
-                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded transition-colors text-[11px]"
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-full transition-colors text-[11px]"
               >
                 Ativar demonstração
               </button>
@@ -166,7 +166,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Backup */}
         <div className="space-y-3">
-          <div className="text-[10px] font-mono uppercase text-amber-400 font-semibold border-b border-neutral-800 pb-1">
+          <div className="text-[11px] text-amber-400 font-semibold border-b border-white/[0.06] pb-1">
             04. Backup dos dados
           </div>
           <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
@@ -185,7 +185,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 px-4 py-2 text-xs font-semibold text-neutral-200 hover:bg-neutral-700"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-4 py-2 text-xs font-semibold text-neutral-200 hover:bg-white/[0.1]"
             >
               <Upload className="h-3.5 w-3.5" />
               Restaurar backup
@@ -197,17 +197,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        <div className="pt-3 border-t border-neutral-800 flex justify-end gap-2">
+        <div className="pt-3 border-t border-white/[0.06] flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-neutral-800 text-neutral-300 rounded hover:bg-neutral-700"
+            className="px-4 py-2 bg-white/[0.06] text-neutral-300 rounded-full hover:bg-white/[0.1]"
           >
             Fechar
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-amber-500 text-neutral-950 font-bold rounded hover:bg-amber-400"
+            className="px-4 py-2 bg-amber-500 text-neutral-950 font-bold rounded-full hover:bg-amber-400"
           >
             Salvar Configurações
           </button>

@@ -28,7 +28,7 @@ export const ChartBar: React.FC<ChartBarProps> = ({
   const data = (rawData || []).filter((d): d is BarDataPoint & { value: number } => typeof d.value === 'number');
   if (data.length === 0) {
     return (
-      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col items-center justify-center text-neutral-500 text-sm h-48">
+      <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-6 flex flex-col items-center justify-center text-neutral-500 text-sm h-48">
         Sem dados para gráfico de barras.
       </div>
     );
@@ -37,7 +37,7 @@ export const ChartBar: React.FC<ChartBarProps> = ({
   const maxVal = Math.max(...data.map(d => d.value)) || 1;
 
   return (
-    <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4 flex flex-col">
+    <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-4 flex flex-col">
       {(title || subtitle) && (
         <div className="mb-4">
           {title && <h4 className="text-sm font-semibold text-neutral-200">{title}</h4>}
@@ -52,7 +52,7 @@ export const ChartBar: React.FC<ChartBarProps> = ({
 
           return (
             <div key={idx} className="group">
-              <div className="flex items-center justify-between text-xs mb-1 font-mono">
+              <div className="flex items-center justify-between text-xs mb-1 tabular-nums">
                 <span className="text-neutral-300 font-medium truncate max-w-[200px]">
                   {item.label}
                 </span>

@@ -51,11 +51,11 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Alert Banner if any critical alert exists */}
       {unhandledAlerts.length > 0 && (
-        <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 flex items-start justify-between gap-3">
+        <div className="bg-amber-950/20 border border-amber-500/30 rounded-2xl p-4 flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-xs font-bold text-amber-300 uppercase font-mono">
+              <h4 className="text-sm font-bold text-amber-300">
                 {unhandledAlerts.length} Alerta(s) da Operação
               </h4>
               <p className="text-xs text-neutral-300 mt-0.5">
@@ -65,7 +65,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
           </div>
           <button
             onClick={() => onNavigateTab('performance')}
-            className="text-xs text-amber-400 hover:text-amber-300 font-mono font-medium shrink-0"
+            className="text-xs text-amber-400 hover:text-amber-300 tabular-nums font-medium shrink-0"
           >
             Ver Detalhes →
           </button>
@@ -73,7 +73,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
       )}
 
       {/* Main KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           label="Seguidores Atuais"
           value={formatMetric(periodSummary.followersGrowth.current)}
@@ -122,15 +122,15 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
         </div>
 
         {/* Top Performer Card */}
-        <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 flex flex-col justify-between">
+        <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="text-xs font-mono uppercase text-amber-400 font-semibold flex items-center gap-1.5">
+              <span className="text-sm text-amber-400 font-semibold flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5" />
                 Melhor Conteúdo Recente
               </span>
               {topContent && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
+                <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full bg-white/[0.06] text-neutral-300 border border-white/[0.1]">
                   {topContent.format}
                 </span>
               )}
@@ -142,8 +142,8 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
                   {topContent.title}
                 </h4>
 
-                <div className="p-2.5 rounded-lg bg-neutral-950/70 border border-neutral-800 text-xs">
-                  <div className="text-[10px] font-mono text-neutral-500 uppercase mb-1">
+                <div className="p-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-xs">
+                  <div className="text-[11px] text-neutral-500 mb-1">
                     Gancho Estratégico
                   </div>
                   <p className="text-neutral-300 italic">
@@ -151,8 +151,8 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
                   </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center pt-1 font-mono">
-                  <div className="p-2 bg-neutral-950/40 rounded border border-neutral-800/60">
+                <div className="grid grid-cols-3 gap-2 text-center pt-1 tabular-nums">
+                  <div className="p-2 bg-white/[0.03] rounded-2xl border border-white/[0.05]">
                     <div className="text-[10px] text-neutral-500 flex items-center justify-center gap-1">
                       <Eye className="w-3 h-3" /> Views
                     </div>
@@ -161,7 +161,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-2 bg-neutral-950/40 rounded border border-neutral-800/60">
+                  <div className="p-2 bg-white/[0.03] rounded-2xl border border-white/[0.05]">
                     <div className="text-[10px] text-neutral-500 flex items-center justify-center gap-1">
                       <Bookmark className="w-3 h-3" /> Salvos
                     </div>
@@ -170,7 +170,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-2 bg-neutral-950/40 rounded border border-neutral-800/60">
+                  <div className="p-2 bg-white/[0.03] rounded-2xl border border-white/[0.05]">
                     <div className="text-[10px] text-neutral-500 flex items-center justify-center gap-1">
                       <Share2 className="w-3 h-3" /> Shares
                     </div>
@@ -189,7 +189,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
 
           <button
             onClick={() => onNavigateTab('content')}
-            className="mt-4 pt-3 border-t border-neutral-800 flex items-center justify-between text-xs font-medium text-amber-400 hover:text-amber-300"
+            className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs font-medium text-amber-400 hover:text-amber-300"
           >
             <span>Ver todos os conteúdos</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -198,21 +198,21 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
       </div>
 
       {/* Strategic AI Next Actions Section */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5">
+      <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+            <div className="p-1.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
                 Próximas Ações Estratégicas
                 {actionsFromAi ? (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-purple-500/30 text-purple-400 bg-purple-950/20">
+                  <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-purple-500/30 text-purple-400 bg-purple-950/20">
                     DO DIAGNÓSTICO
                   </span>
                 ) : (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-900">
+                  <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-white/[0.1] text-neutral-400 bg-[#161618]">
                     CHECKLIST
                   </span>
                 )}
@@ -227,7 +227,7 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
 
           <button
             onClick={() => onNavigateTab('diagnostic')}
-            className="text-xs font-mono text-neutral-400 hover:text-neutral-200 flex items-center gap-1 hidden sm:flex"
+            className="text-xs tabular-nums text-neutral-400 hover:text-neutral-200 flex items-center gap-1 hidden sm:flex"
           >
             Ver Diagnóstico Completo →
           </button>
@@ -237,9 +237,9 @@ export const ClientOverviewTab: React.FC<ClientOverviewTabProps> = ({
           {nextActions.map((action, idx) => (
             <div
               key={idx}
-              className="flex items-start gap-3 p-3 rounded-lg bg-neutral-950/60 border border-neutral-800/80 text-xs text-neutral-200"
+              className="flex items-start gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-xs text-neutral-200"
             >
-              <div className="w-5 h-5 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[10px] font-mono font-bold text-amber-400 shrink-0 mt-0.5">
+              <div className="w-5 h-5 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[10px] tabular-nums font-bold text-amber-400 shrink-0 mt-0.5">
                 {idx + 1}
               </div>
               <div className="flex-1 font-medium leading-relaxed">

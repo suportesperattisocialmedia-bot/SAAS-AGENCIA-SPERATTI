@@ -13,6 +13,14 @@ import { analyticsService } from './analyticsService';
 import { aiService } from './aiService';
 import { formatMetric } from '../utils/metrics';
 import { weekDayLabel } from './storage/migration';
+import { brasiliaDay } from './dashboardInsights';
+
+/** Próximas ações do último diagnóstico importado (se houver). */
+function latestDiagnosticActions(clientId: string): string[] | null {
+  const last = storageService.aiAnalyses.getByClient(clientId).find((a) => a.analysisType === 'PROFILE_DIAGNOSTIC');
+  const actions = (last?.output as { nextActions?: unknown } | undefined)?.nextActions;
+  return Array.isArray(actions) && actions.length > 0 && actions.every((x) => typeof x === 'string') ? actions.slice(0, 5) : null;
+}
 
 export const reportService = {
   /**
@@ -23,7 +31,12 @@ export const reportService = {
     const contents = storageService.contents.getByClient(client.id);
     const period = analyticsService.calculatePeriod(snapshots, periodDays, undefined, contents);
 
-    const ranked = analyticsService.rankContents(contents, 'score', false);
+    // Destaques só do período do relatório (data de publicação em Brasília).
+    const periodContents = contents.filter((c) => {
+      const d = brasiliaDay(c.publishedAt);
+      return d >= period.startDate && d <= period.endDate;
+    });
+    const ranked = analyticsService.rankContents(periodContents, 'score', false);
     const topContents = ranked.slice(0, 3);
     const worstContents = ranked.length > 3 ? ranked.slice(-2) : [];
 
@@ -100,7 +113,7 @@ export const reportService = {
         'Garantir CTAs claros orientados ao objetivo da publicação.',
         'Acompanhar os relatórios de sincronização para detecção de variações de alcance.'
       ],
-      nextSteps: aiService.generateNextActions(client, contents)
+      nextSteps: latestDiagnosticActions(client.id) ?? aiService.generateNextActions(client, contents, snapshots)
     };
 
     return storageService.reports.create(reportData);

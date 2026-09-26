@@ -1,3 +1,4 @@
+import { ALERT_STATUS_LABELS } from '../../utils/labels';
 import { formatDateBR } from '../../utils/dates';
 import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
@@ -52,7 +53,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
       case 'low':
         return 'border-sky-500/30 bg-sky-950/20 text-sky-400';
       default:
-        return 'border-neutral-500/30 bg-neutral-900 text-neutral-300';
+        return 'border-neutral-500/30 bg-[#161618] text-neutral-300';
     }
   };
 
@@ -66,11 +67,11 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
     >
       <div className="space-y-4">
         {/* Filter Bar */}
-        <div className="flex items-center justify-between gap-2 border-b border-neutral-800 pb-3 font-mono text-xs">
+        <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] pb-3 tabular-nums text-xs">
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setFilterStatus('all')}
-              className={`px-2.5 py-1 rounded transition-colors ${
+              className={`px-2.5 py-1 rounded-2xl transition-colors ${
                 filterStatus === 'all'
                   ? 'bg-amber-500 text-neutral-950 font-bold'
                   : 'text-neutral-400 hover:text-neutral-200'
@@ -80,7 +81,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
             </button>
             <button
               onClick={() => setFilterStatus('new')}
-              className={`px-2.5 py-1 rounded transition-colors ${
+              className={`px-2.5 py-1 rounded-2xl transition-colors ${
                 filterStatus === 'new'
                   ? 'bg-amber-500 text-neutral-950 font-bold'
                   : 'text-neutral-400 hover:text-neutral-200'
@@ -90,7 +91,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
             </button>
             <button
               onClick={() => setFilterStatus('resolved')}
-              className={`px-2.5 py-1 rounded transition-colors ${
+              className={`px-2.5 py-1 rounded-2xl transition-colors ${
                 filterStatus === 'resolved'
                   ? 'bg-amber-500 text-neutral-950 font-bold'
                   : 'text-neutral-400 hover:text-neutral-200'
@@ -109,11 +110,11 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
             return (
               <div
                 key={alert.id}
-                className={`p-3.5 rounded-xl border flex flex-col justify-between gap-2 transition-colors ${getSeverityStyle(alert.severity)}`}
+                className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2 transition-colors ${getSeverityStyle(alert.severity)}`}
               >
                 <div>
-                  <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                    <span className="font-bold uppercase tracking-wider">{alert.type.replace('_', ' ')}</span>
+                  <div className="flex items-center justify-between text-[10px] tabular-nums mb-1">
+                    <span className="font-bold">{alert.type.replace('_', ' ')}</span>
                     <span className="text-neutral-400">{formatDateBR(alert.createdAt)}</span>
                   </div>
 
@@ -126,16 +127,16 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
                   </p>
 
                   {client && (
-                    <div className="mt-2 text-[11px] font-mono text-neutral-400">
+                    <div className="mt-2 text-[11px] tabular-nums text-neutral-400">
                       Cliente: <span className="text-amber-300">{client.name}</span> ({client.instagram})
                     </div>
                   )}
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-neutral-800/60 text-xs font-mono">
-                  <span className="text-[10px] text-neutral-500 uppercase">
-                    Status: {alert.status}
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.05] text-xs tabular-nums">
+                  <span className="text-[11px] text-neutral-500">
+                    Status: {ALERT_STATUS_LABELS[alert.status]}
                   </span>
 
                   <div className="flex items-center gap-2">
@@ -163,7 +164,7 @@ export const AlertsCenterModal: React.FC<AlertsCenterModalProps> = ({
           })}
 
           {filteredAlerts.length === 0 && (
-            <div className="py-8 text-center text-xs text-neutral-500 font-mono">
+            <div className="py-8 text-center text-xs text-neutral-500 tabular-nums">
               Nenhum alerta registrado nesta categoria.
             </div>
           )}

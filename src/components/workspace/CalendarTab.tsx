@@ -89,11 +89,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#161618] border border-white/[0.06] rounded-[24px] p-4">
         <div>
           <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
             <span>Planejamento Editorial Semanal</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-950">
+            <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-white/[0.1] text-neutral-400 bg-white/[0.03]">
               {calendarItems.length} {calendarItems.length === 1 ? 'publicação programada' : 'publicações programadas'}
             </span>
           </h3>
@@ -104,7 +104,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
 
         <button
           onClick={() => handleOpenAddForDay('Segunda-feira')}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs self-start sm:self-center"
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-full text-xs font-semibold transition-colors shadow-xs self-start sm:self-center"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Agendar Conteúdo</span>
@@ -119,23 +119,23 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
           return (
             <div
               key={day}
-              className="bg-neutral-900/70 border border-neutral-800 rounded-xl p-3 flex flex-col justify-between min-h-[380px]"
+              className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-3 flex flex-col justify-between min-h-[380px]"
             >
               <div>
                 {/* Day Header */}
-                <div className="flex items-center justify-between border-b border-neutral-800 pb-2 mb-3">
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-3">
                   <div>
-                    <span className="text-xs font-bold font-mono text-neutral-200">
+                    <span className="text-xs font-bold tabular-nums text-neutral-200">
                       {day.split('-')[0]}
                     </span>
-                    <span className="block text-[10px] text-neutral-500 font-mono">
+                    <span className="block text-[10px] text-neutral-500 tabular-nums">
                       {dayItems.length} post(s)
                     </span>
                   </div>
 
                   <button
                     onClick={() => handleOpenAddForDay(day)}
-                    className="p-1 text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 rounded transition-colors"
+                    className="p-1 text-neutral-400 hover:text-amber-400 hover:bg-white/[0.07] rounded-2xl transition-colors"
                     title={`Adicionar para ${day}`}
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -147,10 +147,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                   {dayItems.map(item => (
                     <div
                       key={item.id}
-                      className="p-2.5 bg-neutral-950 border border-neutral-800 hover:border-neutral-700 rounded-lg text-xs space-y-1.5 group transition-colors"
+                      className="p-2.5 bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.14] rounded-2xl text-xs space-y-1.5 group transition-colors"
                     >
-                      <div className="flex items-center justify-between text-[10px] font-mono">
-                        <span className="px-1.5 py-0.2 rounded bg-amber-950/40 text-amber-400 border border-amber-500/30">
+                      <div className="flex items-center justify-between text-[10px] tabular-nums">
+                        <span className="px-1.5 py-0.2 rounded-full bg-amber-950/40 text-amber-400 border border-amber-500/30">
                           {item.format}
                         </span>
                         {item.timeSlot && (
@@ -170,14 +170,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                         </p>
                       )}
 
-                      <div className="flex items-center justify-between pt-1 border-t border-neutral-900 text-[10px] font-mono text-neutral-500">
+                      <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-[10px] tabular-nums text-neutral-500">
                         <span>{item.pillar}</span>
                         <div className="flex items-center gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
                           <select aria-label="Mover de dia"
                             onChange={(e) => handleMoveDay(item, e.target.value)}
                             value=""
                             title="Mover de dia"
-                            className="bg-neutral-900 text-neutral-400 text-[10px] rounded px-1 py-0.5 cursor-pointer"
+                            className="bg-[#161618] text-neutral-400 text-[10px] rounded-full px-1 py-0.5 cursor-pointer"
                           >
                             <option value="" disabled>→</option>
                             {DAYS_OF_WEEK.filter(d => d !== day).map(d => (
@@ -199,7 +199,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                   ))}
 
                   {dayItems.length === 0 && (
-                    <div className="py-6 text-center text-[11px] text-neutral-600 font-mono">
+                    <div className="py-6 text-center text-[11px] text-neutral-600 tabular-nums">
                       Sem posts
                     </div>
                   )}
@@ -209,7 +209,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
               {/* Bottom Quick-Add trigger */}
               <button
                 onClick={() => handleOpenAddForDay(day)}
-                className="w-full mt-3 py-1 text-[11px] font-mono text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/60 rounded border border-dashed border-neutral-800 transition-colors"
+                className="w-full mt-3 py-1 text-[11px] tabular-nums text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.06] rounded-2xl border border-dashed border-white/[0.06] transition-colors"
               >
                 + Adicionar
               </button>
@@ -226,7 +226,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
           title={`Agendar Conteúdo: ${targetDay}`}
           subtitle={`Planejamento editorial de ${client.name}`}
         >
-          <form onSubmit={handleCreateItem} className="space-y-4 text-xs font-mono">
+          <form onSubmit={handleCreateItem} className="space-y-4 text-xs tabular-nums">
             <div>
               <label className="block text-neutral-400 mb-1">Título do Conteúdo *</label>
               <input
@@ -235,7 +235,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                 value={newItemForm.title}
                 onChange={(e) => setNewItemForm({ ...newItemForm, title: e.target.value })}
                 placeholder="Ex: Por que o Deep Plane não estica a pele"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
@@ -245,7 +245,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                 <select aria-label="Formato"
                   value={newItemForm.format}
                   onChange={(e) => setNewItemForm({ ...newItemForm, format: e.target.value as any })}
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 >
                   <option value="Reels">Reels</option>
                   <option value="Carrossel">Carrossel</option>
@@ -260,7 +260,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                 <select aria-label="Pilar de conteúdo"
                   value={newItemForm.pillar}
                   onChange={(e) => setNewItemForm({ ...newItemForm, pillar: e.target.value as any })}
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 >
                   <option value="Educação">Educação</option>
                   <option value="Autoridade">Autoridade</option>
@@ -280,7 +280,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                   value={newItemForm.timeSlot}
                   onChange={(e) => setNewItemForm({ ...newItemForm, timeSlot: e.target.value })}
                   placeholder="Ex: 18:30"
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 />
               </div>
 
@@ -289,7 +289,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                 <select aria-label="Dia da semana"
                   value={targetDay}
                   onChange={(e) => setTargetDay(e.target.value)}
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 >
                   {DAYS_OF_WEEK.map(d => (
                     <option key={d} value={d}>{d}</option>
@@ -305,21 +305,21 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                 value={newItemForm.hook}
                 onChange={(e) => setNewItemForm({ ...newItemForm, hook: e.target.value })}
                 placeholder="Ex: Três coisas que ninguém te conta sobre a cicatriz atrás da orelha..."
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
-            <div className="pt-3 border-t border-neutral-800 flex justify-end gap-2">
+            <div className="pt-3 border-t border-white/[0.06] flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 bg-neutral-800 text-neutral-300 rounded hover:bg-neutral-700"
+                className="px-4 py-2 bg-white/[0.06] text-neutral-300 rounded-full hover:bg-white/[0.1]"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-amber-500 text-neutral-950 font-bold rounded hover:bg-amber-400"
+                className="px-4 py-2 bg-amber-500 text-neutral-950 font-bold rounded-full hover:bg-amber-400"
               >
                 Salvar no Calendário
               </button>

@@ -113,6 +113,7 @@ export default function App() {
   const [clientFormModalOpen, setClientFormModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [dashboardKey, setDashboardKey] = useState(0);
   const [alertsModalOpen, setAlertsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
@@ -122,6 +123,12 @@ export default function App() {
     const all = storageService.clients.getAll();
     return storageService.isDemoLoaded() ? all.filter((c) => c.id === demoId) : all.filter((c) => c.id !== demoId);
   }, []);
+
+  // Destaque do menu: a seção da aba aberta; abas sem item próprio (Métricas, Overview...) ficam em "Clientes".
+  const inWorkspace = Boolean(activeClient) && currentSection !== 'dashboard' && currentSection !== 'clients';
+  const sidebarSection: MainNavSection = inWorkspace
+    ? (Object.keys(SECTION_TO_TAB) as MainNavSection[]).find((k) => SECTION_TO_TAB[k] === workspaceTab) ?? 'clients'
+    : currentSection;
 
   const visibleIds = new Set(clients.map((c) => c.id));
 
@@ -577,7 +584,7 @@ export default function App() {
       <div className="flex-1 flex min-w-0">
         {/* Fixed Left Sidebar */}
         <Sidebar
-          currentSection={currentSection}
+          currentSection={sidebarSection}
           onNavigate={(sec) => {
             setMobileMenuOpen(false);
             if (sec === 'settings') {
@@ -805,6 +812,7 @@ export default function App() {
               ) : (
                 /* Agency Dashboard / All Clients */
                 <AgencyDashboardView
+                  key={dashboardKey}
                   clients={clients}
                   snapshots={storageService.history.getAll()}
                   contents={storageService.contents.getAll()}
@@ -880,6 +888,18 @@ export default function App() {
         ideas={storageService.ideas.getAll().filter((i) => visibleIds.has(i.clientId))}
         competitors={storageService.competitors.getAll().filter((c) => visibleIds.has(c.clientId))}
         reports={storageService.reports.getAll().filter((r) => visibleIds.has(r.clientId))}
+        tasks={globalSearchOpen ? storageService.tasks.getAll().filter((t) => (t.clientId ? visibleIds.has(t.clientId) : !isDemoLoaded)) : []}
+        onOpenTask={(task) => {
+          // Abre o dashboard em "Tarefas", filtrado pelo cliente da tarefa.
+          try {
+            localStorage.setItem('gs_dash_mode', 'tasks');
+            localStorage.setItem('gs_dash_scope', task.clientId ?? 'general');
+          } catch {
+            /* preferência opcional */
+          }
+          setCurrentSection('dashboard');
+          setDashboardKey((k) => k + 1);
+        }}
         onSelectClient={(client) => {
           setActiveClient(client);
           loadClientData(client);

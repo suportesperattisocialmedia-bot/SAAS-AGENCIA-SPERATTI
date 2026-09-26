@@ -1,3 +1,4 @@
+import { PIPELINE_LABELS } from '../../utils/labels';
 import React, { useState } from 'react';
 import { Client, ContentIdea, PipelineStatus, Content} from '../../types';
 import { HOOK_CATEGORIES, HOOK_TEMPLATES } from '../../data/hookBank';
@@ -108,11 +109,11 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Top Banner with AI Generator and Hook Bank buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#161618] border border-white/[0.06] rounded-[24px] p-4">
         <div>
           <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
             <span>Banco de Ideias & Pipeline de Produção</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-950">
+            <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-white/[0.1] text-neutral-400 bg-white/[0.03]">
               {ideas.length} ideias no pipeline
             </span>
           </h3>
@@ -124,7 +125,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
         <div className="flex items-center gap-2.5 self-start sm:self-center">
           <button
             onClick={() => setShowHookBankModal(true)}
-            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-neutral-200 border border-white/[0.1] rounded-full text-xs transition-colors"
           >
             <BookOpen className="w-3.5 h-3.5 text-amber-400" />
             <span>Banco de Ganchos (14)</span>
@@ -132,7 +133,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
 
           <button
             onClick={() => setShowIdeasModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs"
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-full text-xs font-semibold transition-colors shadow-xs"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Gerar prompt de ideias</span>
@@ -144,10 +145,10 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
         <button
           onClick={() => setFilterStatus('all')}
-          className={`px-3 py-1 rounded text-xs font-mono whitespace-nowrap transition-colors border ${
+          className={`px-3 py-1 rounded-2xl text-xs tabular-nums whitespace-nowrap transition-colors border ${
             filterStatus === 'all'
               ? 'bg-amber-500 text-neutral-950 font-bold border-amber-500'
-              : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+              : 'bg-[#161618] border-white/[0.06] text-neutral-400 hover:text-neutral-200'
           }`}
         >
           Todos os Estágios ({ideas.length})
@@ -160,13 +161,13 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
             <button
               key={st}
               onClick={() => setFilterStatus(st)}
-              className={`px-2.5 py-1 rounded text-xs font-mono whitespace-nowrap transition-colors border ${
+              className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors border ${
                 isSelected
                   ? 'bg-amber-500 text-neutral-950 font-bold border-amber-500'
-                  : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                  : 'bg-[#161618] border-white/[0.06] text-neutral-400 hover:text-neutral-200'
               }`}
             >
-              {st} {count > 0 ? `(${count})` : ''}
+              {PIPELINE_LABELS[st]} {count > 0 ? `(${count})` : ''}
             </button>
           );
         })}
@@ -177,22 +178,22 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
         {filteredIdeas.map(idea => (
           <div
             key={idea.id}
-            className="bg-neutral-900/90 border border-neutral-800 hover:border-neutral-700 rounded-xl p-4 flex flex-col justify-between transition-colors space-y-3"
+            className="bg-[#161618] border border-white/[0.06] hover:border-white/[0.14] rounded-[24px] p-4 flex flex-col justify-between transition-colors space-y-3"
           >
             <div>
               {/* Header tags */}
               <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-500/30">
+                <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full bg-amber-950/40 text-amber-400 border border-amber-500/30">
                   {idea.format} · {idea.pillar}
                 </span>
 
                 <select aria-label="Status da ideia"
                   value={idea.status}
                   onChange={(e) => handleUpdateStatus(idea.id, e.target.value as PipelineStatus)}
-                  className="bg-neutral-950 border border-neutral-800 text-amber-300 text-[10px] font-mono px-1.5 py-0.5 rounded focus:outline-hidden cursor-pointer"
+                  className="bg-white/[0.04] border border-white/[0.06] text-amber-300 text-[10px] tabular-nums px-1.5 py-0.5 rounded-full focus:outline-hidden cursor-pointer"
                 >
                   {PIPELINE_STATUSES.map(s => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s} value={s}>{PIPELINE_LABELS[s]}</option>
                   ))}
                 </select>
               </div>
@@ -206,8 +207,8 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
               </p>
 
               {/* Hook snippet */}
-              <div className="mt-3 p-2.5 bg-neutral-950/70 border border-neutral-800 rounded-lg text-xs">
-                <div className="text-[9px] font-mono text-neutral-500 uppercase mb-0.5 flex items-center justify-between">
+              <div className="mt-3 p-2.5 bg-white/[0.03] border border-white/[0.06] rounded-2xl text-xs">
+                <div className="text-[9px] text-neutral-500 mb-0.5 flex items-center justify-between">
                   <span>Gancho ({idea.hookCategory || 'Fórmula'})</span>
                   <span className="text-amber-400 font-bold">Potencial {idea.potential}</span>
                 </div>
@@ -224,7 +225,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
             </div>
 
             {/* Actions Footer */}
-            <div className="pt-3 border-t border-neutral-800 flex items-center justify-between text-xs font-mono">
+            <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs tabular-nums">
               <span className="text-neutral-500 text-[11px]">
                 {idea.calendarDay ? `Agendado: ${weekDayLabel(idea.calendarDay)}` : 'Não agendado'}
               </span>
@@ -236,7 +237,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
                       if (e.target.value) handleScheduleToCalendar(idea, e.target.value);
                     }}
                     defaultValue=""
-                    className="bg-neutral-950 border border-neutral-800 text-amber-400 text-[11px] px-2 py-1 rounded cursor-pointer"
+                    className="bg-white/[0.03] border border-white/[0.06] text-amber-400 text-[11px] px-2 py-1 rounded-2xl cursor-pointer"
                   >
                     <option value="" disabled>+ Agendar dia</option>
                     <option value="Segunda-feira">Segunda-feira</option>
@@ -269,35 +270,35 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
           title={`Ideia Estratégica: "${activeIdeaModal.title}"`}
           subtitle={`Planejamento de Produção · ${activeIdeaModal.format} · ${activeIdeaModal.pillar}`}
         >
-          <div className="space-y-4 text-xs font-mono">
-            <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
-              <span className="text-[10px] text-neutral-500 uppercase block mb-1">Gancho de Entrada</span>
+          <div className="space-y-4 text-xs tabular-nums">
+            <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+              <span className="text-[11px] text-neutral-500 block mb-1">Gancho de Entrada</span>
               <p className="text-amber-300 font-semibold italic text-sm">&quot;{activeIdeaModal.hook}&quot;</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
-                <span className="text-[10px] text-neutral-500 uppercase block mb-1">Formato</span>
+              <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+                <span className="text-[11px] text-neutral-500 block mb-1">Formato</span>
                 <span className="text-neutral-200 font-bold">{activeIdeaModal.format}</span>
               </div>
-              <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
-                <span className="text-[10px] text-neutral-500 uppercase block mb-1">Pilar</span>
+              <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+                <span className="text-[11px] text-neutral-500 block mb-1">Pilar</span>
                 <span className="text-neutral-200 font-bold">{activeIdeaModal.pillar}</span>
               </div>
             </div>
 
-            <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
-              <span className="text-[10px] text-neutral-500 uppercase block mb-1">Por que produzir este conteúdo?</span>
+            <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+              <span className="text-[11px] text-neutral-500 block mb-1">Por que produzir este conteúdo?</span>
               <p className="text-neutral-300 leading-relaxed font-sans">{activeIdeaModal.whyDoThis}</p>
             </div>
 
-            <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
-              <span className="text-[10px] text-neutral-500 uppercase block mb-1">Chamada para Ação (CTA Recomendado)</span>
-              <p className="text-neutral-200 font-mono">{activeIdeaModal.cta}</p>
+            <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+              <span className="text-[11px] text-neutral-500 block mb-1">Chamada para Ação (CTA Recomendado)</span>
+              <p className="text-neutral-200 tabular-nums">{activeIdeaModal.cta}</p>
             </div>
 
-            <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
-              <span className="text-[10px] text-neutral-500 uppercase block mb-1">Público e Persona</span>
+            <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+              <span className="text-[11px] text-neutral-500 block mb-1">Público e Persona</span>
               <p className="text-neutral-400 font-sans">{activeIdeaModal.targetAudienceSnippet}</p>
             </div>
           </div>
@@ -318,10 +319,10 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
               <button
                 onClick={() => setSelectedHookCategory('all')}
-                className={`px-2.5 py-1 rounded text-xs font-mono whitespace-nowrap border ${
+                className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${
                   selectedHookCategory === 'all'
                     ? 'bg-amber-500 text-neutral-950 font-bold border-amber-500'
-                    : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                    : 'bg-[#161618] border-white/[0.06] text-neutral-400'
                 }`}
               >
                 Todas ({HOOK_TEMPLATES.length})
@@ -330,10 +331,10 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
                 <button
                   key={cat}
                   onClick={() => setSelectedHookCategory(cat)}
-                  className={`px-2.5 py-1 rounded text-xs font-mono whitespace-nowrap border ${
+                  className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${
                     selectedHookCategory === cat
                       ? 'bg-amber-500 text-neutral-950 font-bold border-amber-500'
-                      : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                      : 'bg-[#161618] border-white/[0.06] text-neutral-400'
                   }`}
                 >
                   {cat}
@@ -348,10 +349,10 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
               ).map(hook => (
                 <div
                   key={hook.id}
-                  className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-lg flex flex-col justify-between gap-2"
+                  className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl flex flex-col justify-between gap-2"
                 >
                   <div>
-                    <div className="flex items-center justify-between text-[10px] font-mono uppercase mb-1">
+                    <div className="flex items-center justify-between text-[11px] mb-1">
                       <span className="text-amber-400 font-semibold">{hook.category}</span>
                       <span className="text-neutral-500">{hook.recommendedFormat}</span>
                     </div>
@@ -363,7 +364,7 @@ export const IdeasTab: React.FC<IdeasTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-neutral-800/60 text-[11px] text-neutral-500 font-mono">
+                  <div className="flex items-center justify-between pt-2 border-t border-white/[0.05] text-[11px] text-neutral-500 tabular-nums">
                     <span>{hook.psychologicalTrigger}</span>
                     <button
                       onClick={() => {

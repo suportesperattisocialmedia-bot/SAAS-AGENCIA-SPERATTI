@@ -95,11 +95,11 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Top Banner & Search Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#161618] border border-white/[0.06] rounded-[24px] p-4">
         <div>
           <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
             <span>Pesquisa de público</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-950">
+            <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-white/[0.1] text-neutral-400 bg-white/[0.03]">
               {insights.length} insights mapeados
             </span>
           </h3>
@@ -112,7 +112,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
           <button
             onClick={handleRunSearch}
             disabled={isSearching}
-            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-neutral-200 border border-white/[0.1] rounded-full text-xs transition-colors disabled:opacity-50"
           >
             <Search className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-amber-400' : ''}`} />
             <span>{isSearching ? 'Pesquisando Fontes...' : 'Pesquisar Público'}</span>
@@ -120,7 +120,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-full text-xs font-semibold transition-colors shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Novo Insight</span>
@@ -132,10 +132,10 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
         <button
           onClick={() => setSelectedCategory('all')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap transition-colors border ${
+          className={`px-3 py-1.5 rounded-2xl text-xs tabular-nums whitespace-nowrap transition-colors border ${
             selectedCategory === 'all'
               ? 'bg-amber-500 text-neutral-950 font-bold border-amber-500'
-              : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+              : 'bg-[#161618] border-white/[0.06] text-neutral-400 hover:text-neutral-200'
           }`}
         >
           Todas as Categorias ({insights.length})
@@ -148,10 +148,10 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap transition-colors border ${
+              className={`px-3 py-1.5 rounded-2xl text-xs tabular-nums whitespace-nowrap transition-colors border ${
                 isSelected
                   ? 'bg-amber-500 text-neutral-950 font-bold border-amber-500'
-                  : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                  : 'bg-[#161618] border-white/[0.06] text-neutral-400 hover:text-neutral-200'
               }`}
             >
               {cat} ({count})
@@ -165,21 +165,21 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
         {filteredInsights.map(item => (
           <div
             key={item.id}
-            className="bg-neutral-900/90 border border-neutral-800 hover:border-neutral-700 rounded-xl p-4 flex flex-col justify-between transition-colors space-y-3"
+            className="bg-[#161618] border border-white/[0.06] hover:border-white/[0.14] rounded-[24px] p-4 flex flex-col justify-between transition-colors space-y-3"
           >
             <div>
               {/* Category & Status */}
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-500/30">
+                <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full bg-amber-950/40 text-amber-300 border border-amber-500/30">
                   {item.category}
                 </span>
 
                 {item.isHypothesis ? (
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded border border-purple-500/30 text-purple-400 bg-purple-950/20">
+                  <span className="text-[10px] tabular-nums px-1.5 py-0.2 rounded-full border border-purple-500/30 text-purple-400 bg-purple-950/20">
                     HIPÓTESE
                   </span>
                 ) : (
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded border border-emerald-500/30 text-emerald-400 bg-emerald-950/20 flex items-center gap-1">
+                  <span className="text-[10px] tabular-nums px-1.5 py-0.2 rounded-full border border-emerald-500/30 text-emerald-400 bg-emerald-950/20 flex items-center gap-1">
                     <CheckCircle2 className="w-2.5 h-2.5" /> DADO REAL
                   </span>
                 )}
@@ -204,15 +204,15 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
 
               {/* Context */}
               {item.context && (
-                <div className="mt-3 p-2 bg-neutral-950/70 border border-neutral-800/80 rounded text-[11px] text-neutral-400">
-                  <span className="text-[10px] font-mono uppercase text-neutral-500 block mb-0.5">Contexto Observado</span>
+                <div className="mt-3 p-2 bg-white/[0.03] border border-white/[0.06] rounded-2xl text-[11px] text-neutral-400">
+                  <span className="text-[11px] text-neutral-500 block mb-0.5">Contexto Observado</span>
                   {item.context}
                 </div>
               )}
 
               {/* Interpretation */}
-              <div className="mt-2 p-2.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs">
-                <span className="text-[10px] font-mono uppercase text-amber-400 font-semibold block mb-0.5">
+              <div className="mt-2 p-2.5 bg-white/[0.03] border border-white/[0.06] rounded-2xl text-xs">
+                <span className="text-[11px] text-amber-400 font-semibold block mb-0.5">
                   Interpretação Estratégica Gabriel Speratti
                 </span>
                 <p className="text-neutral-300 text-[11px] leading-relaxed">
@@ -222,7 +222,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
             </div>
 
             {/* Source & Date Footer */}
-            <div className="pt-2 border-t border-neutral-800 flex items-center justify-between text-[10px] font-mono text-neutral-500">
+            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[10px] tabular-nums text-neutral-500">
               <span className="truncate max-w-[180px] flex items-center gap-1">
                 <Globe className="w-3 h-3 text-neutral-400 shrink-0" />
                 {item.source}
@@ -241,13 +241,13 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
           title="Adicionar Insight de Pesquisa de Público"
           subtitle={`Registrar dado qualitativo para ${client.name}`}
         >
-          <form onSubmit={handleCreate} className="space-y-4 text-xs font-mono">
+          <form onSubmit={handleCreate} className="space-y-4 text-xs tabular-nums">
             <div>
               <label className="block text-neutral-400 mb-1">Categoria de Insight *</label>
               <select aria-label="Categoria do insight"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value as any })}
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               >
                 {AUDIENCE_CATEGORIES.map(c => (
                   <option key={c} value={c}>{c}</option>
@@ -263,7 +263,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="Ex: Medo de ficar com a boca torta após cirurgia"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
@@ -274,7 +274,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="O que o público diz nas caixas de perguntas e comentários..."
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
@@ -286,7 +286,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
                   value={form.source}
                   onChange={(e) => setForm({ ...form, source: e.target.value })}
                   placeholder="Ex: Directs da clínica / Reddit"
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 />
               </div>
 
@@ -295,10 +295,10 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
                 <select aria-label="Tipo de dado"
                   value={form.isHypothesis ? 'hipotese' : 'real'}
                   onChange={(e) => setForm({ ...form, isHypothesis: e.target.value === 'hipotese' })}
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 >
-                  <option value="real">Fonte Real Verificada</option>
-                  <option value="hipotese">Hipótese / Inferência da IA</option>
+                  <option value="real">Dado real (observado)</option>
+                  <option value="hipotese">Hipótese (a confirmar)</option>
                 </select>
               </div>
             </div>
@@ -310,21 +310,21 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
                 value={form.interpretation}
                 onChange={(e) => setForm({ ...form, interpretation: e.target.value })}
                 placeholder="Como a agência deve responder a essa dor com conteúdo..."
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
-            <div className="pt-3 border-t border-neutral-800 flex justify-end gap-2">
+            <div className="pt-3 border-t border-white/[0.06] flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 bg-neutral-800 text-neutral-300 rounded hover:bg-neutral-700"
+                className="px-4 py-2 bg-white/[0.06] text-neutral-300 rounded-full hover:bg-white/[0.1]"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-amber-500 text-neutral-950 font-bold rounded hover:bg-amber-400"
+                className="px-4 py-2 bg-amber-500 text-neutral-950 font-bold rounded-full hover:bg-amber-400"
               >
                 Salvar Insight
               </button>

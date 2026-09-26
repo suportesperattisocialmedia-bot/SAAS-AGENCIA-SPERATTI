@@ -30,18 +30,18 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectClient
 }) => {
   return (
-    <header className="sticky top-0 z-30 h-14 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800/80 px-4 sm:px-6 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30 h-14 bg-white/[0.03] backdrop-blur-md border-b border-white/[0.06] px-4 sm:px-6 flex items-center justify-between gap-4">
       {/* Zone 1: Breadcrumbs & Client Switcher */}
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={onToggleMobileMenu}
-          className="lg:hidden p-1.5 text-neutral-400 hover:text-neutral-200 rounded-lg hover:bg-neutral-900"
+          className="lg:hidden p-1.5 text-neutral-400 hover:text-neutral-200 rounded-2xl hover:bg-white/[0.04]"
           aria-label="Abrir menu lateral"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-mono truncate">
+        <div className="flex items-center gap-1.5 text-xs text-neutral-400 tabular-nums truncate">
           <span className="text-neutral-300 font-medium">Agência</span>
           <ChevronRight className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
           
@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
                   const found = clients.find(c => c.id === e.target.value);
                   onSelectClient(found || null);
                 }}
-                className="bg-neutral-900 border border-neutral-800 text-amber-300 font-semibold px-2 py-0.5 rounded text-xs focus:outline-hidden focus:border-amber-500 cursor-pointer truncate max-w-[180px]"
+                className="bg-[#161618] border border-white/[0.06] text-amber-300 font-semibold px-2 py-0.5 rounded-full text-xs focus:outline-hidden focus:border-amber-500 cursor-pointer truncate max-w-[180px]"
               >
                 {clients.map(c => (
                   <option key={c.id} value={c.id}>
@@ -74,13 +74,13 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex-1 max-w-md hidden md:flex items-center">
         <button
           onClick={onOpenSearch}
-          className="w-full flex items-center justify-between px-3 py-1.5 bg-neutral-900/80 border border-neutral-800 hover:border-neutral-700 text-neutral-400 rounded-lg text-xs transition-colors group"
+          className="w-full flex items-center justify-between px-3 py-1.5 bg-[#161618] border border-white/[0.06] hover:border-white/[0.14] text-neutral-400 rounded-[24px] text-xs transition-colors group"
         >
           <div className="flex items-center gap-2">
             <Search className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300" />
             <span>Buscar clientes, conteúdos, ideias, concorrentes...</span>
           </div>
-          <kbd className="text-[10px] font-mono bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded border border-neutral-700">
+          <kbd className="text-[10px] tabular-nums bg-white/[0.06] text-neutral-400 px-1.5 py-0.5 rounded-full border border-white/[0.1]">
             Ctrl K
           </kbd>
         </button>
@@ -90,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <button
           onClick={onOpenSearch}
-          className="md:hidden p-1.5 text-neutral-400 hover:text-neutral-200 rounded-lg hover:bg-neutral-900"
+          className="md:hidden p-1.5 text-neutral-400 hover:text-neutral-200 rounded-2xl hover:bg-white/[0.04]"
           title="Buscar (Ctrl+K)"
         >
           <Search className="w-4 h-4" />
@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         <button
           onClick={onOpenAlerts}
-          className="relative p-1.5 text-neutral-400 hover:text-neutral-200 rounded-lg hover:bg-neutral-900 transition-colors"
+          className="relative p-1.5 text-neutral-400 hover:text-neutral-200 rounded-2xl hover:bg-white/[0.04] transition-colors"
           title="Central de Alertas"
         >
           <Bell className="w-4 h-4" />
@@ -111,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onSyncCurrentClient}
             disabled={isSyncing}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#161618] hover:bg-white/[0.07] text-neutral-300 border border-white/[0.06] rounded-[24px] text-xs font-medium transition-colors disabled:opacity-50"
             title="Sincronizar Instagram deste cliente"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-400' : 'text-neutral-400'}`} />
@@ -121,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         <button
           onClick={onOpenNewClient}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-full text-xs font-semibold transition-colors shadow-xs"
         >
           <Plus className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Novo Cliente</span>

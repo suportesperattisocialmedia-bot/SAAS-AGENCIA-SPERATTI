@@ -20,9 +20,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onSecondaryAction
 }) => {
   return (
-    <div className="bg-neutral-900/60 border border-dashed border-neutral-800 rounded-xl p-8 flex flex-col items-center justify-center text-center max-w-lg mx-auto my-6">
+    <div className="bg-[#161618] border border-dashed border-white/[0.06] rounded-[24px] p-8 flex flex-col items-center justify-center text-center max-w-lg mx-auto my-6">
       {icon && (
-        <div className="w-12 h-12 rounded-xl bg-neutral-800/80 border border-neutral-700/60 flex items-center justify-center text-neutral-400 mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-neutral-800/80 border border-white/[0.08] flex items-center justify-center text-neutral-400 mb-4">
           {icon}
         </div>
       )}
@@ -36,7 +36,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           {actionLabel && onAction && (
             <button
               onClick={onAction}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-semibold rounded-lg transition-colors shadow-sm"
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-semibold rounded-full transition-colors shadow-sm"
             >
               {actionLabel}
             </button>
@@ -44,7 +44,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           {secondaryActionLabel && onSecondaryAction && (
             <button
               onClick={onSecondaryAction}
-              className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-medium rounded-lg transition-colors border border-neutral-700"
+              className="px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-neutral-300 text-xs font-medium rounded-full transition-colors border border-white/[0.1]"
             >
               {secondaryActionLabel}
             </button>

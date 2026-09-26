@@ -167,7 +167,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Resumo + frescor dos dados */}
-      <section className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <section className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 className="text-base font-semibold text-neutral-100">Métricas de {client.name}</h3>
           <p className="text-sm text-neutral-400 mt-1">
@@ -175,9 +175,9 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
           </p>
         </div>
         <span
-          className={`text-sm px-3 py-1.5 rounded-lg border self-start md:self-center ${
+          className={`text-sm px-3 py-1.5 rounded-2xl border self-start md:self-center ${
             staleDays === null
-              ? 'text-neutral-400 border-neutral-700'
+              ? 'text-neutral-400 border-white/[0.1]'
               : staleDays <= 7
                 ? 'text-emerald-300 border-emerald-500/30 bg-emerald-950/30'
                 : 'text-amber-300 border-amber-500/30 bg-amber-950/30'
@@ -188,14 +188,14 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
       </section>
 
       {/* Checklist do onboarding */}
-      <section className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5">
+      <section className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-sm font-semibold text-neutral-100">Onboarding do cliente</h4>
           <span className="text-xs text-neutral-400">
             {doneCount} de {checklist.length} etapas
           </span>
         </div>
-        <div className="h-1.5 rounded-full bg-neutral-800 mb-4 overflow-hidden">
+        <div className="h-1.5 rounded-full bg-white/[0.06] mb-4 overflow-hidden">
           <div className="h-full bg-amber-500 transition-all" style={{ width: `${(doneCount / checklist.length) * 100}%` }} />
         </div>
         <ul className="grid gap-2 sm:grid-cols-2">
@@ -221,7 +221,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
       </section>
 
       {/* Passo a passo Meta Business Suite */}
-      <details className="group bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5" open={contents.length === 0}>
+      <details className="group bg-[#161618] border border-white/[0.06] rounded-[24px] p-5" open={contents.length === 0}>
         <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
           <span className="text-sm font-semibold text-neutral-100">Como exportar as métricas do Meta Business Suite</span>
           <span className="text-xs text-neutral-500 group-open:hidden">Mostrar passo a passo</span>
@@ -243,7 +243,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
             href="https://business.facebook.com/latest/insights/"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-neutral-700 text-neutral-200 hover:bg-neutral-800 text-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-white/[0.1] text-neutral-200 hover:bg-white/[0.07] text-sm"
           >
             Abrir Meta Business Suite <ExternalLink className="w-3.5 h-3.5" />
           </a>
@@ -255,7 +255,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
       </details>
 
       {/* Importação */}
-      <section className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 space-y-4">
+      <section className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 space-y-4">
         <div>
           <h4 className="text-sm font-semibold text-neutral-100">Importar posts e métricas</h4>
           <p className="text-sm text-neutral-400 mt-1">Arquivo CSV do Meta Business Suite, da planilha-modelo, ou linhas copiadas do Excel/Google Sheets.</p>
@@ -268,10 +268,10 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
               void handleFile(file);
             }}
           />
-          <button onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-sm font-semibold">
+          <button onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 text-neutral-950 text-sm font-semibold">
             <FileUp className="w-4 h-4" /> Selecionar arquivo CSV
           </button>
-          <button onClick={downloadTemplate} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 text-sm">
+          <button onClick={downloadTemplate} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/[0.1] text-neutral-300 hover:bg-white/[0.07] text-sm">
             <Download className="w-4 h-4" /> Baixar planilha-modelo
           </button>
         </div>
@@ -287,12 +287,12 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
               value={pasted}
               onChange={(e) => setPasted(e.target.value)}
               placeholder={'Data\tLink\tVisualizações\tAlcance\tCurtidas...'}
-              className="w-full rounded-xl bg-neutral-950 border border-neutral-800 focus:border-amber-500 outline-none p-3 text-xs text-neutral-200 font-mono placeholder:text-neutral-600"
+              className="w-full rounded-2xl bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 outline-none p-3 text-xs text-neutral-200 tabular-nums placeholder:text-neutral-600"
             />
             <button
               onClick={() => loadText(pasted, null)}
               disabled={!pasted.trim()}
-              className="px-4 py-2 rounded-lg border border-neutral-700 text-neutral-200 hover:bg-neutral-800 text-sm disabled:opacity-40"
+              className="px-4 py-2 rounded-full border border-white/[0.1] text-neutral-200 hover:bg-white/[0.07] text-sm disabled:opacity-40"
             >
               Ler dados colados
             </button>
@@ -306,7 +306,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
               {preview.posts.length} post(s) encontrados{preview.skipped ? `, ${preview.skipped} linha(s) ignorada(s)` : ''}.
             </div>
             {preview.warnings.map((w) => (
-              <p key={w} className="text-sm text-amber-200 bg-amber-950/30 border border-amber-500/20 rounded-lg px-3 py-2">
+              <p key={w} className="text-sm text-amber-200 bg-amber-950/30 border border-amber-500/20 rounded-2xl px-3 py-2">
                 {w}
               </p>
             ))}
@@ -315,7 +315,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
               <div className="text-xs text-neutral-500 mb-2">Colunas reconhecidas (ajuste se necessário):</div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {(Object.keys(FIELD_LABELS) as ImportField[]).map((field) => (
-                  <label key={field} className="flex items-center justify-between gap-2 text-xs bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5">
+                  <label key={field} className="flex items-center justify-between gap-2 text-xs bg-white/[0.03] border border-white/[0.06] rounded-2xl px-2.5 py-1.5">
                     <span className="text-neutral-400">{FIELD_LABELS[field]}</span>
                     <select
                       value={preview.mapping[field] ?? ''}
@@ -325,7 +325,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
                         else next[field] = Number(e.target.value);
                         setMapping(next);
                       }}
-                      className="bg-neutral-900 border border-neutral-700 rounded px-1.5 py-1 text-neutral-200 max-w-[55%]"
+                      className="bg-[#161618] border border-white/[0.1] rounded-[24px] px-1.5 py-1 text-neutral-200 max-w-[55%]"
                     >
                       <option value="">(não usar)</option>
                       {preview.headers.map((h, i) => (
@@ -340,9 +340,9 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
             </div>
 
             {preview.posts.length > 0 && (
-              <div className="overflow-x-auto border border-neutral-800 rounded-xl">
+              <div className="overflow-x-auto border border-white/[0.06] rounded-2xl">
                 <table className="w-full text-xs">
-                  <thead className="text-neutral-500 bg-neutral-950">
+                  <thead className="text-neutral-500 bg-white/[0.03]">
                     <tr>
                       {['Data', 'Formato', 'Legenda', 'Views', 'Alcance', 'Curtidas', 'Coment.', 'Salvos', 'Compart.'].map((h) => (
                         <th key={h} className="text-left font-medium px-3 py-2 whitespace-nowrap">
@@ -351,7 +351,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-neutral-800 text-neutral-300">
+                  <tbody className="divide-y divide-white/[0.06] text-neutral-300">
                     {preview.posts.slice(0, 8).map((p) => (
                       <tr key={p.key}>
                         <td className="px-3 py-2 whitespace-nowrap">{p.publishedAt ? formatDateTimeBR(p.publishedAt) : 'n/d'}</td>
@@ -376,14 +376,14 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
                   setSourceText(null);
                   setFileName(null);
                 }}
-                className="px-4 py-2 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 text-sm"
+                className="px-4 py-2 rounded-full border border-white/[0.1] text-neutral-300 hover:bg-white/[0.07] text-sm"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleImport}
                 disabled={importing || preview.posts.length === 0}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-sm font-semibold disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 text-neutral-950 text-sm font-semibold disabled:opacity-50"
               >
                 {importing && <Loader2 className="w-4 h-4 animate-spin" />}
                 Importar {preview.posts.length} post(s)
@@ -394,7 +394,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
       </section>
 
       {/* Seguidores */}
-      <section className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 space-y-4">
+      <section className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 space-y-4">
         <div>
           <h4 className="text-sm font-semibold text-neutral-100">Registrar seguidores</h4>
           <p className="text-sm text-neutral-400 mt-1">
@@ -412,7 +412,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
               value={followersDate}
               max={new Date().toISOString().slice(0, 10)}
               onChange={(e) => setFollowersDate(e.target.value)}
-              className="rounded-lg bg-neutral-950 border border-neutral-800 px-3 py-2 text-sm text-neutral-200"
+              className="rounded-2xl bg-white/[0.03] border border-white/[0.06] px-3 py-2 text-sm text-neutral-200"
             />
           </div>
           <div className="space-y-1">
@@ -425,17 +425,17 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({ client, contents, snapsh
               value={followersValue}
               onChange={(e) => setFollowersValue(e.target.value)}
               placeholder="Ex.: 12.480"
-              className="rounded-lg bg-neutral-950 border border-neutral-800 focus:border-amber-500 outline-none px-3 py-2 text-sm text-neutral-200 w-40"
+              className="rounded-2xl bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 outline-none px-3 py-2 text-sm text-neutral-200 w-40"
             />
           </div>
-          <button type="submit" disabled={!followersValue.trim()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-sm font-semibold disabled:opacity-40">
+          <button type="submit" disabled={!followersValue.trim()} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 text-neutral-950 text-sm font-semibold disabled:opacity-40">
             <UserPlus className="w-4 h-4" /> Registrar
           </button>
         </form>
         {followerSnapshots.length > 0 && (
           <div className="flex flex-wrap gap-2 text-xs">
             {followerSnapshots.slice(-6).reverse().map((s) => (
-              <span key={s.id} className="px-2.5 py-1 rounded-md bg-neutral-950 border border-neutral-800 text-neutral-300">
+              <span key={s.id} className="px-2.5 py-1 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-neutral-300">
                 {new Date(`${s.date}T12:00:00`).toLocaleDateString('pt-BR')}: <strong className="text-neutral-100">{formatMetric(s.followers)}</strong>
               </span>
             ))}

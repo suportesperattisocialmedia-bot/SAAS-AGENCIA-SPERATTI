@@ -73,13 +73,13 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
   ];
 
   return (
-    <div className="bg-neutral-950 border-b border-neutral-800 -mx-4 sm:-mx-6 -mt-6 mb-6 px-4 sm:px-6 pt-6">
+    <div className="bg-white/[0.03] border-b border-white/[0.06] -mx-4 sm:-mx-6 -mt-6 mb-6 px-4 sm:px-6 pt-6">
       {/* Top action row */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5">
         <div className="flex items-center gap-4">
           <button
             onClick={onBackToClients}
-            className="p-2 text-neutral-400 hover:text-neutral-200 rounded-lg hover:bg-neutral-900 border border-neutral-800 transition-colors"
+            className="p-2 text-neutral-400 hover:text-neutral-200 rounded-2xl hover:bg-white/[0.04] border border-white/[0.06] transition-colors"
             title="Voltar para lista de clientes"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -91,10 +91,10 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
                 src={avatarUrl}
                 alt={client.name}
                 referrerPolicy="no-referrer"
-                className="w-12 h-12 rounded-xl object-cover border border-amber-500/40 shadow-sm"
+                className="w-12 h-12 rounded-2xl object-cover border border-amber-500/40 shadow-sm"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-base font-bold font-mono text-amber-400">
+              <div className="w-12 h-12 rounded-[24px] bg-[#161618] border border-white/[0.06] flex items-center justify-center text-base font-bold tabular-nums text-amber-400">
                 {client.name.slice(0, 2).toUpperCase()}
               </div>
             )}
@@ -102,11 +102,11 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-neutral-100">{client.name}</h1>
-                <span className="text-xs font-mono text-amber-400 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded">
+                <span className="text-xs tabular-nums text-amber-400 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded-full">
                   {client.instagram}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400 font-mono mt-0.5">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400 tabular-nums mt-0.5">
                 <span>{client.company}</span>
                 <span>·</span>
                 <span className="text-neutral-300">{client.segment}</span>
@@ -122,7 +122,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             onClick={onSync}
             disabled={isSyncing || !account?.isConnected}
             title={account?.isConnected ? 'Sincronizar mídia e métricas da Meta' : 'Conecte o Instagram para sincronizar'}
-            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3.5 py-2 bg-[#161618] hover:bg-white/[0.07] text-neutral-200 border border-white/[0.06] rounded-[24px] text-xs font-medium transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-400' : 'text-neutral-400'}`} />
             <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar'}</span>
@@ -131,7 +131,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
           <button
             onClick={onAnalyzeProfile}
             disabled={isAnalyzing}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs disabled:opacity-60"
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-full text-xs font-semibold transition-colors shadow-xs disabled:opacity-60"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-pulse' : ''}`} />
             <span>Gerar análise completa</span>
@@ -140,7 +140,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
       </div>
 
       {/* Horizontal Tab Navigation */}
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar border-t border-neutral-900 pt-2">
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar border-t border-white/[0.04] pt-2">
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -149,8 +149,8 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
               onClick={() => onTabChange(tab.id)}
               className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors ${
                 isActive
-                  ? 'border-amber-500 text-amber-300 font-semibold bg-neutral-900/40'
-                  : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+                  ? 'border-amber-500 text-amber-300 font-semibold bg-white/[0.02]'
+                  : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:border-white/[0.14]'
               }`}
             >
               <span className={isActive ? 'text-amber-400' : 'text-neutral-500'}>

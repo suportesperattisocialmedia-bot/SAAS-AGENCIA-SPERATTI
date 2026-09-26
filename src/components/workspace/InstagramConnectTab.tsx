@@ -83,10 +83,10 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
 
   return (
     <div className="max-w-4xl space-y-6 animate-in fade-in duration-200">
-      <section className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-5 sm:p-6">
+      <section className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
           <div className="flex items-start gap-4 min-w-0">
-            <div className="w-11 h-11 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-center shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center shrink-0">
               <Instagram className="w-5 h-5 text-amber-400" />
             </div>
             <div className="min-w-0 space-y-1.5">
@@ -101,7 +101,7 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
                 {isDemo ? 'Cliente de demonstração: nenhuma conexão real com a Meta é feita.' : state.description}
               </p>
               {account.errorStatus && (status === 'ERROR' || needsReconnect || status === 'NOT_CONFIGURED') && (
-                <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-500/20 rounded-lg px-3 py-2">{account.errorStatus}</p>
+                <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-500/20 rounded-2xl px-3 py-2">{account.errorStatus}</p>
               )}
             </div>
           </div>
@@ -112,7 +112,7 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
                 <button
                   onClick={onSync}
                   disabled={isSyncing || busy !== null}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 text-sm font-semibold transition disabled:opacity-60"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 text-sm font-semibold transition disabled:opacity-60"
                 >
                   <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                   {isSyncing ? 'Sincronizando...' : 'Sincronizar agora'}
@@ -120,7 +120,7 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
                 <button
                   onClick={handleDisconnect}
                   disabled={busy !== null || isSyncing}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 text-sm transition disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full border border-white/[0.1] text-neutral-300 hover:bg-white/[0.07] text-sm transition disabled:opacity-50"
                 >
                   <Unlink className="w-4 h-4" />
                   Desconectar
@@ -130,7 +130,7 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
               <button
                 onClick={handleConnect}
                 disabled={!canConnect || busy !== null}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {busy === 'connect' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
                 {status === 'NOT_CONFIGURED' ? 'Instagram API não configurada' : needsReconnect ? 'Reconectar Instagram' : 'Conectar Instagram'}
@@ -139,7 +139,7 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
           </div>
         </div>
 
-        <dl className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-neutral-800 pt-5 text-sm">
+        <dl className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/[0.06] pt-5 text-sm">
           <div>
             <dt className="text-xs text-neutral-500">Última sincronização</dt>
             <dd className="text-neutral-200 mt-0.5">{formatDateTime(account.lastSyncAt)}</dd>
@@ -150,14 +150,14 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
           </div>
           <div>
             <dt className="text-xs text-neutral-500">Conta profissional (ID)</dt>
-            <dd className="text-neutral-200 mt-0.5 font-mono text-xs break-all">{account.accountId || 'n/d'}</dd>
+            <dd className="text-neutral-200 mt-0.5 tabular-nums text-xs break-all">{account.accountId || 'n/d'}</dd>
           </div>
         </dl>
 
         {account.permissions.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {account.permissions.map((scope) => (
-              <span key={scope} className="text-[11px] px-2 py-0.5 rounded-md bg-neutral-950 border border-neutral-800 text-neutral-400">
+              <span key={scope} className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.03] border border-white/[0.06] text-neutral-400">
                 {SCOPE_LABELS[scope] ?? scope}
               </span>
             ))}
@@ -166,7 +166,7 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="md:col-span-3 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5">
+        <div className="md:col-span-3 bg-[#161618] border border-white/[0.06] rounded-[24px] p-5">
           <h4 className="text-sm font-semibold text-neutral-100 mb-3">Histórico de sincronização</h4>
           {syncLogs.length === 0 ? (
             <p className="text-sm text-neutral-500">Nenhuma sincronização registrada ainda.</p>
@@ -181,7 +181,7 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
                     </div>
                   </div>
                   <span
-                    className={`text-[11px] px-2 py-0.5 rounded-md border shrink-0 ${
+                    className={`text-[11px] px-2 py-0.5 rounded-full border shrink-0 ${
                       log.status === 'SUCCESS'
                         ? 'text-emerald-300 border-emerald-500/30'
                         : log.status === 'PARTIAL'
@@ -197,7 +197,7 @@ export const InstagramConnectTab: React.FC<InstagramConnectTabProps> = ({ client
           )}
         </div>
 
-        <div className="md:col-span-2 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 space-y-3 text-sm text-neutral-400">
+        <div className="md:col-span-2 bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 space-y-3 text-sm text-neutral-400">
           <h4 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             Como a conexão é protegida

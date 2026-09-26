@@ -54,9 +54,9 @@ export const Modal: React.FC<ModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative z-10 w-full ${maxWidthClasses} bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150`}
+        className={`relative z-10 w-full ${maxWidthClasses} bg-[#161618] border border-white/[0.06] rounded-[24px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150`}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] shrink-0">
           <div>
             <h3 className="text-base font-semibold text-neutral-100">{title}</h3>
             {subtitle && <p className="text-xs text-neutral-400 mt-0.5">{subtitle}</p>}
@@ -65,7 +65,7 @@ export const Modal: React.FC<ModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="text-neutral-400 hover:text-neutral-200 p-1 rounded-lg hover:bg-neutral-800 transition-colors"
+            className="text-neutral-400 hover:text-neutral-200 p-1 rounded-2xl hover:bg-white/[0.07] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>

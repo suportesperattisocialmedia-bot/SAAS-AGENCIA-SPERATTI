@@ -38,7 +38,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col items-center justify-center text-neutral-500 text-sm h-60">
+      <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-6 flex flex-col items-center justify-center text-neutral-500 text-sm h-60">
         Dados históricos insuficientes.
       </div>
     );
@@ -86,14 +86,14 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const hoveredPoint = hoveredIdx !== null ? points[hoveredIdx] : null;
 
   return (
-    <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4 flex flex-col">
+    <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-4 flex flex-col">
       {(title || subtitle) && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-4">
           <div>
             {title && <h4 className="text-sm font-semibold text-neutral-200">{title}</h4>}
             {subtitle && <p className="text-xs text-neutral-400 mt-0.5">{subtitle}</p>}
           </div>
-          <div className="flex items-center gap-3 text-xs text-neutral-400 font-mono">
+          <div className="flex items-center gap-3 text-xs text-neutral-400 tabular-nums">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: lineColor }} />
               {primaryLabel}
@@ -138,7 +138,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                   x={paddingX - 8}
                   y={y + 3}
                   textAnchor="end"
-                  className="text-[10px] font-mono fill-neutral-500"
+                  className="text-[10px] tabular-nums fill-neutral-500"
                 >
                   {valueFormatter(Math.round(val))}
                 </text>
@@ -150,7 +150,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           {points.length === 1 && (
             <g>
               <circle cx={points[0].x} cy={points[0].y} r={5} fill={lineColor} />
-              <text x={points[0].x} y={points[0].y - 12} textAnchor="middle" className="text-[11px] font-mono fill-neutral-300">
+              <text x={points[0].x} y={points[0].y - 12} textAnchor="middle" className="text-[11px] tabular-nums fill-neutral-300">
                 {valueFormatter(points[0].data.value)}
               </text>
             </g>
@@ -220,7 +220,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                 x={pt.x}
                 y={height - 12}
                 textAnchor="middle"
-                className="text-[10px] font-mono fill-neutral-500"
+                className="text-[10px] tabular-nums fill-neutral-500"
               >
                 {pt.data.label || pt.data.date.split('-').slice(1).reverse().join('/')}
               </text>
@@ -231,7 +231,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
         {/* Floating Tooltip */}
         {hoveredPoint && (
           <div
-            className="absolute z-20 pointer-events-none transform -translate-x-1/2 -translate-y-full bg-neutral-950 border border-neutral-700 rounded-lg p-2.5 shadow-xl text-xs font-mono"
+            className="absolute z-20 pointer-events-none transform -translate-x-1/2 -translate-y-full bg-white/[0.03] border border-white/[0.1] rounded-2xl p-2.5 shadow-xl text-xs tabular-nums"
             style={{
               left: `${(hoveredPoint.x / width) * 100}%`,
               top: `${(hoveredPoint.y / height) * 100}%`,

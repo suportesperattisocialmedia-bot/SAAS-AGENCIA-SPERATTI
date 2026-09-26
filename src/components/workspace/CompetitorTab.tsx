@@ -1,3 +1,4 @@
+import { computeWinningPatterns } from '../../services/winningPatterns';
 import React, { useState } from 'react';
 import { Client, Competitor, ContentFormat } from '../../types';
 import { competitorService, CompetitorBenchmarkRow } from '../../services/competitorService';
@@ -45,7 +46,19 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
   const approvedCompetitors = competitors.filter(c => c.status === 'approved');
   const candidateCompetitors = competitors.filter(c => c.status === 'candidate' || c.status === 'discovered');
   const latestFollowers = [...storageService.history.getByClient(client.id)].reverse().find((s) => s.followers !== null)?.followers ?? null;
-  const benchmarkMatrix = competitorService.generateBenchmarkTable(client, latestFollowers, null);
+  // Linha do cliente com os posts importados (últimos 90 dias), mesma régua dos padrões vencedores.
+  const patterns = computeWinningPatterns(storageService.contents.getByClient(client.id));
+  const recentWithViews = patterns.formats.reduce((acc, f) => acc + f.posts, 0);
+  const engBase = patterns.formats.filter((f) => f.avgEngagement !== null);
+  const engPosts = engBase.reduce((acc, f) => acc + f.posts, 0);
+  const weightedEngagement = engPosts ? Math.round((engBase.reduce((acc, f) => acc + (f.avgEngagement ?? 0) * f.posts, 0) / engPosts) * 10) / 10 : null;
+  const benchmarkMatrix = competitorService.generateBenchmarkTable(client, {
+    followers: latestFollowers,
+    weeklyFrequency: patterns.cadencePerWeek,
+    avgViews: recentWithViews ? Math.round(patterns.formats.reduce((acc, f) => acc + (f.avgViews ?? 0) * f.posts, 0) / recentWithViews) : null,
+    avgEngagementRate: weightedEngagement,
+    topFormats: patterns.formats.slice(0, 2).map((f) => f.label as ContentFormat)
+  });
   const patternInsights = competitorService.detectCompetitorPatterns(approvedCompetitors);
 
   const handleDiscover = async () => {
@@ -132,11 +145,11 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#161618] border border-white/[0.06] rounded-[24px] p-4">
         <div>
           <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
             <span>Inteligência Competitiva & Benchmarking</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-neutral-700 text-neutral-400 bg-neutral-950">
+            <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-white/[0.1] text-neutral-400 bg-white/[0.03]">
               {approvedCompetitors.length} monitorados
             </span>
           </h3>
@@ -149,7 +162,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
           <button
             onClick={handleDiscover}
             disabled={isSearching}
-            className="flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-lg text-xs transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-neutral-200 border border-white/[0.1] rounded-full text-xs transition-colors disabled:opacity-50"
           >
             <Search className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-amber-400' : ''}`} />
             <span>{isSearching ? 'Buscando...' : 'Encontrar Concorrentes'}</span>
@@ -157,7 +170,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-xs font-semibold transition-colors shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-full text-xs font-semibold transition-colors shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Adicionar Concorrente</span>
@@ -167,15 +180,15 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
 
       {/* Candidate Competitors Queue (Review by Gabriel Speratti) */}
       {candidateCompetitors.length > 0 && (
-        <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-5 space-y-4">
+        <div className="bg-amber-950/20 border border-amber-500/30 rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-bold font-mono uppercase text-amber-300">
+              <h4 className="text-sm font-bold text-amber-300">
                 Novos Concorrentes Candidatos Identificados ({candidateCompetitors.length})
               </h4>
             </div>
-            <span className="text-[10px] font-mono text-neutral-400">
+            <span className="text-[10px] tabular-nums text-neutral-400">
               Revise a fonte antes de aprovar
             </span>
           </div>
@@ -184,15 +197,15 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
             {candidateCompetitors.map(cand => (
               <div
                 key={cand.id}
-                className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 flex flex-col justify-between"
+                className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-4 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
                       <h5 className="text-xs font-bold text-neutral-100">{cand.name}</h5>
-                      <span className="text-[11px] font-mono text-amber-400">{cand.instagram}</span>
+                      <span className="text-[11px] tabular-nums text-amber-400">{cand.instagram}</span>
                     </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
+                    <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full bg-white/[0.06] text-neutral-300 border border-white/[0.1]">
                       {cand.similarityScore === null ? 'Similaridade n/d' : `${cand.similarityScore}% similar`}
                     </span>
                   </div>
@@ -206,22 +219,22 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                     </a>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-neutral-400 bg-neutral-950 p-2 rounded mb-3">
+                  <div className="grid grid-cols-2 gap-2 text-[11px] tabular-nums text-neutral-400 bg-white/[0.03] p-2 rounded-2xl mb-3">
                     <div>Seguidores: <span className="text-neutral-200">{formatMetric(cand.followers)}</span></div>
                     <div>Cadência: <span className="text-neutral-200">{formatMetric(cand.postingFrequencyWeekly, { suffix: 'x / sem' })}</span></div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-800">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/[0.06]">
                   <button
                     onClick={() => handleIgnore(cand.id)}
-                    className="px-3 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 rounded text-xs transition-colors"
+                    className="px-3 py-1 bg-white/[0.06] hover:bg-white/[0.1] text-neutral-400 hover:text-neutral-200 rounded-full text-xs transition-colors"
                   >
                     Ignorar
                   </button>
                   <button
                     onClick={() => handleApprove(cand.id)}
-                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded text-xs transition-colors"
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-full text-xs transition-colors"
                   >
                     Aprovar Concorrente
                   </button>
@@ -233,23 +246,23 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
       )}
 
       {/* Comparative Benchmarking Table */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+      <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
           <div className="flex items-center gap-2">
             <Swords className="w-4 h-4 text-amber-400" />
-            <h4 className="text-xs font-bold font-mono uppercase text-neutral-200">
+            <h4 className="text-sm font-bold text-neutral-200">
               Matriz Comparativa de Mercado (Cliente vs Concorrentes)
             </h4>
           </div>
-          <span className="text-[10px] font-mono text-neutral-400">
+          <span className="text-[10px] tabular-nums text-neutral-400">
             Dados Fatuais · Sem métricas arbitrariamente inventadas
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono">
+          <table className="[&_th]:px-3 [&_td]:px-3 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 w-full text-left text-xs tabular-nums">
             <thead>
-              <tr className="border-b border-neutral-800 text-neutral-500 uppercase text-[10px]">
+              <tr className="border-b border-white/[0.06] text-neutral-500 text-[11px]">
                 <th className="pb-3 font-semibold">Conta</th>
                 <th className="pb-3 font-semibold text-right">Seguidores</th>
                 <th className="pb-3 font-semibold text-center">Frequência Semanal</th>
@@ -259,7 +272,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 <th className="pb-3 font-semibold">Temas Recentes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800/60 text-neutral-300">
+            <tbody className="divide-y divide-white/[0.05] text-neutral-300">
               {benchmarkMatrix.map((row: CompetitorBenchmarkRow, idx: number) => (
                 <tr
                   key={idx}
@@ -293,7 +306,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   <td className="py-3">
                     <div className="flex flex-wrap gap-1">
                       {row.topFormats.map((f: string, i: number) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.2 rounded bg-neutral-800 border border-neutral-700 text-neutral-300">
+                        <span key={i} className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/[0.06] border border-white/[0.1] text-neutral-300">
                           {f}
                         </span>
                       ))}
@@ -310,13 +323,13 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
       </div>
 
       {/* "O QUE OS CONCORRENTES ESTÃO FAZENDO?" - Pattern Detector */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-4">
-        <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
+      <div className="bg-[#161618] border border-white/[0.06] rounded-[24px] p-5 space-y-4">
+        <div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
           <TrendingUp className="w-4 h-4 text-purple-400" />
-          <h4 className="text-xs font-bold font-mono uppercase text-neutral-200">
+          <h4 className="text-sm font-bold text-neutral-200">
             Monitor de Tendências: O Que os Concorrentes Estão Fazendo?
           </h4>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-purple-500/30 text-purple-400 bg-purple-950/20">
+          <span className="text-[10px] tabular-nums px-2 py-0.5 rounded-full border border-purple-500/30 text-purple-400 bg-purple-950/20">
             DETECTOR DE PADRÕES
           </span>
         </div>
@@ -330,10 +343,10 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
           {patternInsights.map(insight => (
             <div
               key={insight.id}
-              className="p-4 bg-neutral-950/60 border border-neutral-800 rounded-lg space-y-2.5 flex flex-col justify-between"
+              className="p-4 bg-white/[0.03] border border-white/[0.06] rounded-2xl space-y-2.5 flex flex-col justify-between"
             >
               <div>
-                <span className="text-[10px] font-mono uppercase text-amber-400 font-semibold">
+                <span className="text-[11px] text-amber-400 font-semibold">
                   {insight.type}
                 </span>
                 <h5 className="text-xs font-bold text-neutral-100 mt-1">
@@ -344,8 +357,8 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 </p>
               </div>
 
-              <div className="p-2.5 bg-neutral-900 border border-neutral-800 rounded text-xs mt-2">
-                <span className="text-[10px] font-mono uppercase text-neutral-500 block mb-1">
+              <div className="p-2.5 bg-[#161618] border border-white/[0.06] rounded-[24px] text-xs mt-2">
+                <span className="text-[11px] text-neutral-500 block mb-1">
                   Implicação Estratégica
                 </span>
                 <p className="text-amber-200 text-[11px] leading-relaxed">
@@ -365,7 +378,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
           title="Cadastrar Concorrente Manualmente"
           subtitle={`Adicionar player de mercado para benchmarking de ${client.name}`}
         >
-          <form onSubmit={handleCreateManual} className="space-y-4 text-xs font-mono">
+          <form onSubmit={handleCreateManual} className="space-y-4 text-xs tabular-nums">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-neutral-400 mb-1">Nome do Player *</label>
@@ -375,7 +388,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   value={newCompForm.name}
                   onChange={(e) => setNewCompForm({ ...newCompForm, name: e.target.value })}
                   placeholder="Ex: Dr. Fulano Facial"
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 />
               </div>
 
@@ -387,7 +400,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   value={newCompForm.instagram}
                   onChange={(e) => setNewCompForm({ ...newCompForm, instagram: e.target.value })}
                   placeholder="Ex: @drfulanofacial"
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-amber-300"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-amber-300"
                 />
               </div>
 
@@ -397,7 +410,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   type="number"
                   value={newCompForm.followers}
                   onChange={(e) => setNewCompForm({ ...newCompForm, followers: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 />
               </div>
 
@@ -408,7 +421,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   step="0.5"
                   value={newCompForm.postingFrequencyWeekly}
                   onChange={(e) => setNewCompForm({ ...newCompForm, postingFrequencyWeekly: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 />
               </div>
 
@@ -418,7 +431,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   type="number"
                   value={newCompForm.avgViews}
                   onChange={(e) => setNewCompForm({ ...newCompForm, avgViews: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 />
               </div>
 
@@ -429,7 +442,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   step="0.1"
                   value={newCompForm.avgEngagementRate}
                   onChange={(e) => setNewCompForm({ ...newCompForm, avgEngagementRate: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
                 />
               </div>
             </div>
@@ -441,7 +454,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 value={newCompForm.topFormats}
                 onChange={(e) => setNewCompForm({ ...newCompForm, topFormats: e.target.value })}
                 placeholder="Reels, Carrossel"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
@@ -452,7 +465,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 value={newCompForm.recentThemes}
                 onChange={(e) => setNewCompForm({ ...newCompForm, recentThemes: e.target.value })}
                 placeholder="Ex: Recuperação, Cicatriz, Lipoaspiração"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
@@ -463,7 +476,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 value={newCompForm.evidenceUrl}
                 onChange={(e) => setNewCompForm({ ...newCompForm, evidenceUrl: e.target.value })}
                 placeholder="https://www.instagram.com/perfil"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
@@ -474,21 +487,21 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 value={newCompForm.notes}
                 onChange={(e) => setNewCompForm({ ...newCompForm, notes: e.target.value })}
                 placeholder="Observações sobre posicionamento..."
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded p-2 text-neutral-100"
+                className="w-full bg-white/[0.04] border border-white/[0.06] focus:border-amber-500 rounded-2xl p-2 text-neutral-100"
               />
             </div>
 
-            <div className="pt-3 border-t border-neutral-800 flex justify-end gap-2">
+            <div className="pt-3 border-t border-white/[0.06] flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 bg-neutral-800 text-neutral-300 rounded hover:bg-neutral-700"
+                className="px-4 py-2 bg-white/[0.06] text-neutral-300 rounded-full hover:bg-white/[0.1]"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-amber-500 text-neutral-950 font-bold rounded hover:bg-amber-400"
+                className="px-4 py-2 bg-amber-500 text-neutral-950 font-bold rounded-full hover:bg-amber-400"
               >
                 Salvar Concorrente
               </button>
