@@ -113,3 +113,51 @@ export const ResearchRequestSchema = z.object({
   city: shortText(120).optional(),
   query: shortText(300).optional()
 });
+
+/** Coleções do app que podem ser sincronizadas com a nuvem (mesmas do backup + biblioteca). */
+export const WORKSPACE_KEYS = [
+  'gs_intel_clients',
+  'gs_intel_instagram',
+  'gs_intel_snapshots',
+  'gs_intel_contents',
+  'gs_intel_content_metric_snapshots',
+  'gs_intel_competitors',
+  'gs_intel_audience',
+  'gs_intel_ideas',
+  'gs_intel_calendar',
+  'gs_intel_alerts',
+  'gs_intel_reports',
+  'gs_intel_sync_logs',
+  'gs_intel_ai_analyses',
+  'gs_intel_research_insights',
+  'gs_intel_research_runs',
+  'gs_intel_tasks',
+  'gs_intel_snippets'
+] as const;
+
+export const WorkspaceSaveRequestSchema = z.object({
+  key: z.enum(WORKSPACE_KEYS),
+  baseVersion: z.number().int().min(0),
+  data: z.array(z.record(z.string(), z.unknown())).max(50_000)
+});
+
+// Portal de aprovação do cliente
+export const ApprovalTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{32,128}$/, 'Link inválido.');
+
+export const CreateApprovalLinkRequestSchema = z.object({
+  clientId: ClientIdSchema,
+  clientName: z.string().trim().min(1).max(120),
+  days: z.number().int().min(1).max(90).default(30)
+});
+
+export const RevokeApprovalLinkRequestSchema = z.object({ id: z.string().uuid() });
+
+export const PortalDecisionRequestSchema = z.object({
+  token: ApprovalTokenSchema,
+  taskId: z.string().min(1).max(100),
+  decision: z.enum(['approved', 'changes']),
+  comment: z.string().trim().max(2000).optional()
+}).refine((v) => v.decision === 'approved' || (v.comment && v.comment.length > 0), {
+  message: 'Descreva o que precisa ser ajustado.',
+  path: ['comment']
+});

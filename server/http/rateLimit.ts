@@ -41,5 +41,7 @@ export const RATE_LIMITS = {
   login: { name: 'login', limit: 10, windowMs: 15 * 60 * 1000 },
   ai: { name: 'ai', limit: 30, windowMs: 60 * 1000 },
   oauth: { name: 'oauth', limit: 20, windowMs: 60 * 1000 },
-  sync: { name: 'sync', limit: 10, windowMs: 60 * 1000 }
+  sync: { name: 'sync', limit: 10, windowMs: 60 * 1000 },
+  workspace: { name: 'workspace', limit: 120, windowMs: 60 * 1000 },
+  portal: { name: 'portal', limit: 40, windowMs: 60 * 1000 }
 } satisfies Record<string, RateLimitRule>;

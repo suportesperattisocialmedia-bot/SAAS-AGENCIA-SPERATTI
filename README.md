@@ -44,7 +44,7 @@ Diagnóstico ("Gerar análise completa") e Banco de Ideias ("Gerar prompt de ide
 2. Você copia e cola em qualquer IA (ChatGPT, Gemini, Claude).
 3. Cola a resposta de volta no sistema; ela é validada e salva.
 
-Código: `src/ai/manualPrompts.ts` e `src/components/common/ManualAiModal.tsx`. As rotas `/api/ai/*` com Gemini continuam no backend como opção, mas a interface não depende delas.
+Código: `src/ai/manualPrompts.ts` e `src/components/common/ManualAiModal.tsx`. A rota `/api/ai?action=...` com Gemini continuam no backend como opção, mas a interface não depende delas.
 
 Produção: https://saas-agencia-speratti.vercel.app
 
@@ -78,9 +78,9 @@ React (Vite, /src) ──fetch same-origin──▶ Vercel Functions (/api/*.ts)
 | GET/DELETE | `/api/instagram/connection?clientId=` | Estado real da conexão / desconectar |
 | POST | `/api/instagram/sync` | Sincroniza mídia e métricas (idempotente) |
 | GET | `/api/instagram/sync?clientId=` | Conteúdos, snapshots e logs persistidos |
-| POST | `/api/ai/analyze-profile` | Diagnóstico (Gemini) |
-| POST | `/api/ai/generate-ideas` | Ideias (Gemini) |
-| POST | `/api/ai/classify-content` | Classificação (Gemini) |
+| POST | `/api/ai?action=analyze-profile\|generate-ideas\|classify-content` | IA opcional (Gemini) |
+| GET/PUT | `/api/workspace` | Sincronização das coleções do app (tarefas, métricas, ideias, calendário...) com versão; 409 em conflito |
+| GET/POST | `/api/portal` | Links de aprovação do cliente (agência) e portal público por token (`/aprovar/<token>`) |
 | POST | `/api/research` | Pesquisa de público/concorrentes (SerpAPI, opcional) |
 
 Erros seguem sempre `{ "ok": false, "error": { "code", "message", "requestId" } }`.
@@ -96,7 +96,7 @@ Veja `.env.example`. Obrigatórias em produção:
 | `META_APP_ID`, `META_APP_SECRET` | App da Meta |
 | `META_REDIRECT_URI` | `https://saas-agencia-speratti.vercel.app/api/auth/instagram/callback` |
 
-Opcionais: `GEMINI_API_KEY`/`GEMINI_MODEL` (só para as rotas `/api/ai/*`), `ADMIN_EMAIL`/`ADMIN_PASSWORD` (primeiro usuário), `TOKEN_ENCRYPTION_KEY`, `META_GRAPH_VERSION`, `SERPAPI_KEY`, `DATABASE_SSL`.
+Opcionais: `GEMINI_API_KEY`/`GEMINI_MODEL` (só para a rota `/api/ai`), `ADMIN_EMAIL`/`ADMIN_PASSWORD` (primeiro usuário), `TOKEN_ENCRYPTION_KEY`, `META_GRAPH_VERSION`, `SERPAPI_KEY`, `DATABASE_SSL`.
 
 > Trocar `SESSION_SECRET` invalida sessões e torna ilegíveis os tokens já salvos (será preciso reconectar o Instagram), a menos que `TOKEN_ENCRYPTION_KEY` esteja definida.
 

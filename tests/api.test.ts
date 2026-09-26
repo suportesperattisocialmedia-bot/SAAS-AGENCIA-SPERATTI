@@ -3,9 +3,10 @@ import { GET as sessionGet, POST as login, DELETE as logout } from '../api/sessi
 import { GET as listClients, POST as upsertClient } from '../api/clients.js';
 import { GET as connectionGet, DELETE as connectionDelete } from '../api/instagram/connection.js';
 import { GET as syncGet, POST as syncPost } from '../api/instagram/sync.js';
-import { POST as analyze } from '../api/ai/analyze-profile.js';
-import { POST as ideas } from '../api/ai/generate-ideas.js';
-import { POST as classify } from '../api/ai/classify-content.js';
+import { POST as ai } from '../api/ai.js';
+const analyze = ai;
+const ideas = ai;
+const classify = ai;
 import { POST as research } from '../api/research.js';
 import { getPool } from '../server/db/database.js';
 import { setGeminiGeneratorForTests } from '../server/services/geminiService.js';
@@ -111,13 +112,13 @@ describe.skipIf(!dbAvailable)('API', () => {
       expect((await syncPost(req('/api/instagram/sync', { method: 'POST', cookie: b.cookie, json: { clientId: a.clientId } }))).status).toBe(404);
       process.env.GEMINI_API_KEY = 'fake';
       setGeminiGeneratorForTests(async () => JSON.stringify(validDiagnostic));
-      expect((await analyze(req('/api/ai/analyze-profile', { method: 'POST', cookie: b.cookie, json: { clientId: a.clientId, client: { name: 'x' } } }))).status).toBe(404);
+      expect((await analyze(req('/api/ai?action=analyze-profile', { method: 'POST', cookie: b.cookie, json: { clientId: a.clientId, client: { name: 'x' } } }))).status).toBe(404);
     });
 
     it('rotas protegidas exigem sessão', async () => {
       expect((await listClients(req('/api/clients'))).status).toBe(401);
       expect((await syncPost(req('/api/instagram/sync', { method: 'POST', json: { clientId: 'client-a' } }))).status).toBe(401);
-      expect((await analyze(req('/api/ai/analyze-profile', { method: 'POST', json: { clientId: 'client-a', client: { name: 'x' } } }))).status).toBe(401);
+      expect((await analyze(req('/api/ai?action=analyze-profile', { method: 'POST', json: { clientId: 'client-a', client: { name: 'x' } } }))).status).toBe(401);
     });
   });
 
@@ -144,7 +145,7 @@ describe.skipIf(!dbAvailable)('API', () => {
   describe('IA (Gemini)', () => {
     it('503 quando GEMINI_API_KEY ausente', async () => {
       const { cookie, clientId } = await createTenant('A');
-      const res = await analyze(req('/api/ai/analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
+      const res = await analyze(req('/api/ai?action=analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
       expect(res.status).toBe(503);
       expect((await res.json()).error.code).toBe('GEMINI_NOT_CONFIGURED');
     });
@@ -153,7 +154,7 @@ describe.skipIf(!dbAvailable)('API', () => {
       const { cookie, clientId } = await createTenant('A');
       process.env.GEMINI_API_KEY = 'fake';
       setGeminiGeneratorForTests(async () => '```json\n' + JSON.stringify(validDiagnostic) + '\n```');
-      const res = await analyze(req('/api/ai/analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
+      const res = await analyze(req('/api/ai?action=analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.diagnostic.nextActions).toEqual(['agir']);
@@ -166,17 +167,17 @@ describe.skipIf(!dbAvailable)('API', () => {
       const { cookie, clientId } = await createTenant('A');
       process.env.GEMINI_API_KEY = 'fake';
       setGeminiGeneratorForTests(async () => '{"profileSection": "texto livre"}');
-      const res = await analyze(req('/api/ai/analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
+      const res = await analyze(req('/api/ai?action=analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
       expect(res.status).toBe(502);
       expect((await res.json()).error.code).toBe('AI_RESPONSE_VALIDATION_FAILED');
 
       setGeminiGeneratorForTests(async () => 'não é json');
-      const bad = await ideas(req('/api/ai/generate-ideas', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
+      const bad = await ideas(req('/api/ai?action=generate-ideas', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
       expect(bad.status).toBe(502);
 
       setGeminiGeneratorForTests(async () => JSON.stringify({ pillar: 'x', hookCategory: 'y', hypothesisReason: 'z', isHypothesis: true, confidence: 'SUPER', improvementTip: 'w' }));
       const cls = await classify(
-        req('/api/ai/classify-content', {
+        req('/api/ai?action=classify-content', {
           method: 'POST',
           cookie,
           json: { clientId, caption: 'c', format: 'Reels', metrics: { views: null, reach: 10, likes: 1, comments: 0, shares: null, saves: null, engagementRate: null } }
@@ -187,7 +188,7 @@ describe.skipIf(!dbAvailable)('API', () => {
       setGeminiGeneratorForTests(async () => {
         throw new Error('quota exceeded for key AIzaSyFAKEFAKEFAKEFAKEFAKE');
       });
-      const failed = await analyze(req('/api/ai/analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
+      const failed = await analyze(req('/api/ai?action=analyze-profile', { method: 'POST', cookie, json: { clientId, client: { name: 'Cliente' } } }));
       expect(failed.status).toBe(429);
       const failedText = await failed.text();
       expect(failedText).toContain('cota');

@@ -24,6 +24,8 @@ export type ErrorCode =
   | 'AI_EXECUTION_ERROR'
   | 'AI_RESPONSE_VALIDATION_FAILED'
   | 'INVALID_CREDENTIALS'
+  | 'VERSION_CONFLICT'
+  | 'LINK_EXPIRED'
   | 'INTERNAL_ERROR';
 
 export class AppError extends Error {
