@@ -483,6 +483,32 @@ export default function App() {
     if (!isBooting && sessionUser && !isDemoLoaded) void handleOAuthReturn();
   }, [isBooting, sessionUser, isDemoLoaded, handleOAuthReturn]);
 
+  // Atalhos do aplicativo instalado (/?abrir=financeiro|cobrancas|tarefas).
+  useEffect(() => {
+    if (isBooting || !sessionUser) return;
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get('abrir');
+    if (!target && !params.has('origem')) return;
+    params.delete('abrir');
+    params.delete('origem');
+    const qs = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    const canAdmin = (sessionUser.role === 'owner' || sessionUser.role === 'admin') && !isDemoLoaded;
+    if (target === 'financeiro' && canAdmin) setAdminSection('overview');
+    else if (target === 'cobrancas' && canAdmin) setAdminSection('invoices');
+    else if (target === 'tarefas') {
+      setAppMode('agency');
+      try {
+        localStorage.setItem('gs_dash_mode', 'tasks');
+      } catch {
+        /* preferência opcional */
+      }
+      setCurrentSection('dashboard');
+      setDashboardKey((k) => k + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBooting, sessionUser, isDemoLoaded]);
+
   useEffect(() => {
     initializeApplication();
   }, [initializeApplication]);
@@ -845,7 +871,7 @@ export default function App() {
                   section={adminSection}
                   onNavigate={setAdminSection}
                   clients={clients}
-                  agencyName={sessionUser?.agencyName || 'Gabriel Speratti | Social Intelligence'}
+                  agencyName={storageService.settings.get().agencyName || sessionUser?.agencyName || 'Gabriel Speratti | Social Intelligence'}
                 />
               ) : !activeClient && SECTION_TO_TAB[currentSection] ? (
                 <div className="max-w-lg mx-auto mt-16 text-center bg-neutral-900/60 border border-neutral-800 rounded-2xl p-8 space-y-4">

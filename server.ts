@@ -103,7 +103,7 @@ async function main(): Promise<void> {
     const distPath = path.join(rootDir, 'dist');
     const candidate = path.join(distPath, path.normalize(pathname).replace(/^(\.\.[/\\])+/, ''));
     const file = candidate.startsWith(distPath) && existsSync(candidate) && statSync(candidate).isFile() ? candidate : path.join(distPath, 'index.html');
-    const types: Record<string, string> = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
+    const types: Record<string, string> = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
     res.writeHead(200, { 'Content-Type': types[path.extname(file)] ?? 'application/octet-stream' });
     res.end(readFileSync(file));
   });
