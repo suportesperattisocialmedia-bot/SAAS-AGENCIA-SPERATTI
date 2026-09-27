@@ -15,6 +15,8 @@ interface HeaderProps {
   onOpenAlerts: () => void;
   onToggleMobileMenu: () => void;
   onSelectClient: (client: Client | null) => void;
+  /** Primeiro nível do caminho (Agência / Administração). */
+  rootLabel?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +30,8 @@ export const Header: React.FC<HeaderProps> = ({
   unreadAlertsCount,
   onOpenAlerts,
   onToggleMobileMenu,
-  onSelectClient
+  onSelectClient,
+  rootLabel = 'Agência'
 }) => {
   return (
     <header className="sticky top-0 z-30 h-14 bg-white/[0.03] backdrop-blur-md border-b border-white/[0.06] px-4 sm:px-6 flex items-center justify-between gap-4">
@@ -43,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div className="flex items-center gap-1.5 text-xs text-neutral-400 tabular-nums truncate">
-          <span className="text-neutral-300 font-medium">Agência</span>
+          <span className="text-neutral-300 font-medium">{rootLabel}</span>
           <ChevronRight className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
           
           {activeClient ? (

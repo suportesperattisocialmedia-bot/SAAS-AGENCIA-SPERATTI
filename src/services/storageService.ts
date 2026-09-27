@@ -26,7 +26,11 @@ import {
   ResearchInsight,
   DeliveryTask,
   TaskStatus,
-  Snippet
+  Snippet,
+  Contract,
+  Invoice,
+  Project,
+  Expense
 } from '../types';
 import { storageFactory } from './storage/StorageFactory';
 import { defaultStorageAdapter } from './storage/LocalStorageAdapter';
@@ -46,7 +50,11 @@ import {
   AIAnalysisRecordSchema,
   ResearchInsightSchema,
   DeliveryTaskSchema,
-  SnippetSchema
+  SnippetSchema,
+  ContractSchema,
+  InvoiceSchema,
+  ProjectSchema,
+  ExpenseSchema
 } from '../schemas';
 import { logger } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
@@ -70,7 +78,11 @@ const KEYS = {
   RESEARCH_INSIGHTS: 'gs_intel_research_insights',
   RESEARCH_RUNS: 'gs_intel_research_runs',
   TASKS: 'gs_intel_tasks',
-  SNIPPETS: 'gs_intel_snippets'
+  SNIPPETS: 'gs_intel_snippets',
+  CONTRACTS: 'gs_fin_contracts',
+  INVOICES: 'gs_fin_invoices',
+  PROJECTS: 'gs_fin_projects',
+  EXPENSES: 'gs_fin_expenses'
 };
 
 /** Chave de armazenamento -> tipo de entidade (define o adaptador). Usado pelo backup. */
@@ -91,8 +103,52 @@ export const BACKUP_COLLECTIONS: Array<{ key: string; entity: Parameters<typeof 
   { key: KEYS.RESEARCH_INSIGHTS, entity: 'research_insights' },
   { key: KEYS.RESEARCH_RUNS, entity: 'research_runs' },
   { key: KEYS.TASKS, entity: 'tasks' },
-  { key: KEYS.SNIPPETS, entity: 'snippets' }
+  { key: KEYS.SNIPPETS, entity: 'snippets' },
+  { key: KEYS.CONTRACTS, entity: 'finance' },
+  { key: KEYS.INVOICES, entity: 'finance' },
+  { key: KEYS.PROJECTS, entity: 'finance' },
+  { key: KEYS.EXPENSES, entity: 'finance' }
 ];
+
+/**
+ * Coleção financeira genérica: validação Zod, id próprio, carimbo de data e desfazer.
+ * Registros financeiros não são apagados em cascata com o cliente (histórico contábil).
+ */
+function financeCollection<T extends { id: string; createdAt: string; updatedAt: string }>(
+  key: string,
+  prefix: string,
+  schema: { parse: (v: unknown) => unknown }
+) {
+  const adapter = () => storageFactory.getAdapter('finance');
+  return {
+    getAll(): T[] {
+      return adapter().getCollection<T>(key);
+    },
+    getById(id: string): T | undefined {
+      return this.getAll().find((x) => x.id === id);
+    },
+    save(data: Omit<T, 'id' | 'createdAt' | 'updatedAt'> & Partial<Pick<T, 'id' | 'createdAt'>>): T {
+      const all = this.getAll();
+      const now = new Date().toISOString();
+      const existing = data.id ? all.find((x) => x.id === data.id) : undefined;
+      const item = schema.parse({
+        ...existing,
+        ...data,
+        id: existing?.id ?? data.id ?? `${prefix}-${generateUUID()}`,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now
+      }) as T;
+      adapter().setCollection(key, existing ? all.map((x) => (x.id === item.id ? item : x)) : [...all, item]);
+      return item;
+    },
+    delete(id: string): void {
+      adapter().setCollection(key, this.getAll().filter((x) => x.id !== id));
+    },
+    restore(item: T): void {
+      adapter().setCollection(key, [...this.getAll().filter((x) => x.id !== item.id), schema.parse(item) as T]);
+    }
+  };
+}
 
 const DEFAULT_SETTINGS: AppSettings = {
   instagramApiConfigured: false,
@@ -832,6 +888,14 @@ export const storageService = {
       const all = this.getAll().filter((t) => t.id !== task.id);
       storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, [...all, DeliveryTaskSchema.parse(task) as DeliveryTask]);
     }
+  },
+
+  // ADMINISTRAÇÃO / FINANCEIRO
+  finance: {
+    contracts: financeCollection<Contract>(KEYS.CONTRACTS, 'ctr', ContractSchema),
+    invoices: financeCollection<Invoice>(KEYS.INVOICES, 'inv', InvoiceSchema),
+    projects: financeCollection<Project>(KEYS.PROJECTS, 'prj', ProjectSchema),
+    expenses: financeCollection<Expense>(KEYS.EXPENSES, 'exp', ExpenseSchema)
   },
 
   // BIBLIOTECA (legendas, hashtags, CTAs, ganchos)

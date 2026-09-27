@@ -132,7 +132,11 @@ export const WORKSPACE_KEYS = [
   'gs_intel_research_insights',
   'gs_intel_research_runs',
   'gs_intel_tasks',
-  'gs_intel_snippets'
+  'gs_intel_snippets',
+  'gs_fin_contracts',
+  'gs_fin_invoices',
+  'gs_fin_projects',
+  'gs_fin_expenses'
 ] as const;
 
 export const WorkspaceSaveRequestSchema = z.object({

@@ -43,7 +43,9 @@ import { Sidebar, MainNavSection } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { ClientsView } from './components/clients/ClientsView';
 import { GlobalSearchModal, type CommandAction } from './components/layout/GlobalSearchModal';
-import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked } from 'lucide-react';
+import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked, Scale, Receipt, FileSignature, KanbanSquare, Wallet } from 'lucide-react';
+import { AdminView, type AdminSection } from './components/admin/AdminView';
+import { invoiceState, todayBR } from './services/finance';
 import { backupStats, downloadBackup } from './services/backupService';
 import { BootLoader } from './components/common/BootLoader';
 import { DemoBanner } from './components/common/DemoBanner';
@@ -124,6 +126,40 @@ export default function App() {
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const [dashboardAction, setDashboardAction] = useState<'pilot' | 'newTask' | null>(null);
+
+  // Modo Administração (financeiro). Lembrado entre aberturas: quem liga o computador cai onde parou.
+  const [appMode, setAppModeState] = useState<'agency' | 'admin'>(() => {
+    try {
+      return localStorage.getItem('gs_app_mode') === 'admin' ? 'admin' : 'agency';
+    } catch {
+      return 'agency';
+    }
+  });
+  const [adminSection, setAdminSectionState] = useState<AdminSection>(() => {
+    try {
+      const v = localStorage.getItem('gs_admin_section');
+      return (['overview', 'invoices', 'contracts', 'projects', 'expenses'] as const).includes(v as AdminSection) ? (v as AdminSection) : 'overview';
+    } catch {
+      return 'overview';
+    }
+  });
+  const setAppMode = (m: 'agency' | 'admin') => {
+    setAppModeState(m);
+    try {
+      localStorage.setItem('gs_app_mode', m);
+    } catch {
+      /* preferência opcional */
+    }
+  };
+  const setAdminSection = (s: AdminSection) => {
+    setAdminSectionState(s);
+    setAppMode('admin');
+    try {
+      localStorage.setItem('gs_admin_section', s);
+    } catch {
+      /* preferência opcional */
+    }
+  };
 
   // Sessão expirou no meio do uso: volta ao login com aviso (os dados deste navegador ficam salvos).
   const sessionUserRef = useRef<SessionUser | null>(null);
@@ -490,6 +526,11 @@ export default function App() {
   // Profile Analysis handler
   // IA manual: abre o modal com o prompt completo do cliente.
   /** Ações da paleta de comandos (Ctrl+K). */
+  // Administração só para dono/administrador logado, fora do modo demonstração.
+  const adminAvailable = Boolean(sessionUser && (sessionUser.role === 'owner' || sessionUser.role === 'admin') && !isDemoLoaded);
+  const inAdmin = adminAvailable && appMode === 'admin';
+  const overdueCount = adminAvailable ? storageService.finance.invoices.getAll().filter((i) => invoiceState(i, todayBR()) === 'vencida').length : 0;
+
   const buildCommands = (): CommandAction[] => {
     const goDashboard = (mode?: 'tasks' | 'summary') => {
       if (mode) {
@@ -503,6 +544,15 @@ export default function App() {
       setDashboardKey((k) => k + 1);
     };
     const list: CommandAction[] = [
+      ...(adminAvailable
+        ? [
+            { id: 'admin', label: 'Financeiro: visão geral', hint: 'Modo Administração', keywords: 'administracao financeiro faturamento dinheiro admin', icon: Scale, run: () => setAdminSection('overview') },
+            { id: 'admin-invoices', label: 'Cobranças', hint: 'Recebimentos, vencidos, recibos', keywords: 'cobranca recebimento nota fatura receber pagamento', icon: Receipt, run: () => setAdminSection('invoices') },
+            { id: 'admin-contracts', label: 'Contratos', hint: 'Mensalidades e projetos fechados', keywords: 'contrato mensalidade recorrente mrr', icon: FileSignature, run: () => setAdminSection('contracts') },
+            { id: 'admin-projects', label: 'Projetos (etapas de produção)', keywords: 'projeto producao etapa job faturar', icon: KanbanSquare, run: () => setAdminSection('projects') },
+            { id: 'admin-expenses', label: 'Despesas', keywords: 'despesa custo gasto pagar', icon: Wallet, run: () => setAdminSection('expenses') }
+          ]
+        : []),
       { id: 'new-task', label: 'Nova tarefa', hint: 'Criar entrega no CRM', keywords: 'tarefa crm entrega', icon: ListChecks, run: () => { goDashboard('tasks'); setDashboardAction('newTask'); } },
       { id: 'pilot', label: 'Piloto da semana', hint: 'Planejar a próxima semana de um cliente', keywords: 'planejar semana ia prompt', icon: Rocket, run: () => { goDashboard('summary'); setDashboardAction('pilot'); } },
       { id: 'tasks', label: 'Abrir minhas tarefas', keywords: 'crm quadro kanban', icon: ListChecks, run: () => goDashboard('tasks') },
@@ -532,7 +582,8 @@ export default function App() {
         { id: 'library', label: `Biblioteca de legendas: ${activeClient.name}`, hint: 'Legendas, hashtags, CTAs e ganchos', keywords: 'legenda hashtag cta gancho copiar texto biblioteca', icon: BookMarked, run: () => openTab('library') }
       );
     }
-    return list;
+    // Ações da agência saem do modo Administração.
+    return list.map((c) => (c.id.startsWith('admin') ? c : { ...c, run: () => { setAppMode('agency'); c.run(); } }));
   };
 
   const handleAnalyzeProfile = () => {
@@ -649,6 +700,9 @@ export default function App() {
 
   // Navigation title mapper
   const getSectionTitle = () => {
+    if (inAdmin) {
+      return { overview: 'Visão geral', invoices: 'Cobranças', contracts: 'Contratos', projects: 'Projetos', expenses: 'Despesas' }[adminSection];
+    }
     if (activeClient) {
       return activeClient.name;
     }
@@ -754,13 +808,19 @@ export default function App() {
           userName={sessionUser?.name ?? null}
           userRole={sessionUser?.role ?? null}
           onLogout={sessionUser ? handleLogout : undefined}
+          appMode={inAdmin ? 'admin' : 'agency'}
+          onModeChange={adminAvailable ? setAppMode : undefined}
+          adminSection={adminSection}
+          onAdminNavigate={setAdminSection}
+          overdueCount={overdueCount}
         />
 
         {/* Main App Container */}
         <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
           {/* Top Bar Header */}
           <Header
-            activeClient={activeClient}
+            rootLabel={inAdmin ? 'Administração' : 'Agência'}
+            activeClient={inAdmin ? null : activeClient}
             clients={clients}
             currentSectionTitle={getSectionTitle()}
             onOpenSearch={() => setGlobalSearchOpen(true)}
@@ -780,7 +840,14 @@ export default function App() {
           <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             <ErrorBoundary>
               {/* Workspace Tab View */}
-              {!activeClient && SECTION_TO_TAB[currentSection] ? (
+              {inAdmin ? (
+                <AdminView
+                  section={adminSection}
+                  onNavigate={setAdminSection}
+                  clients={clients}
+                  agencyName={sessionUser?.agencyName || 'Gabriel Speratti | Social Intelligence'}
+                />
+              ) : !activeClient && SECTION_TO_TAB[currentSection] ? (
                 <div className="max-w-lg mx-auto mt-16 text-center bg-neutral-900/60 border border-neutral-800 rounded-2xl p-8 space-y-4">
                   <h2 className="text-lg font-semibold text-neutral-100">Cadastre um cliente primeiro</h2>
                   <p className="text-sm text-neutral-400">
@@ -1049,6 +1116,7 @@ export default function App() {
         tasks={globalSearchOpen ? storageService.tasks.getAll().filter((t) => (t.clientId ? visibleIds.has(t.clientId) : !isDemoLoaded)) : []}
         commands={buildCommands()}
         onOpenTask={(task) => {
+          setAppMode('agency');
           // Abre o dashboard em "Tarefas", filtrado pelo cliente da tarefa.
           try {
             localStorage.setItem('gs_dash_mode', 'tasks');
@@ -1060,10 +1128,12 @@ export default function App() {
           setDashboardKey((k) => k + 1);
         }}
         onSelectClient={(client) => {
+          setAppMode('agency');
           setActiveClient(client);
           loadClientData(client);
         }}
         onNavigateSection={(target: string) => {
+          setAppMode('agency');
           // Resultado da busca abre o workspace do cliente na aba correspondente.
           const tab: WorkspaceSubTab =
             target === 'content' ? 'content' : SECTION_TO_TAB[target as MainNavSection] ?? 'overview';

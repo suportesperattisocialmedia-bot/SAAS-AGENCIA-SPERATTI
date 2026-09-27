@@ -539,3 +539,103 @@ export interface Snippet {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Administração / financeiro (valores sempre em centavos, inteiros)
+// ---------------------------------------------------------------------------
+
+export type PaymentMethod = 'pix' | 'boleto' | 'transferencia' | 'cartao' | 'dinheiro' | 'outro';
+
+/** Serviço contratado: recorrente (mensalidade) ou avulso (projeto fechado). */
+export interface Contract {
+  id: string;
+  clientId: string;
+  /** Nome do cliente no momento do cadastro: o histórico financeiro sobrevive à exclusão do cliente. */
+  clientName: string;
+  title: string;
+  kind: 'recorrente' | 'avulso';
+  /** Recorrente: valor mensal. Avulso: valor total. */
+  amountCents: number;
+  /** Recorrente: dia do vencimento (1 a 28). */
+  billingDay?: number;
+  startDate: string;
+  endDate?: string;
+  status: 'ativo' | 'pausado' | 'encerrado';
+  paymentMethod: PaymentMethod;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvoiceItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCents: number;
+}
+
+/** Cobrança / recebimento (documento interno; não é nota fiscal eletrônica). */
+export interface Invoice {
+  id: string;
+  /** Número sequencial interno (#0001). */
+  number: number;
+  clientId: string;
+  clientName: string;
+  contractId?: string;
+  projectId?: string;
+  /** Mês de referência de cobranças recorrentes (YYYY-MM): evita gerar duas vezes. */
+  period?: string;
+  description: string;
+  items: InvoiceItem[];
+  discountCents: number;
+  issueDate: string;
+  dueDate: string;
+  /** "vencida" não é guardado: é calculado pela data. */
+  status: 'aberta' | 'paga' | 'cancelada';
+  paidAt?: string;
+  paidCents?: number;
+  paymentMethod: PaymentMethod;
+  /** Número da NF emitida no sistema da prefeitura/contador, se houver. */
+  fiscalNumber?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ProjectStage = 'proposta' | 'aprovado' | 'producao' | 'revisao' | 'entregue' | 'faturado' | 'recebido';
+
+/** Job com etapas de produção, da proposta ao dinheiro na conta. */
+export interface Project {
+  id: string;
+  clientId: string;
+  clientName: string;
+  title: string;
+  kind: 'recorrente' | 'avulso';
+  valueCents: number;
+  stage: ProjectStage;
+  contractId?: string;
+  startDate?: string;
+  deadline?: string;
+  notes?: string;
+  stageHistory: Array<{ stage: ProjectStage; at: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ExpenseCategory = 'ferramentas' | 'equipe' | 'freelancer' | 'anuncios' | 'impostos' | 'escritorio' | 'outros';
+
+export interface Expense {
+  id: string;
+  description: string;
+  category: ExpenseCategory;
+  amountCents: number;
+  /** Data de vencimento / competência. */
+  date: string;
+  paid: boolean;
+  paidAt?: string;
+  recurring: boolean;
+  clientId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
