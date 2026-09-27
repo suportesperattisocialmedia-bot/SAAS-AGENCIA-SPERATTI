@@ -612,8 +612,11 @@ export default function App() {
         { id: 'library', label: `Biblioteca de legendas: ${activeClient.name}`, hint: 'Legendas, hashtags, CTAs e ganchos', keywords: 'legenda hashtag cta gancho copiar texto biblioteca', icon: BookMarked, run: () => openTab('library') }
       );
     }
-    // Ações da agência saem do modo Administração.
-    return list.map((c) => (c.id.startsWith('admin') ? c : { ...c, run: () => { setAppMode('agency'); c.run(); } }));
+    // Ações da agência saem do modo Administração. As do modo atual aparecem primeiro.
+    const wrapped = list.map((c) => (c.id.startsWith('admin') ? c : { ...c, run: () => { setAppMode('agency'); c.run(); } }));
+    const adminCmds = wrapped.filter((c) => c.id.startsWith('admin'));
+    const agencyCmds = wrapped.filter((c) => !c.id.startsWith('admin'));
+    return inAdmin ? [...adminCmds, ...agencyCmds] : [...agencyCmds, ...adminCmds];
   };
 
   const handleAnalyzeProfile = () => {
