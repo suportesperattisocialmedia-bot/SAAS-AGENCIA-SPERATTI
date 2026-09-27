@@ -24,9 +24,9 @@ import {
   SyncLog,
   AIAnalysis,
   ResearchInsight,
-  ResearchRun,
   DeliveryTask,
-  TaskStatus
+  TaskStatus,
+  Snippet
 } from '../types';
 import { storageFactory } from './storage/StorageFactory';
 import { defaultStorageAdapter } from './storage/LocalStorageAdapter';
@@ -45,10 +45,12 @@ import {
   SyncLogSchema,
   AIAnalysisRecordSchema,
   ResearchInsightSchema,
-  DeliveryTaskSchema
+  DeliveryTaskSchema,
+  SnippetSchema
 } from '../schemas';
 import { logger } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
+import { weekDayOfDate } from '../utils/calendarDates';
 
 const KEYS = {
   CLIENTS: 'gs_intel_clients',
@@ -67,8 +69,30 @@ const KEYS = {
   AI_ANALYSES: 'gs_intel_ai_analyses',
   RESEARCH_INSIGHTS: 'gs_intel_research_insights',
   RESEARCH_RUNS: 'gs_intel_research_runs',
-  TASKS: 'gs_intel_tasks'
+  TASKS: 'gs_intel_tasks',
+  SNIPPETS: 'gs_intel_snippets'
 };
+
+/** Chave de armazenamento -> tipo de entidade (define o adaptador). Usado pelo backup. */
+export const BACKUP_COLLECTIONS: Array<{ key: string; entity: Parameters<typeof storageFactory.getAdapter>[0] }> = [
+  { key: KEYS.CLIENTS, entity: 'clients' },
+  { key: KEYS.INSTAGRAM, entity: 'instagram_accounts' },
+  { key: KEYS.SNAPSHOTS, entity: 'account_snapshots' },
+  { key: KEYS.CONTENTS, entity: 'contents' },
+  { key: KEYS.CONTENT_METRIC_SNAPSHOTS, entity: 'content_metric_snapshots' },
+  { key: KEYS.COMPETITORS, entity: 'competitors' },
+  { key: KEYS.AUDIENCE, entity: 'audience_insights' },
+  { key: KEYS.IDEAS, entity: 'content_ideas' },
+  { key: KEYS.CALENDAR, entity: 'calendar_items' },
+  { key: KEYS.ALERTS, entity: 'alerts' },
+  { key: KEYS.REPORTS, entity: 'reports' },
+  { key: KEYS.SYNC_LOGS, entity: 'sync_logs' },
+  { key: KEYS.AI_ANALYSES, entity: 'ai_analysis' },
+  { key: KEYS.RESEARCH_INSIGHTS, entity: 'research_insights' },
+  { key: KEYS.RESEARCH_RUNS, entity: 'research_runs' },
+  { key: KEYS.TASKS, entity: 'tasks' },
+  { key: KEYS.SNIPPETS, entity: 'snippets' }
+];
 
 const DEFAULT_SETTINGS: AppSettings = {
   instagramApiConfigured: false,
@@ -273,6 +297,29 @@ export const storageService = {
       }
 
       return this.create(contentData);
+    },
+
+    /** Grava vários posts com uma única leitura e uma única escrita (importações grandes). */
+    upsertMany(list: Array<Omit<Content, 'id'> & { id?: string }>): { created: number; updated: number } {
+      const all = this.getAll();
+      const index = new Map(all.map((c, i) => [`${c.clientId}|${c.instagramMediaId ?? ''}`, i]));
+      const now = new Date().toISOString();
+      const fresh: Content[] = [];
+      let updated = 0;
+      for (const data of list) {
+        const i = data.instagramMediaId ? index.get(`${data.clientId}|${data.instagramMediaId}`) : undefined;
+        if (i === -1) continue; // mesmo post repetido neste lote
+        if (i !== undefined) {
+          all[i] = ContentSchema.parse({ ...all[i], ...data, id: all[i].id, updatedAt: now }) as Content;
+          updated++;
+        } else {
+          const created = ContentSchema.parse({ ...data, id: data.id || `content-${generateUUID()}`, createdAt: data.createdAt || now, updatedAt: now }) as Content;
+          fresh.push(created);
+          if (created.instagramMediaId) index.set(`${created.clientId}|${created.instagramMediaId}`, -1);
+        }
+      }
+      storageFactory.getAdapter('contents').setCollection(KEYS.CONTENTS, [...fresh, ...all]);
+      return { created: fresh.length, updated };
     },
 
     update(id: string, updates: Partial<Content>): Content | null {
@@ -514,8 +561,12 @@ export const storageService = {
 
       const newItem: CalendarItem = {
         ...itemData,
+        // Com data real, o dia da semana sempre acompanha a data.
+        dayOfWeek: itemData.date ? weekDayOfDate(itemData.date) : itemData.dayOfWeek,
+        date: itemData.date || undefined,
         id,
-        orderIndex: order
+        orderIndex: order,
+        updatedAt: new Date().toISOString()
       };
 
       const validated = CalendarItemSchema.parse(newItem);
@@ -774,6 +825,54 @@ export const storageService = {
 
     delete(id: string): void {
       storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, this.getAll().filter((t) => t.id !== id));
+    },
+
+    /** Recoloca uma tarefa excluída exatamente como era (desfazer). */
+    restore(task: DeliveryTask): void {
+      const all = this.getAll().filter((t) => t.id !== task.id);
+      storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, [...all, DeliveryTaskSchema.parse(task) as DeliveryTask]);
+    }
+  },
+
+  // BIBLIOTECA (legendas, hashtags, CTAs, ganchos)
+  snippets: {
+    getAll(): Snippet[] {
+      return storageFactory.getAdapter('snippets').getCollection<Snippet>(KEYS.SNIPPETS);
+    },
+
+    save(data: Pick<Snippet, 'kind' | 'title' | 'text'> & Partial<Pick<Snippet, 'id' | 'clientId'>>): Snippet {
+      const all = this.getAll();
+      const now = new Date().toISOString();
+      const existing = data.id ? all.find((s) => s.id === data.id) : undefined;
+      const snippet = SnippetSchema.parse({
+        ...existing,
+        ...data,
+        id: existing?.id ?? `snip-${generateUUID()}`,
+        clientId: data.clientId || undefined,
+        uses: existing?.uses ?? 0,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now
+      }) as Snippet;
+      const next = existing ? all.map((s) => (s.id === snippet.id ? snippet : s)) : [snippet, ...all];
+      storageFactory.getAdapter('snippets').setCollection(KEYS.SNIPPETS, next);
+      return snippet;
+    },
+
+    /** Conta um uso (copiar). Não mexe em updatedAt para não "ganhar" mesclagens por isso. */
+    markUsed(id: string): void {
+      const all = this.getAll();
+      storageFactory
+        .getAdapter('snippets')
+        .setCollection(KEYS.SNIPPETS, all.map((s) => (s.id === id ? { ...s, uses: s.uses + 1 } : s)));
+    },
+
+    delete(id: string): void {
+      storageFactory.getAdapter('snippets').setCollection(KEYS.SNIPPETS, this.getAll().filter((s) => s.id !== id));
+    },
+
+    restore(snippet: Snippet): void {
+      const all = this.getAll().filter((s) => s.id !== snippet.id);
+      storageFactory.getAdapter('snippets').setCollection(KEYS.SNIPPETS, [SnippetSchema.parse(snippet) as Snippet, ...all]);
     }
   },
 
@@ -836,6 +935,9 @@ export const storageService = {
 
     // 14. Delete Tasks (CRM de entregas)
     storageFactory.getAdapter('tasks').setCollection(KEYS.TASKS, this.tasks.getAll().filter(t => t.clientId !== clientId));
+
+    // 15. Biblioteca do cliente (textos gerais ficam)
+    storageFactory.getAdapter('snippets').setCollection(KEYS.SNIPPETS, this.snippets.getAll().filter(s => s.clientId !== clientId));
 
     logger.info(`Cascade delete completed cleanly for client ${clientId}.`);
     return true;

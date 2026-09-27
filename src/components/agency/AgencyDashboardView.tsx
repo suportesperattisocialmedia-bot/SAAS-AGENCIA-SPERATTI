@@ -1,9 +1,15 @@
+import { motion } from 'motion/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Client, Alert, AccountSnapshot, Content, CalendarItem, DeliveryTask } from '../../types';
 import { storageService } from '../../services/storageService';
-import { summarizeTasks, upcomingTasks } from '../../services/taskInsights';
+import { syncService } from '../../services/sync/syncService';
+import { packageProgress, summarizeTasks, upcomingTasks } from '../../services/taskInsights';
 import { TasksBoard } from '../tasks/TasksBoard';
 import { ScopePicker } from './ScopePicker';
+import { PatternCards, WeeklyPilotModal } from '../pilot/WeeklyPilotModal';
+import { computeWinningPatterns } from '../../services/winningPatterns';
+import { backupStats, daysSinceBackup, downloadBackup } from '../../services/backupService';
+import { notificationService } from '../../services/notificationService';
 import type { WorkspaceSubTab } from '../workspace/WorkspaceHeader';
 import { analyticsService } from '../../services/analyticsService';
 import {
@@ -24,11 +30,12 @@ import {
   KpiCard,
   RoutinePanel,
   TopPostsPanel,
+  PackagesPanel,
   UpcomingTasksPanel,
   WeekPanel,
   WeeklyViewsChart
 } from './DashboardPanels';
-import { AlertTriangle, CalendarDays, FileText, ListChecks, Plus, Database, LayoutDashboard, Users } from 'lucide-react';
+import { AlertTriangle, HardDriveDownload, Rocket, CalendarDays, FileText, ListChecks, Plus, Database, LayoutDashboard, Users } from 'lucide-react';
 
 interface AgencyDashboardViewProps {
   clients: Client[];
@@ -47,6 +54,11 @@ interface AgencyDashboardViewProps {
   onDeleteClient: (client: Client) => void;
   onOpenAlerts: () => void;
   onSeedDemoData?: () => void;
+  /** Recarregar dados do App (calendário etc.) depois de mudanças feitas aqui. */
+  onDataChanged?: () => void;
+  /** Ação pedida pela paleta de comandos; executada uma vez e confirmada via onActionHandled. */
+  pendingAction?: 'pilot' | 'newTask' | null;
+  onActionHandled?: () => void;
 }
 
 function greeting(now: Date): string {
@@ -69,8 +81,13 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   onDuplicateClient,
   onDeleteClient,
   onOpenAlerts,
-  onSeedDemoData
+  onSeedDemoData,
+  onDataChanged,
+  pendingAction = null,
+  onActionHandled
 }) => {
+  const [pilotOpen, setPilotOpen] = useState(false);
+  const [newTaskRequest, setNewTaskRequest] = useState(0);
   const now = new Date();
   const readPref = (key: string, fallback: string) => {
     try {
@@ -96,8 +113,30 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
     setScopeState(v);
     writePref('gs_dash_scope', v);
   };
+  const [backupDays, setBackupDays] = useState<number | null>(() => daysSinceBackup());
+  // Com a nuvem funcionando os dados já estão protegidos; o aviso de backup só aparece sem ela.
+  const [cloudOk, setCloudOk] = useState(() => !['disabled', 'error'].includes(syncService.getStatus().state));
+  useEffect(() => syncService.onStatus((st) => setCloudOk(!['disabled', 'error'].includes(st.state))), []);
   const [allTasks, setAllTasks] = useState<DeliveryTask[]>(() => storageService.tasks.getAll());
   const reloadTasks = () => setAllTasks(storageService.tasks.getAll());
+  useEffect(
+    () =>
+      syncService.onRemoteChange((keys) => {
+        if (keys.includes('gs_intel_tasks')) setAllTasks(storageService.tasks.getAll());
+      }),
+    []
+  );
+
+  useEffect(() => {
+    if (!pendingAction) return;
+    if (pendingAction === 'pilot') setPilotOpen(true);
+    if (pendingAction === 'newTask') {
+      setMode('tasks');
+      setNewTaskRequest((n) => n + 1);
+    }
+    onActionHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAction]);
 
   // Escopo inválido (cliente excluído, troca demo/produção) volta para "todos".
   const scopeValid = scope === 'all' || (scope === 'general' && mode === 'tasks') || allClients.some((c) => c.id === scope);
@@ -107,6 +146,10 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   }, [scopeValid, scope]);
   const effectiveScope = scopeValid ? scope : 'all';
   const selectedClient = allClients.find((c) => c.id === effectiveScope);
+  const selectedPatterns = useMemo(
+    () => (selectedClient ? computeWinningPatterns(allContents.filter((c) => c.clientId === selectedClient.id)) : null),
+    [selectedClient, allContents]
+  );
 
   // Resumo: todos os clientes ou só o escolhido.
   const clients = selectedClient ? [selectedClient] : allClients;
@@ -150,7 +193,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   const formats = formatBreakdown(contents, 30, now);
   const top = topPosts(contents, 5, 30, now);
   const freshness = clientFreshness(clients, contents, snapshots, now);
-  const plan = weekPlan(calendar);
+  const plan = weekPlan(calendar, now);
   const today = weekDayOf(now);
   const unhandledAlerts = alerts.filter((a) => a.status === 'NEW');
   const firstName = userName?.trim().split(/\s+/)[0];
@@ -194,6 +237,14 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           )}
           {allClients.length > 0 && (
             <>
+              <button
+                type="button"
+                onClick={() => setPilotOpen(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-amber-400 active:scale-[0.98]"
+              >
+                <Rocket className="h-4 w-4" />
+                Piloto da semana
+              </button>
               <ScopePicker clients={allClients} value={effectiveScope} onChange={setScope} allowGeneral={mode === 'tasks'} />
               <div className="flex rounded-full bg-[#161618] p-1" role="tablist" aria-label="Seção do painel">
                 {([
@@ -206,14 +257,22 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                     role="tab"
                     aria-selected={mode === id}
                     onClick={() => setMode(id)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                      mode === id ? 'bg-neutral-50 text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'
+                    className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      mode === id ? 'text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'
                     }`}
                   >
-                    <Icon className="h-4 w-4" />
-                    {label}
+                    {mode === id && (
+                      <motion.span
+                        layoutId="dashboard-mode-pill"
+                        transition={{ type: 'spring', stiffness: 460, damping: 36 }}
+                        className="absolute inset-0 rounded-full bg-neutral-50"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <Icon className="relative h-4 w-4" />
+                    <span className="relative">{label}</span>
                     {id === 'tasks' && taskSummary.overdue > 0 && (
-                      <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white tabular-nums">{taskSummary.overdue}</span>
+                      <span className="relative rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white tabular-nums">{taskSummary.overdue}</span>
                     )}
                   </button>
                 ))}
@@ -223,8 +282,33 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Título da seção para leitores de tela (h1 > h2 > h3). */}
+      <h2 className="sr-only">{mode === 'tasks' ? 'Minhas tarefas' : 'Resumo'}</h2>
+
+      {allClients.length > 0 && !isDemo && !cloudOk && (backupDays === null || backupDays > 7) && (
+        <div className="flex flex-col gap-3 rounded-[22px] border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-center gap-3 text-sm text-neutral-200">
+            <HardDriveDownload className="h-5 w-5 shrink-0 text-amber-400" />
+            {backupDays === null
+              ? 'Você ainda não fez backup. Métricas, tarefas e planejamento ficam só neste navegador.'
+              : `Último backup há ${backupDays} dias. Baixe um novo para não perder nada.`}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const file = downloadBackup();
+              setBackupDays(0);
+              notificationService.showToast(`Backup baixado (${backupStats(file).total} registros).`, 'success');
+            }}
+            className="shrink-0 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-neutral-950 hover:bg-amber-400 active:scale-[0.98]"
+          >
+            Baixar backup agora
+          </button>
+        </div>
+      )}
+
       {allClients.length > 0 && mode === 'tasks' && (
-        <TasksBoard tasks={visibleTasks} clients={allClients} scope={effectiveScope} onChanged={reloadTasks} />
+        <TasksBoard tasks={visibleTasks} clients={allClients} scope={effectiveScope} onChanged={reloadTasks} newTaskRequest={newTaskRequest} />
       )}
 
       {clients.length > 0 && mode === 'summary' && (
@@ -236,12 +320,14 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                 highlight
                 label="Visualizações"
                 value={formatMetric(views, { fallback: 'Sem dados' })}
+                numeric={{ value: views, format: (n) => Math.round(n).toLocaleString('pt-BR') }}
                 delta={percentChange(views, viewsPrev)}
                 icon={KPI_ICONS.views}
               />
               <KpiCard
                 label="Alcance"
                 value={formatMetric(reach, { fallback: 'Sem dados' })}
+                numeric={{ value: reach, format: (n) => Math.round(n).toLocaleString('pt-BR') }}
                 delta={percentChange(reach, reachPrev)}
                 icon={KPI_ICONS.reach}
                 delay={0.05}
@@ -249,6 +335,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
               <KpiCard
                 label="Engajamento"
                 value={formatMetric(engagement, { suffix: '%', digits: 1, fallback: 'Sem dados' })}
+                numeric={{ value: engagement, format: (n) => `${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%` }}
                 delta={percentChange(engagement, engagementPrev)}
                 icon={KPI_ICONS.engagement}
                 delay={0.1}
@@ -256,6 +343,7 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
               <KpiCard
                 label="Publicações"
                 value={String(posts)}
+                numeric={{ value: posts, format: (n) => String(Math.round(n)) }}
                 delta={percentChange(posts, postsPrev)}
                 icon={KPI_ICONS.posts}
                 delay={0.15}
@@ -267,6 +355,30 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
               onOpen={firstForPerformance ? () => onOpenClientTab(firstForPerformance, 'performance') : undefined}
             />
           </div>
+
+          {selectedClient && (
+            <section className="rounded-[28px] border border-white/[0.04] bg-[#161618] p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-50">Padrões vencedores</h3>
+                  <p className="text-xs text-neutral-500">O que mais funcionou para {selectedClient.name} nos últimos 90 dias</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPilotOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-full bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-white active:scale-[0.98]"
+                >
+                  <Rocket className="h-4 w-4" />
+                  Planejar a próxima semana
+                </button>
+              </div>
+              {selectedPatterns && selectedPatterns.sample > 0 ? (
+                <PatternCards p={selectedPatterns} compact />
+              ) : (
+                <p className="text-sm text-neutral-500">Importe o CSV do Meta Business Suite na aba Métricas para descobrir os padrões deste cliente.</p>
+              )}
+            </section>
+          )}
 
           {/* Números grandes + formatos */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
@@ -302,6 +414,16 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
             <TopPostsPanel posts={top} clientsById={clientsById} onOpen={(c) => onOpenClientTab(c, 'content')} delay={0.3} />
             <RoutinePanel rows={freshness} onImport={(c) => onOpenClientTab(c, 'metrics')} delay={0.35} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+            <PackagesPanel
+              rows={packageProgress(clients, visibleTasks, now)}
+              clientsById={clientsById}
+              unconfigured={clients.filter((c) => !c.monthlyDeliverables)}
+              onConfigure={onEditClient}
+              delay={0.38}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
@@ -379,6 +501,21 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
           </div>
         )}
       </div>
+      {pilotOpen && (
+      <WeeklyPilotModal
+        open={pilotOpen}
+        onClose={() => setPilotOpen(false)}
+        clients={allClients}
+        initialClientId={selectedClient?.id}
+        onApplied={(client, count) => {
+          reloadTasks();
+          onDataChanged?.();
+          setScope(client.id);
+          setMode('tasks');
+          notificationService.showToast(`${count} ${count === 1 ? 'post planejado' : 'posts planejados'} no calendário e ${count} ${count === 1 ? 'tarefa criada' : 'tarefas criadas'} para ${client.name}.`, 'success');
+        }}
+      />
+      )}
     </div>
   );
 };

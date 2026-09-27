@@ -87,17 +87,17 @@ function assertSameOrigin(request: Request, url: URL): void {
   }
 }
 
-export async function readJson<S extends z.ZodType>(request: Request, schema: S): Promise<z.infer<S>> {
+export async function readJson<S extends z.ZodType>(request: Request, schema: S, maxBytes = MAX_JSON_BYTES): Promise<z.infer<S>> {
   const contentType = request.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
     throw Errors.invalid('Content-Type deve ser application/json.');
   }
   const declared = Number(request.headers.get('content-length') || '0');
-  if (declared > MAX_JSON_BYTES) {
+  if (declared > maxBytes) {
     throw new AppError('PAYLOAD_TOO_LARGE', 413, 'Payload excede o limite permitido.');
   }
   const text = await request.text();
-  if (text.length > MAX_JSON_BYTES) {
+  if (text.length > maxBytes) {
     throw new AppError('PAYLOAD_TOO_LARGE', 413, 'Payload excede o limite permitido.');
   }
   let parsed: unknown;

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Check, Plus, Trash2, X } from 'lucide-react';
-import type { Client, DeliveryTask, TaskChecklistItem, TaskPriority, TaskStatus, TaskType } from '../../types';
+import React, { useState } from 'react';
+import { Check, ExternalLink, MessageSquareWarning, Plus, ThumbsUp, Trash2, X } from 'lucide-react';
+import type { Client, DeliveryTask, TaskApproval, TaskChecklistItem, TaskPriority, TaskStatus, TaskType } from '../../types';
+import { formatDateTimeBR } from '../../utils/dates';
 import { Modal } from '../common/Modal';
 import { TASK_STATUSES } from '../../services/taskInsights';
 import { generateUUID } from '../../utils/uuid';
@@ -23,10 +24,14 @@ export interface TaskDraft {
   dueDate: string;
   notes: string;
   checklist: TaskChecklistItem[];
+  clientCopy: string;
+  previewUrl: string;
+  /** Somente leitura: decisões do cliente no portal. */
+  approvals: TaskApproval[];
 }
 
 export function emptyDraft(patch: Partial<TaskDraft> = {}): TaskDraft {
-  return { clientId: '', title: '', type: 'Post', status: 'todo', priority: 'normal', dueDate: '', notes: '', checklist: [], ...patch };
+  return { clientId: '', title: '', type: 'Post', status: 'todo', priority: 'normal', dueDate: '', notes: '', checklist: [], clientCopy: '', previewUrl: '', approvals: [], ...patch };
 }
 
 export function draftFromTask(t: DeliveryTask): TaskDraft {
@@ -39,7 +44,10 @@ export function draftFromTask(t: DeliveryTask): TaskDraft {
     priority: t.priority,
     dueDate: t.dueDate ?? '',
     notes: t.notes ?? '',
-    checklist: t.checklist
+    checklist: t.checklist,
+    clientCopy: t.clientCopy ?? '',
+    previewUrl: t.previewUrl ?? '',
+    approvals: t.approvals ?? []
   };
 }
 
@@ -57,15 +65,9 @@ export const TaskModal: React.FC<{
   const [draft, setDraft] = useState<TaskDraft>(initial);
   const [newItem, setNewItem] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (open) {
-      setDraft(initial);
-      setNewItem('');
-      setError(null);
-    }
-  }, [open, initial]);
-
+  // O componente é remontado a cada abertura (key no pai): o estado nasce com a tarefa certa.
   const set = <K extends keyof TaskDraft>(key: K, value: TaskDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
   const addItem = () => {
@@ -81,14 +83,19 @@ export const TaskModal: React.FC<{
       setError('Dê um nome para a tarefa.');
       return;
     }
-    onSave({ ...draft, title: draft.title.trim() });
+    const url = draft.previewUrl.trim();
+    if (url && !/^https:\/\/\S+\.\S+/i.test(url)) {
+      setUrlError('Use um link completo começando com https://');
+      return;
+    }
+    onSave({ ...draft, title: draft.title.trim(), previewUrl: draft.previewUrl.trim() });
   };
 
   const done = draft.checklist.filter((i) => i.done).length;
 
   return (
     <Modal isOpen={open} onClose={onClose} title={draft.id ? 'Editar tarefa' : 'Nova tarefa'} maxWidth="xl">
-      <form onSubmit={submit} className="space-y-5">
+      <form onSubmit={submit} noValidate className="space-y-5">
         <div>
           <label htmlFor="task-title" className={LABEL}>Tarefa</label>
           <input
@@ -181,6 +188,66 @@ export const TaskModal: React.FC<{
           />
         </div>
 
+        {draft.clientId && (
+          <fieldset className="space-y-3 rounded-[20px] border border-white/[0.06] bg-white/[0.02] p-4">
+            <legend className="px-1 text-xs font-medium text-neutral-300">Para o cliente aprovar</legend>
+            <p className="text-[11px] text-neutral-500">Aparece no link de aprovação quando a tarefa estiver em "Aprovação do cliente". As notas acima nunca aparecem.</p>
+            <div>
+              <label htmlFor="task-client-copy" className={LABEL}>Legenda / texto para aprovação</label>
+              <textarea
+                id="task-client-copy"
+                rows={4}
+                value={draft.clientCopy}
+                onChange={(e) => set('clientCopy', e.target.value)}
+                placeholder="Legenda final, roteiro ou texto que o cliente precisa aprovar"
+                className={`${FIELD} resize-y`}
+              />
+            </div>
+            <div>
+              <label htmlFor="task-preview-url" className={LABEL}>Link da arte ou vídeo</label>
+              <input
+                id="task-preview-url"
+                type="url"
+                inputMode="url"
+                value={draft.previewUrl}
+                onChange={(e) => {
+                  set('previewUrl', e.target.value);
+                  setUrlError(null);
+                }}
+                placeholder="https://drive.google.com/..."
+                className={FIELD}
+              />
+              {urlError && <p role="alert" className="mt-1.5 text-xs text-rose-400">{urlError}</p>}
+            </div>
+            {draft.approvals.length > 0 && (
+              <div>
+                <span className={LABEL}>Respostas do cliente</span>
+                <ul className="space-y-1.5">
+                  {[...draft.approvals].reverse().map((a) => (
+                    <li key={a.at} className="flex gap-2.5 rounded-xl bg-white/[0.03] px-3 py-2 text-xs">
+                      {a.decision === 'approved' ? (
+                        <ThumbsUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                      ) : (
+                        <MessageSquareWarning className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+                      )}
+                      <span className="min-w-0">
+                        <span className="text-neutral-200">{a.decision === 'approved' ? 'Aprovado' : 'Pediu ajustes'}</span>
+                        <span className="ml-2 text-neutral-500">{formatDateTimeBR(a.at)}</span>
+                        {a.comment && <span className="mt-0.5 block whitespace-pre-wrap text-neutral-400">{a.comment}</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {draft.previewUrl && /^https:\/\//i.test(draft.previewUrl) && (
+              <a href={draft.previewUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-amber-400 hover:underline">
+                Abrir link <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </fieldset>
+        )}
+
         <div>
           <span className={LABEL}>
             Checklist {draft.checklist.length > 0 && <span className="text-neutral-500">({done}/{draft.checklist.length})</span>}
@@ -235,7 +302,7 @@ export const TaskModal: React.FC<{
             <button
               type="button"
               onClick={() => {
-                if (window.confirm(`Excluir a tarefa "${draft.title}"?`)) onDelete(draft.id as string);
+                onDelete(draft.id as string);
               }}
               className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/10"
             >

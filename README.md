@@ -13,12 +13,49 @@ Cada cliente tem a aba **Métricas** com:
 
 Código: `src/services/metricsImport.ts` e `src/components/workspace/MetricsTab.tsx`. Células vazias viram `n/d` (nunca 0).
 
+## Piloto da Semana
+
+Botão **Piloto da semana** no dashboard (ou "Planejar a próxima semana" com um cliente selecionado):
+1. Calcula os **padrões vencedores** do cliente com os posts importados (últimos 90 dias): melhor dia, faixa de horário, formato campeão e ritmo. Amostra pequena é sinalizada; CSV sem horário não gera "melhor horário".
+2. Gera o prompt da semana (padrões + melhores posts + banco de ideias + público) para colar em qualquer IA.
+3. A resposta é validada e revisada; os posts escolhidos viram itens no **Calendário** e tarefas de produção em **Minhas tarefas** (prazo na véspera, checklist do formato, roteiro e legenda nas notas).
+
+Código: `src/services/winningPatterns.ts`, `src/ai/weeklyPilot.ts`, `src/components/pilot/WeeklyPilotModal.tsx`.
+
+## Sincronização na nuvem
+
+Com login, tarefas, métricas importadas, ideias, calendário, biblioteca, diagnósticos e relatórios ficam também no banco (`/api/workspace`), um documento por coleção com versão.
+Abrir em outro computador ou celular traz tudo. O navegador continua sendo a cópia rápida: cada alteração sobe em ~1,5s; sem internet fica pendente e sobe quando a conexão volta.
+Se dois aparelhos gravarem ao mesmo tempo, o servidor responde 409 e o app mescla por item (o mais recente vence; exclusões não voltam).
+O ícone de nuvem no cabeçalho mostra o estado (salvo, sincronizando, offline, erro) e sincroniza ao clicar. O modo demonstração nunca vai para a nuvem.
+
+Código: `src/services/sync/`, `api/workspace.ts`, `server/repositories/workspaceRepository.ts`.
+
+## Backup
+
+Configurações → **Backup dos dados**: baixa um `.json` com tudo que fica no navegador (posts, métricas, ideias, calendário, tarefas, biblioteca, diagnósticos, relatórios) e restaura em qualquer computador. O dashboard só lembra do backup quando a sincronização na nuvem não está ativa.
+
+Código: `src/services/backupService.ts`.
+
 ## Dashboard: resumo por cliente e Minhas tarefas
 
 - Seletor no topo do dashboard: **Todos os clientes** ou um cliente específico (todo o resumo passa a mostrar só ele).
 - Alternância **Resumo | Tarefas**. Tarefas é um CRM de entregas em quadro: A fazer, Em produção, Aprovação do cliente, Aprovado, Entregue.
   Cada tarefa tem cliente (ou "Geral"), tipo, prazo, prioridade, notas e checklist; arrastar entre colunas, seta para avançar, visão em lista, filtros (atrasadas, hoje, 7 dias, prioridade alta) e busca.
-- As tarefas ficam no armazenamento local do navegador, como ideias e calendário. Excluir um cliente exclui as tarefas dele.
+- As tarefas ficam no navegador e na nuvem (ver Sincronização). Excluir um cliente exclui as tarefas dele.
+
+## Portal de aprovação do cliente
+
+Tarefas → **Link de aprovação**: gera um link por cliente (`/aprovar/<token>`, válido 30 dias, um ativo por cliente). O cliente abre sem conta e vê só as entregas em "Aprovação do cliente", com o **texto para aprovação** e o **link da arte** preenchidos na tarefa; as notas internas nunca aparecem.
+Ele aprova (a tarefa vai para Aprovado) ou pede ajuste com comentário (volta para Em produção com o pedido). A agência recebe aviso e o histórico fica na tarefa.
+O token é guardado só como hash (busca) e criptografado (para copiar de novo); dá para gerar outro ou revogar a qualquer momento.
+
+Código: `api/portal.ts`, `server/services/portalService.ts`, `src/components/portal/`, `src/components/tasks/ApprovalLinkModal.tsx`.
+
+## Calendário e Biblioteca
+
+- **Calendário** com datas reais: visão Mês (agenda em lista no celular) e Semana, arrastar para reagendar, clicar num dia para agendar, formulário para mudar a data pelo teclado. Itens antigos sem data ficam numa bandeja. O Piloto da Semana e o Banco de Ideias já agendam com data.
+- **Biblioteca** (aba do cliente): legendas, grupos de hashtags, CTAs e ganchos para copiar com um clique, com contagem de uso e aviso dos limites do Instagram (30 hashtags, 2.200 caracteres). Textos "gerais" aparecem em todos os clientes.
 
 Código: `src/components/agency/`, `src/components/tasks/`, `src/services/dashboardInsights.ts`, `src/services/taskInsights.ts`.
 
@@ -29,7 +66,7 @@ Diagnóstico ("Gerar análise completa") e Banco de Ideias ("Gerar prompt de ide
 2. Você copia e cola em qualquer IA (ChatGPT, Gemini, Claude).
 3. Cola a resposta de volta no sistema; ela é validada e salva.
 
-Código: `src/ai/manualPrompts.ts` e `src/components/common/ManualAiModal.tsx`. As rotas `/api/ai/*` com Gemini continuam no backend como opção, mas a interface não depende delas.
+Código: `src/ai/manualPrompts.ts` e `src/components/common/ManualAiModal.tsx`. A rota `/api/ai?action=...` com Gemini continuam no backend como opção, mas a interface não depende delas.
 
 Produção: https://saas-agencia-speratti.vercel.app
 
@@ -63,9 +100,9 @@ React (Vite, /src) ──fetch same-origin──▶ Vercel Functions (/api/*.ts)
 | GET/DELETE | `/api/instagram/connection?clientId=` | Estado real da conexão / desconectar |
 | POST | `/api/instagram/sync` | Sincroniza mídia e métricas (idempotente) |
 | GET | `/api/instagram/sync?clientId=` | Conteúdos, snapshots e logs persistidos |
-| POST | `/api/ai/analyze-profile` | Diagnóstico (Gemini) |
-| POST | `/api/ai/generate-ideas` | Ideias (Gemini) |
-| POST | `/api/ai/classify-content` | Classificação (Gemini) |
+| POST | `/api/ai?action=analyze-profile\|generate-ideas\|classify-content` | IA opcional (Gemini) |
+| GET/PUT | `/api/workspace` | Sincronização das coleções do app (tarefas, métricas, ideias, calendário...) com versão; 409 em conflito |
+| GET/POST | `/api/portal` | Links de aprovação do cliente (agência) e portal público por token (`/aprovar/<token>`) |
 | POST | `/api/research` | Pesquisa de público/concorrentes (SerpAPI, opcional) |
 
 Erros seguem sempre `{ "ok": false, "error": { "code", "message", "requestId" } }`.
@@ -81,7 +118,7 @@ Veja `.env.example`. Obrigatórias em produção:
 | `META_APP_ID`, `META_APP_SECRET` | App da Meta |
 | `META_REDIRECT_URI` | `https://saas-agencia-speratti.vercel.app/api/auth/instagram/callback` |
 
-Opcionais: `GEMINI_API_KEY`/`GEMINI_MODEL` (só para as rotas `/api/ai/*`), `ADMIN_EMAIL`/`ADMIN_PASSWORD` (primeiro usuário), `TOKEN_ENCRYPTION_KEY`, `META_GRAPH_VERSION`, `SERPAPI_KEY`, `DATABASE_SSL`.
+Opcionais: `GEMINI_API_KEY`/`GEMINI_MODEL` (só para a rota `/api/ai`), `ADMIN_EMAIL`/`ADMIN_PASSWORD` (primeiro usuário), `TOKEN_ENCRYPTION_KEY`, `META_GRAPH_VERSION`, `SERPAPI_KEY`, `DATABASE_SSL`.
 
 > Trocar `SESSION_SECRET` invalida sessões e torna ilegíveis os tokens já salvos (será preciso reconectar o Instagram), a menos que `TOKEN_ENCRYPTION_KEY` esteja definida.
 
@@ -89,7 +126,7 @@ Opcionais: `GEMINI_API_KEY`/`GEMINI_MODEL` (só para as rotas `/api/ai/*`), `ADM
 
 ### Supabase
 1. Use a connection string **Transaction pooler** (Project Settings > Database) em `DATABASE_URL`.
-2. Aplique o schema: `DATABASE_URL=... npm run db:migrate` (ou cole `db/migrations/001_initial_schema.sql` no SQL Editor). É idempotente.
+2. Aplique o schema: `DATABASE_URL=... npm run db:migrate` (ou cole os arquivos de `db/migrations/` em ordem no SQL Editor). É idempotente.
 3. As tabelas têm RLS habilitado sem policies: a API REST pública do Supabase não acessa nada; só o backend (dono das tabelas).
 
 ### Primeiro usuário

@@ -80,6 +80,7 @@ export function clientProfile(client: Client) {
     targetAudience: client.targetAudience,
     persona: client.persona,
     averageTicket: client.averageTicket,
+    monthlyDeliverables: client.monthlyDeliverables,
     pillars: client.pillars,
     objectives: client.objectives,
     formats: client.formats,

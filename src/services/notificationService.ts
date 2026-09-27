@@ -7,26 +7,21 @@ import { AppNotification, NotificationType } from '../types';
 import { generateUUID } from '../utils/uuid';
 
 type NotificationListener = (notifications: AppNotification[]) => void;
-type ToastListener = (toast: { message: string; type: NotificationType }) => void;
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+export interface ToastPayload {
+  message: string;
+  type: NotificationType;
+  action?: ToastAction;
+}
+type ToastListener = (toast: ToastPayload) => void;
 
 class NotificationService {
   private notifications: AppNotification[] = [];
   private listeners: Set<NotificationListener> = new Set();
   private toastListeners: Set<ToastListener> = new Set();
-
-  constructor() {
-    // Initial sample notification
-    this.notifications = [
-      {
-        id: 'notif-01',
-        title: 'Central de Inteligência Pronta',
-        message: 'Sistema Gabriel Speratti Social Intelligence inicializado com sucesso.',
-        type: 'info',
-        timestamp: new Date().toISOString(),
-        read: false
-      }
-    ];
-  }
 
   getNotifications(): AppNotification[] {
     return [...this.notifications];
@@ -62,8 +57,13 @@ class NotificationService {
     this.notifyListeners();
   }
 
-  showToast(message: string, type: NotificationType = 'info'): void {
-    this.toastListeners.forEach(listener => listener({ message, type }));
+  showToast(message: string, type: NotificationType = 'info', action?: ToastAction): void {
+    this.toastListeners.forEach(listener => listener({ message, type, action }));
+  }
+
+  /** Aviso com botão "Desfazer" (padrão para exclusões: rápido e reversível). */
+  undoable(message: string, undo: () => void): void {
+    this.showToast(message, 'info', { label: 'Desfazer', onClick: undo });
   }
 
   subscribe(listener: NotificationListener): () => void {

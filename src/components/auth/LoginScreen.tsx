@@ -8,6 +8,8 @@ interface LoginScreenProps {
   status: BackendStatus | null;
   onLogin: (email: string, password: string) => Promise<void>;
   onExploreDemo: () => void;
+  /** Aviso extra (ex.: sessão expirada). */
+  sessionNotice?: string | null;
 }
 
 function backendNotice(status: BackendStatus | null): string | null {
@@ -20,14 +22,14 @@ function backendNotice(status: BackendStatus | null): string | null {
   return null;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExploreDemo }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExploreDemo, sessionNotice }) => {
   const reduceMotion = useReducedMotion();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const notice = backendNotice(status);
+  const notice = sessionNotice ?? backendNotice(status);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,8 +44,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExp
   };
 
   return (
-    <div className="min-h-[100dvh] bg-neutral-950 text-neutral-100 grid lg:grid-cols-[1.1fr_1fr]">
-      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden border-r border-neutral-900 p-12">
+    <div className="min-h-[100dvh] bg-white/[0.03] text-neutral-100 grid lg:grid-cols-[1.1fr_1fr]">
+      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden border-r border-white/[0.04] p-12">
         <img
           src={ASSETS.agencyHero}
           alt=""
@@ -87,7 +89,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExp
           </div>
 
           {notice && (
-            <div role="status" className="text-sm text-amber-200 bg-amber-950/30 border border-amber-500/25 rounded-xl px-4 py-3 leading-relaxed">
+            <div role="status" className="text-sm text-amber-200 bg-amber-950/30 border border-amber-500/25 rounded-2xl px-4 py-3 leading-relaxed">
               {notice}
             </div>
           )}
@@ -104,7 +106,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExp
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl bg-neutral-900 border border-neutral-800 px-3.5 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition"
+                className="w-full rounded-[24px] bg-[#161618] border border-white/[0.06] px-3.5 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition"
                 placeholder="voce@agencia.com"
               />
             </div>
@@ -121,12 +123,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExp
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl bg-neutral-900 border border-neutral-800 px-3.5 py-2.5 pr-11 text-sm text-neutral-100 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition"
+                  className="w-full rounded-[24px] bg-[#161618] border border-white/[0.06] px-3.5 py-2.5 pr-11 text-sm text-neutral-100 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-neutral-500 hover:text-neutral-300 rounded-lg"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-neutral-500 hover:text-neutral-300 rounded-2xl"
                   aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -143,18 +145,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ status, onLogin, onExp
             <button
               type="submit"
               disabled={submitting || !email || !password}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-neutral-950 px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LockKeyhole className="w-4 h-4" />}
               {submitting ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
 
-          <div className="pt-6 border-t border-neutral-900">
+          <div className="pt-6 border-t border-white/[0.04]">
             <button
               type="button"
               onClick={onExploreDemo}
-              className="group w-full flex items-center justify-between gap-3 rounded-xl border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-900 px-4 py-3 text-left transition"
+              className="group w-full flex items-center justify-between gap-3 rounded-full border border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.04] px-4 py-3 text-left transition"
             >
               <span className="flex items-center gap-3">
                 <PlayCircle className="w-5 h-5 text-amber-400 shrink-0" />

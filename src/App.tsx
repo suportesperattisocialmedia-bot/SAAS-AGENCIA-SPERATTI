@@ -6,7 +6,7 @@
  * Aplicação Interna de Inteligência, Estratégia e Operação de Marketing Digital
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import {
   Client,
   InstagramAccount,
@@ -25,9 +25,13 @@ import { aiService, ProfileDiagnosticResult } from './services/aiService';
 import { notificationService, notificationStore } from './services/notifications/NotificationStore';
 import { alertEngine } from './services/alerts/alertEngine';
 import { migrationEngine } from './services/storage/migration';
+import { indexedDBAdapter } from './services/storage/IndexedDBAdapter';
 import { logger } from './utils/logger';
 import { sessionService, type BackendStatus, type SessionUser } from './services/sessionService';
-import { describeApiError } from './services/api/apiClient';
+import { syncService } from './services/sync/syncService';
+import { onStorageWrite } from './services/storage/changeBus';
+import { describeApiError, onSessionExpired } from './services/api/apiClient';
+import { motion, useReducedMotion } from 'motion/react';
 import { DemoProvider } from './services/demo/DemoProvider';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { ManualAiModal } from './components/common/ManualAiModal';
@@ -37,7 +41,9 @@ import { ProfileDiagnosticResponseSchema } from './schemas/aiSchemas';
 // Layout & Common Components
 import { Sidebar, MainNavSection } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
-import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
+import { GlobalSearchModal, type CommandAction } from './components/layout/GlobalSearchModal';
+import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked } from 'lucide-react';
+import { backupStats, downloadBackup } from './services/backupService';
 import { BootLoader } from './components/common/BootLoader';
 import { DemoBanner } from './components/common/DemoBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -51,18 +57,20 @@ import { ToastContainer } from './components/common/ToastContainer';
 
 // Workspace Components
 import { WorkspaceHeader, WorkspaceSubTab } from './components/workspace/WorkspaceHeader';
-import { ClientOverviewTab } from './components/workspace/ClientOverviewTab';
-import { InstagramConnectTab } from './components/workspace/InstagramConnectTab';
-import { MetricsTab } from './components/workspace/MetricsTab';
-import { DiagnosticTab } from './components/workspace/DiagnosticTab';
-import { PerformanceTab } from './components/workspace/PerformanceTab';
-import { ContentTab } from './components/workspace/ContentTab';
-import { CompetitorTab } from './components/workspace/CompetitorTab';
-import { AudienceTab } from './components/workspace/AudienceTab';
-import { IdeasTab } from './components/workspace/IdeasTab';
-import { CalendarTab } from './components/workspace/CalendarTab';
-import { ReportsTab } from './components/workspace/ReportsTab';
-import { HistoryTab } from './components/workspace/HistoryTab';
+// Abas do workspace carregadas sob demanda (bundle inicial menor).
+const ClientOverviewTab = lazy(() => import('./components/workspace/ClientOverviewTab').then((m) => ({ default: m.ClientOverviewTab })));
+const InstagramConnectTab = lazy(() => import('./components/workspace/InstagramConnectTab').then((m) => ({ default: m.InstagramConnectTab })));
+const MetricsTab = lazy(() => import('./components/workspace/MetricsTab').then((m) => ({ default: m.MetricsTab })));
+const DiagnosticTab = lazy(() => import('./components/workspace/DiagnosticTab').then((m) => ({ default: m.DiagnosticTab })));
+const PerformanceTab = lazy(() => import('./components/workspace/PerformanceTab').then((m) => ({ default: m.PerformanceTab })));
+const ContentTab = lazy(() => import('./components/workspace/ContentTab').then((m) => ({ default: m.ContentTab })));
+const CompetitorTab = lazy(() => import('./components/workspace/CompetitorTab').then((m) => ({ default: m.CompetitorTab })));
+const AudienceTab = lazy(() => import('./components/workspace/AudienceTab').then((m) => ({ default: m.AudienceTab })));
+const IdeasTab = lazy(() => import('./components/workspace/IdeasTab').then((m) => ({ default: m.IdeasTab })));
+const LibraryTab = lazy(() => import('./components/workspace/LibraryTab').then((m) => ({ default: m.LibraryTab })));
+const CalendarTab = lazy(() => import('./components/workspace/CalendarTab').then((m) => ({ default: m.CalendarTab })));
+const ReportsTab = lazy(() => import('./components/workspace/ReportsTab').then((m) => ({ default: m.ReportsTab })));
+const HistoryTab = lazy(() => import('./components/workspace/HistoryTab').then((m) => ({ default: m.HistoryTab })));
 
 /** Itens do menu lateral que abrem uma aba do workspace do cliente. */
 const SECTION_TO_TAB: Partial<Record<MainNavSection, WorkspaceSubTab>> = {
@@ -111,6 +119,25 @@ export default function App() {
   const [clientFormModalOpen, setClientFormModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [dashboardKey, setDashboardKey] = useState(0);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
+  const [dashboardAction, setDashboardAction] = useState<'pilot' | 'newTask' | null>(null);
+
+  // Sessão expirou no meio do uso: volta ao login com aviso (os dados deste navegador ficam salvos).
+  const sessionUserRef = useRef<SessionUser | null>(null);
+  sessionUserRef.current = sessionUser;
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        if (!sessionUserRef.current) return;
+        setSessionNotice('Sua sessão expirou. Entre novamente para continuar; os dados deste navegador estão salvos.');
+        syncService.stop();
+        setSessionUser(null);
+        setActiveClient(null);
+      }),
+    []
+  );
   const [alertsModalOpen, setAlertsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
@@ -120,6 +147,12 @@ export default function App() {
     const all = storageService.clients.getAll();
     return storageService.isDemoLoaded() ? all.filter((c) => c.id === demoId) : all.filter((c) => c.id !== demoId);
   }, []);
+
+  // Destaque do menu: a seção da aba aberta; abas sem item próprio (Métricas, Overview...) ficam em "Clientes".
+  const inWorkspace = Boolean(activeClient) && currentSection !== 'dashboard' && currentSection !== 'clients';
+  const sidebarSection: MainNavSection = inWorkspace
+    ? (Object.keys(SECTION_TO_TAB) as MainNavSection[]).find((k) => SECTION_TO_TAB[k] === workspaceTab) ?? 'clients'
+    : currentSection;
 
   const visibleIds = new Set(clients.map((c) => c.id));
 
@@ -204,6 +237,45 @@ export default function App() {
     }
   }, [loadClientData, visibleClients]);
 
+  // Dados que chegaram da nuvem (outro aparelho, portal do cliente) recarregam a tela.
+  useEffect(() => syncService.onRemoteChange(() => reloadAllData()), [reloadAllData]);
+
+  // Avisa quando o cliente responde pelo link de aprovação. A referência acompanha as escritas
+  // locais; só dados vindos da nuvem geram aviso (e não o histórico inteiro num aparelho novo).
+  const approvalsSeen = useRef<Map<string, number> | null>(null);
+  const firstPullFresh = useRef(false);
+  useEffect(() => {
+    const snapshot = () => new Map(storageService.tasks.getAll().map((t) => [t.id, t.approvals?.length ?? 0]));
+    const offLocal = onStorageWrite((key) => {
+      if (key === 'gs_intel_tasks') approvalsSeen.current = snapshot();
+    });
+    const offStatus = syncService.onStatus((st) => {
+      if (st.state === 'saved' || st.state === 'offline' || st.state === 'error') firstPullFresh.current = false;
+    });
+    const offRemote = syncService.onRemoteChange((keys) => {
+      if (!keys.includes('gs_intel_tasks')) return;
+      const before = approvalsSeen.current;
+      approvalsSeen.current = snapshot();
+      if (!before || firstPullFresh.current) return;
+      storageService.tasks.getAll().forEach((t) => {
+        const last = t.approvals?.[t.approvals.length - 1];
+        if (!last || (t.approvals?.length ?? 0) <= (before.get(t.id) ?? 0)) return;
+        if (Date.now() - Date.parse(last.at) > 7 * 24 * 3600 * 1000) return;
+        const who = t.clientId ? storageService.clients.getById(t.clientId)?.name ?? 'Cliente' : 'Cliente';
+        const title = last.decision === 'approved' ? `${who} aprovou` : `${who} pediu ajuste`;
+        const body = last.decision === 'approved' ? `"${t.title}" foi aprovado pelo link.` : `"${t.title}": ${last.comment ?? ''}`;
+        notificationStore.notify(title, body, last.decision === 'approved' ? 'success' : 'warning');
+        notificationService.showToast(`${title}: ${t.title}`, last.decision === 'approved' ? 'success' : 'warning');
+      });
+    });
+    return () => {
+      offLocal();
+      offStatus();
+      offRemote();
+    };
+  }, []);
+
+
   /** Sincroniza o cadastro local de clientes com o servidor (necessário para OAuth, sync e IA). */
   const syncClientsWithServer = useCallback(async () => {
     const demoId = DemoProvider.getDemoClientId();
@@ -229,6 +301,7 @@ export default function App() {
             targetAudience: p.targetAudience ?? '',
             persona: p.persona ?? '',
             averageTicket: p.averageTicket ?? '',
+            monthlyDeliverables: typeof p.monthlyDeliverables === 'number' ? p.monthlyDeliverables : undefined,
             products: '',
             services: '',
             objectives: p.objectives ?? [],
@@ -291,6 +364,11 @@ export default function App() {
     try {
       logger.info('Starting system boot sequence...');
       
+      // Step 0: o cache do IndexedDB (posts, métricas, diagnósticos) precisa estar carregado
+      // antes de qualquer leitura ou escrita; senão a tela abre vazia e uma escrita
+      // poderia sobrescrever os dados salvos.
+      await indexedDBAdapter.ready();
+
       // Step 1: Run storage migrations
       migrationEngine.runMigrations();
 
@@ -308,7 +386,15 @@ export default function App() {
       setSessionUser(session.user);
 
       if (session.user && !isDemo) {
+        // Dados da nuvem primeiro (tarefas, métricas, calendário...), sem travar a abertura
+        // se a rede estiver lenta: o que chegar depois recarrega a tela sozinho.
+        // Referência para avisar das respostas do cliente que chegarem (inclusive nesta abertura).
+        approvalsSeen.current = new Map(storageService.tasks.getAll().map((t) => [t.id, t.approvals?.length ?? 0]));
+        firstPullFresh.current = approvalsSeen.current.size === 0;
+        await Promise.race([syncService.start(session.user.agencyId), new Promise((r) => setTimeout(r, 5000))]);
         await syncClientsWithServer();
+      } else {
+        syncService.stop();
       }
 
       // Step 4: clientes visíveis no modo atual
@@ -332,6 +418,28 @@ export default function App() {
       setIsBooting(false);
     }
   }, [loadClientData, visibleClients, syncClientsWithServer]);
+
+  // Depois do login, baixa as abas do workspace em segundo plano (troca de aba instantânea).
+  useEffect(() => {
+    if (isBooting || !sessionUser) return;
+    const load = () => {
+      void import('./components/workspace/ClientOverviewTab');
+      void import('./components/workspace/MetricsTab');
+      void import('./components/workspace/InstagramConnectTab');
+      void import('./components/workspace/DiagnosticTab');
+      void import('./components/workspace/PerformanceTab');
+      void import('./components/workspace/ContentTab');
+      void import('./components/workspace/CompetitorTab');
+      void import('./components/workspace/AudienceTab');
+      void import('./components/workspace/IdeasTab');
+      void import('./components/workspace/CalendarTab');
+      void import('./components/workspace/ReportsTab');
+      void import('./components/workspace/HistoryTab');
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(load);
+    else setTimeout(load, 1500);
+  }, [isBooting, sessionUser]);
 
   // Retorno do OAuth tratado após o boot, com a interface (e os toasts) já montada.
   useEffect(() => {
@@ -380,6 +488,52 @@ export default function App() {
 
   // Profile Analysis handler
   // IA manual: abre o modal com o prompt completo do cliente.
+  /** Ações da paleta de comandos (Ctrl+K). */
+  const buildCommands = (): CommandAction[] => {
+    const goDashboard = (mode?: 'tasks' | 'summary') => {
+      if (mode) {
+        try {
+          localStorage.setItem('gs_dash_mode', mode);
+        } catch {
+          /* preferência opcional */
+        }
+      }
+      setCurrentSection('dashboard');
+      setDashboardKey((k) => k + 1);
+    };
+    const list: CommandAction[] = [
+      { id: 'new-task', label: 'Nova tarefa', hint: 'Criar entrega no CRM', keywords: 'tarefa crm entrega', icon: ListChecks, run: () => { goDashboard('tasks'); setDashboardAction('newTask'); } },
+      { id: 'pilot', label: 'Piloto da semana', hint: 'Planejar a próxima semana de um cliente', keywords: 'planejar semana ia prompt', icon: Rocket, run: () => { goDashboard('summary'); setDashboardAction('pilot'); } },
+      { id: 'tasks', label: 'Abrir minhas tarefas', keywords: 'crm quadro kanban', icon: ListChecks, run: () => goDashboard('tasks') },
+      { id: 'new-client', label: 'Novo cliente', keywords: 'cadastrar cliente', icon: UserPlus, run: () => { setEditingClient(null); setClientFormModalOpen(true); } },
+      {
+        id: 'backup',
+        label: 'Baixar backup',
+        hint: 'Salvar todos os dados deste navegador',
+        keywords: 'backup exportar salvar',
+        icon: HardDriveDownload,
+        run: () => {
+          const file = downloadBackup();
+          notificationService.showToast(`Backup baixado (${backupStats(file).total} registros).`, 'success');
+        }
+      }
+    ];
+    if (activeClient && !isDemoLoaded) {
+      const openTab = (tab: WorkspaceSubTab) => {
+        setCurrentSection((Object.keys(SECTION_TO_TAB) as MainNavSection[]).find((k) => SECTION_TO_TAB[k] === tab) ?? 'performance');
+        setWorkspaceTab(tab);
+        loadClientData(activeClient);
+      };
+      list.push(
+        { id: 'import', label: `Importar métricas: ${activeClient.name}`, hint: 'CSV do Meta Business Suite', keywords: 'csv importar metricas meta', icon: Upload, run: () => openTab('metrics') },
+        { id: 'diagnostic', label: `Gerar análise completa: ${activeClient.name}`, keywords: 'diagnostico analise ia prompt', icon: Sparkles, run: () => { openTab('diagnostic'); handleAnalyzeProfile(); } },
+        { id: 'report', label: `Relatório: ${activeClient.name}`, keywords: 'relatorio pdf', icon: FileText, run: () => openTab('reports') },
+        { id: 'library', label: `Biblioteca de legendas: ${activeClient.name}`, hint: 'Legendas, hashtags, CTAs e ganchos', keywords: 'legenda hashtag cta gancho copiar texto biblioteca', icon: BookMarked, run: () => openTab('library') }
+      );
+    }
+    return list;
+  };
+
   const handleAnalyzeProfile = () => {
     if (!activeClient) return;
     setDiagnosticModalOpen(true);
@@ -509,12 +663,14 @@ export default function App() {
       <>
         <LoginScreen
           status={backendStatus}
+          sessionNotice={sessionNotice}
           onLogin={async (email, password) => {
             try {
               await sessionService.login(email, password);
             } catch (err) {
               throw new Error(describeApiError(err, 'Não foi possível entrar.'));
             }
+            setSessionNotice(null);
             await initializeApplication();
           }}
           onExploreDemo={() => {
@@ -530,6 +686,8 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      await syncService.flush().catch(() => undefined);
+      syncService.stop();
       await sessionService.logout();
     } finally {
       setSessionUser(null);
@@ -548,7 +706,7 @@ export default function App() {
       <div className="flex-1 flex min-w-0">
         {/* Fixed Left Sidebar */}
         <Sidebar
-          currentSection={currentSection}
+          currentSection={sidebarSection}
           onNavigate={(sec) => {
             setMobileMenuOpen(false);
             if (sec === 'settings') {
@@ -653,6 +811,20 @@ export default function App() {
                   />
 
                   {/* Subtab Views */}
+                  <Suspense
+                    fallback={
+                      <div className="mt-6 space-y-4" aria-busy="true" aria-label="Carregando aba">
+                        <div className="h-24 animate-pulse rounded-[28px] bg-white/[0.04]" />
+                        <div className="h-64 animate-pulse rounded-[28px] bg-white/[0.04]" />
+                      </div>
+                    }
+                  >
+                  <motion.div
+                    key={workspaceTab}
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  >
                   {workspaceTab === 'overview' && (
                     <ClientOverviewTab
                       client={activeClient}
@@ -739,6 +911,8 @@ export default function App() {
                     />
                   )}
 
+                  {workspaceTab === 'library' && <LibraryTab key={activeClient.id} client={activeClient} />}
+
                   {workspaceTab === 'calendar' && (
                     <CalendarTab
                       client={activeClient}
@@ -763,10 +937,15 @@ export default function App() {
                       snapshots={snapshots}
                     />
                   )}
+                  </motion.div>
+                  </Suspense>
                 </div>
               ) : (
                 /* Agency Dashboard / All Clients */
                 <AgencyDashboardView
+                  key={dashboardKey}
+                  pendingAction={dashboardAction}
+                  onActionHandled={() => setDashboardAction(null)}
                   clients={clients}
                   snapshots={storageService.history.getAll()}
                   contents={storageService.contents.getAll()}
@@ -774,6 +953,7 @@ export default function App() {
                   alerts={alerts}
                   userName={sessionUser?.name}
                   isDemo={isDemoLoaded}
+                  onDataChanged={reloadAllData}
                   onOpenWorkspace={(client) => {
                     setActiveClient(client);
                     loadClientData(client);
@@ -841,6 +1021,19 @@ export default function App() {
         ideas={storageService.ideas.getAll().filter((i) => visibleIds.has(i.clientId))}
         competitors={storageService.competitors.getAll().filter((c) => visibleIds.has(c.clientId))}
         reports={storageService.reports.getAll().filter((r) => visibleIds.has(r.clientId))}
+        tasks={globalSearchOpen ? storageService.tasks.getAll().filter((t) => (t.clientId ? visibleIds.has(t.clientId) : !isDemoLoaded)) : []}
+        commands={buildCommands()}
+        onOpenTask={(task) => {
+          // Abre o dashboard em "Tarefas", filtrado pelo cliente da tarefa.
+          try {
+            localStorage.setItem('gs_dash_mode', 'tasks');
+            localStorage.setItem('gs_dash_scope', task.clientId ?? 'general');
+          } catch {
+            /* preferência opcional */
+          }
+          setCurrentSection('dashboard');
+          setDashboardKey((k) => k + 1);
+        }}
         onSelectClient={(client) => {
           setActiveClient(client);
           loadClientData(client);
@@ -863,6 +1056,9 @@ export default function App() {
       />
 
       <SettingsModal
+        onRestored={() => {
+          void syncClientsWithServer().then(reloadAllData);
+        }}
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
         onResetAllData={() => {

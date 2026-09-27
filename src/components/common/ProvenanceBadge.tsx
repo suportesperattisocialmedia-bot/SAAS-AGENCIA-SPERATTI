@@ -24,7 +24,7 @@ export const ProvenanceBadge: React.FC<ProvenanceBadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-mono uppercase tracking-wider ${config.badgeClass} ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] ${config.badgeClass} ${className}`}
       title={config.sublabel}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />

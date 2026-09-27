@@ -6,13 +6,13 @@ import type { InstagramConnectionStatus } from '../../types';
 export const CONNECTION_STATE: Record<InstagramConnectionStatus, { label: string; tone: string; icon: React.ReactNode; description: string }> = {
   NOT_CONFIGURED: {
     label: 'Instagram API não configurada',
-    tone: 'text-neutral-400 border-neutral-700 bg-neutral-900',
+    tone: 'text-neutral-400 border-white/[0.1] bg-[#161618]',
     icon: <Wrench className="w-3 h-3" />,
     description: 'O servidor ainda não possui META_APP_ID, META_APP_SECRET e META_REDIRECT_URI.'
   },
   DISCONNECTED: {
     label: 'Não conectado',
-    tone: 'text-neutral-300 border-neutral-700 bg-neutral-900',
+    tone: 'text-neutral-300 border-white/[0.1] bg-[#161618]',
     icon: <Unplug className="w-3 h-3" />,
     description: 'Nenhuma autorização OAuth ativa para este cliente.'
   },
@@ -58,7 +58,7 @@ export const ConnectionBadge: React.FC<{ status: InstagramConnectionStatus; clas
   const state = CONNECTION_STATE[status] ?? CONNECTION_STATE.DISCONNECTED;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-medium ${state.tone} ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium ${state.tone} ${className}`}
       title={state.description}
     >
       {state.icon}

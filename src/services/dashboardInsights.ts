@@ -6,6 +6,7 @@
 import type { AccountSnapshot, CalendarItem, Client, Content, ContentFormat, Metric } from '../types';
 import { avgMetric, engagementFrom, isMetric, sortValue, sumMetric } from '../utils/metrics';
 import { normalizeWeekDay } from './storage/migration';
+import { weekDates } from '../utils/calendarDates';
 
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -161,10 +162,13 @@ export function weekDayOf(now = new Date()): (typeof WEEK_ORDER)[number] {
 }
 
 /** Itens do calendário por dia da semana (segunda a domingo). */
-export function weekPlan(items: CalendarItem[]): Array<{ day: (typeof WEEK_ORDER)[number]; items: CalendarItem[] }> {
+/** Plano da semana atual: posts com data nesta semana + modelos semanais (sem data). */
+export function weekPlan(items: CalendarItem[], now = new Date()): Array<{ day: (typeof WEEK_ORDER)[number]; items: CalendarItem[] }> {
+  const week = new Set(weekDates(brasiliaDay(now)));
+  const current = items.filter((i) => !i.date || week.has(i.date));
   return WEEK_ORDER.map((day) => ({
     day,
-    items: items
+    items: current
       .filter((i) => normalizeWeekDay(i.dayOfWeek) === day)
       .sort((a, b) => (a.timeSlot ?? '').localeCompare(b.timeSlot ?? '') || a.orderIndex - b.orderIndex)
   }));

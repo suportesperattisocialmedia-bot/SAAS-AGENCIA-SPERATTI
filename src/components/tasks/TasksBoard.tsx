@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowRight, CheckSquare, Columns3, Flag, List, Plus, Search } from 'lucide-react';
+import { ArrowRight, CheckSquare, Columns3, Flag, Link2, List, MessageSquareWarning, Plus, Search, ThumbsUp } from 'lucide-react';
 import type { Client, DeliveryTask, TaskStatus } from '../../types';
 import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
 import { TASK_STATUSES, dueLabel, dueState, filterTasks, summarizeTasks, type QuickFilter } from '../../services/taskInsights';
 import { TaskModal, TaskDraft, draftFromTask, emptyDraft } from './TaskModal';
+import { ApprovalLinkModal } from './ApprovalLinkModal';
 
 /** Cor de cada etapa (faixa superior dos cards de resumo e marcador das colunas). */
 export const STATUS_COLOR: Record<TaskStatus, string> = {
@@ -41,7 +42,9 @@ export const TasksBoard: React.FC<{
   /** 'all', 'general' ou id do cliente. */
   scope: string;
   onChanged: () => void;
-}> = ({ tasks, clients, scope, onChanged }) => {
+  /** Muda de valor para abrir o formulário de nova tarefa (paleta de comandos). */
+  newTaskRequest?: number;
+}> = ({ tasks, clients, scope, onChanged, newTaskRequest = 0 }) => {
   const reduce = useReducedMotion();
   const [view, setView] = useState<'board' | 'list'>(() => {
     try {
@@ -52,13 +55,15 @@ export const TasksBoard: React.FC<{
   });
   const [search, setSearch] = useState('');
   const [quick, setQuick] = useState<QuickFilter>('all');
-  const [modal, setModal] = useState<{ open: boolean; draft: TaskDraft }>({ open: false, draft: emptyDraft() });
+  const [modal, setModal] = useState<{ open: boolean; draft: TaskDraft; seq: number }>({ open: false, draft: emptyDraft(), seq: 0 });
   const [dragId, setDragId] = useState<string | null>(null);
+  const [approvalOpen, setApprovalOpen] = useState(0);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
 
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.name])), [clients]);
   const scoped = useMemo(() => filterTasks(tasks, { clientId: scope }, clientNames), [tasks, scope, clientNames]);
-  const visible = useMemo(() => filterTasks(scoped, { clientId: 'all', search, quick }, clientNames), [scoped, search, quick, clientNames]);
+  const deferredSearch = useDeferredValue(search);
+  const visible = useMemo(() => filterTasks(scoped, { clientId: 'all', search: deferredSearch, quick }, clientNames), [scoped, deferredSearch, quick, clientNames]);
   const summary = summarizeTasks(scoped);
 
   const changeView = (v: 'board' | 'list') => {
@@ -71,7 +76,11 @@ export const TasksBoard: React.FC<{
   };
 
   const defaultClient = scope !== 'all' && scope !== 'general' ? scope : '';
-  const openNew = (status: TaskStatus = 'todo') => setModal({ open: true, draft: emptyDraft({ status, clientId: defaultClient }) });
+  useEffect(() => {
+    if (newTaskRequest > 0) setModal((m) => ({ open: true, draft: emptyDraft({ clientId: defaultClient }), seq: m.seq + 1 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newTaskRequest]);
+  const openNew = (status: TaskStatus = 'todo') => setModal((m) => ({ open: true, draft: emptyDraft({ status, clientId: defaultClient }), seq: m.seq + 1 }));
 
   const save = (d: TaskDraft) => {
     storageService.tasks.save({
@@ -83,7 +92,9 @@ export const TasksBoard: React.FC<{
       priority: d.priority,
       dueDate: d.dueDate || undefined,
       notes: d.notes || undefined,
-      checklist: d.checklist
+      checklist: d.checklist,
+      clientCopy: d.clientCopy.trim() || undefined,
+      previewUrl: d.previewUrl || undefined
     });
     notificationService.showToast(d.id ? 'Tarefa atualizada.' : 'Tarefa criada.', 'success');
     setModal((m) => ({ ...m, open: false }));
@@ -91,8 +102,14 @@ export const TasksBoard: React.FC<{
   };
 
   const remove = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
     storageService.tasks.delete(id);
-    notificationService.showToast('Tarefa excluída.', 'info');
+    if (task) {
+      notificationService.undoable(`Tarefa "${task.title}" excluída.`, () => {
+        storageService.tasks.restore(task);
+        onChanged();
+      });
+    }
     setModal((m) => ({ ...m, open: false }));
     onChanged();
   };
@@ -115,9 +132,18 @@ export const TasksBoard: React.FC<{
     const label = dueLabel(task);
     const done = task.checklist.filter((i) => i.done).length;
     const next = nextStatus(task.status);
+    const lastDecision = task.approvals?.[task.approvals.length - 1];
     return (
-      <div
+      // Card desliza para a nova posição/coluna ao mudar de etapa (layoutId compartilhado).
+      <motion.div
         key={task.id}
+        layout={!reduce}
+        layoutId={reduce ? undefined : `task-${task.id}`}
+        initial={reduce ? false : { opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+      >
+      <div
         draggable
         onDragStart={(e) => {
           setDragId(task.id);
@@ -138,7 +164,7 @@ export const TasksBoard: React.FC<{
         }}
         className={`group rounded-2xl border border-white/[0.05] bg-[#1d1d20] p-3.5 transition-all hover:border-white/[0.12] ${dragId === task.id ? 'opacity-40' : ''}`}
       >
-        <button type="button" onClick={() => setModal({ open: true, draft: draftFromTask(task) })} className="block w-full text-left">
+        <button type="button" onClick={() => setModal((m) => ({ open: true, draft: draftFromTask(task), seq: m.seq + 1 }))} className="block w-full text-left">
           <span className="flex items-center gap-2">
             <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/[0.08] text-[10px] font-semibold text-neutral-200">
               {client ? initials(client.name) : 'AG'}
@@ -156,6 +182,16 @@ export const TasksBoard: React.FC<{
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-neutral-300">{task.type}</span>
           {label && <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${DUE_STYLE[state]}`}>{label}</span>}
+          {lastDecision?.decision === 'changes' && task.status !== 'done' && task.status !== 'approved' && (
+            <span title={lastDecision.comment} className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+              <MessageSquareWarning className="h-3 w-3" /> Cliente pediu ajuste
+            </span>
+          )}
+          {lastDecision?.decision === 'approved' && task.status === 'approved' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+              <ThumbsUp className="h-3 w-3" /> Aprovado pelo cliente
+            </span>
+          )}
           {task.checklist.length > 0 && (
             <span className={`inline-flex items-center gap-1 text-[10px] ${done === task.checklist.length ? 'text-emerald-400' : 'text-neutral-500'}`}>
               <CheckSquare className="h-3 w-3" />
@@ -175,6 +211,7 @@ export const TasksBoard: React.FC<{
           )}
         </div>
       </div>
+      </motion.div>
     );
   };
 
@@ -240,6 +277,17 @@ export const TasksBoard: React.FC<{
               </button>
             ))}
           </div>
+          {clients.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setApprovalOpen((n) => n + 1)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#161618] px-4 py-2 text-sm text-neutral-200 hover:bg-white/[0.08]"
+            >
+              <Link2 className="h-4 w-4" />
+              Link de aprovação
+              {summary.byStatus.review > 0 && <span className="rounded-full bg-orange-300 px-1.5 text-[10px] font-semibold tabular-nums text-neutral-950">{summary.byStatus.review}</span>}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => openNew()}
@@ -359,7 +407,7 @@ export const TasksBoard: React.FC<{
                 return (
                   <tr key={t.id} className="border-t border-white/[0.04] hover:bg-white/[0.02]">
                     <td className="max-w-[320px] px-4 py-3">
-                      <button type="button" onClick={() => setModal({ open: true, draft: draftFromTask(t) })} className="block w-full truncate text-left text-neutral-100 hover:text-amber-300">
+                      <button type="button" onClick={() => setModal((m) => ({ open: true, draft: draftFromTask(t), seq: m.seq + 1 }))} className="block w-full truncate text-left text-neutral-100 hover:text-amber-300">
                         {t.title}
                       </button>
                     </td>
@@ -391,12 +439,22 @@ export const TasksBoard: React.FC<{
       )}
 
       <TaskModal
+        key={modal.seq}
         open={modal.open}
         initial={modal.draft}
         clients={clients}
         onClose={() => setModal((m) => ({ ...m, open: false }))}
         onSave={save}
         onDelete={remove}
+      />
+
+      <ApprovalLinkModal
+        key={`approval-${approvalOpen}`}
+        open={approvalOpen > 0}
+        onClose={() => setApprovalOpen(0)}
+        clients={clients}
+        tasks={tasks}
+        initialClientId={defaultClient || tasks.find((t) => t.status === 'review' && t.clientId)?.clientId}
       />
     </div>
   );

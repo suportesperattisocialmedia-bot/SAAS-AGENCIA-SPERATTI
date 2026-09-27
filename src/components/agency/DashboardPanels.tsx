@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowDown, ArrowUp, ArrowUpRight, CalendarDays, Eye, Heart, LayoutGrid, ListChecks, Radar, Trophy, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpRight, CalendarDays, Eye, Heart, LayoutGrid, ListChecks, Package, Radar, Trophy, Upload } from 'lucide-react';
 import type { CalendarItem, Client, Content, ContentFormat, DeliveryTask, Metric } from '../../types';
-import { TASK_STATUSES, dueLabel, dueState } from '../../services/taskInsights';
+import { TASK_STATUSES, dueLabel, dueState, type PackageProgress } from '../../services/taskInsights';
 import { engagementFrom, formatCompact, formatMetric, isMetric } from '../../utils/metrics';
 import { weekDayLabel } from '../../services/storage/migration';
+import { CountUp } from '../common/CountUp';
 import type { ClientFreshness, FormatRow, WeekPoint } from '../../services/dashboardInsights';
 
 /*
@@ -69,11 +70,13 @@ export const DeltaPill: React.FC<{ value: number | null; suffix?: string }> = ({
 export const KpiCard: React.FC<{
   label: string;
   value: string;
+  /** Valor numérico para a contagem animada (opcional). */
+  numeric?: { value: number | null; format: (n: number) => string };
   delta: number | null;
   icon: React.ElementType;
   highlight?: boolean;
   delay?: number;
-}> = ({ label, value, delta, icon: Icon, highlight, delay }) => {
+}> = ({ label, value, numeric, delta, icon: Icon, highlight, delay }) => {
   const empty = value === 'Sem dados';
   return (
     <Card delay={delay} className={`flex min-h-[140px] flex-col justify-between p-4 sm:min-h-[168px] sm:p-5 ${highlight ? '!bg-neutral-50 !border-transparent' : ''}`}>
@@ -90,7 +93,7 @@ export const KpiCard: React.FC<{
               empty ? (highlight ? 'text-neutral-400' : 'text-neutral-600') : highlight ? 'text-neutral-950' : 'text-neutral-50'
             }`}
           >
-            {value}
+            {numeric && numeric.value !== null ? <CountUp value={numeric.value} format={numeric.format} /> : value}
           </p>
           <DeltaPill value={delta} />
         </div>
@@ -598,3 +601,88 @@ export const UpcomingTasksPanel: React.FC<{
     )}
   </Card>
 );
+
+/* ------------------------------------------------------------------ */
+/* Pacotes do mês                                                       */
+/* ------------------------------------------------------------------ */
+
+const PKG_STATUS = {
+  done: { label: 'Concluído', cls: 'bg-emerald-400/15 text-emerald-300', bar: 'bg-emerald-400' },
+  'on-track': { label: 'No ritmo', cls: 'bg-white/[0.07] text-neutral-200', bar: 'bg-amber-500' },
+  behind: { label: 'Atrasado', cls: 'bg-rose-500/15 text-rose-300', bar: 'bg-rose-400' }
+} as const;
+
+export const PackagesPanel: React.FC<{
+  rows: PackageProgress[];
+  clientsById: Map<string, Client>;
+  unconfigured: Client[];
+  onConfigure: (client: Client) => void;
+  delay?: number;
+}> = ({ rows, clientsById, unconfigured, onConfigure, delay }) => {
+  const reduce = useReducedMotion();
+  return (
+    <Card delay={delay} className="p-5 lg:col-span-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-white/[0.07] text-neutral-300">
+            <Package className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="text-lg font-semibold text-neutral-50">Pacotes do mês</h3>
+            <p className="text-xs text-neutral-500">Entregas de conteúdo concluídas no mês x contratadas</p>
+          </div>
+        </div>
+        {unconfigured.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onConfigure(unconfigured[0])}
+            className="rounded-full bg-white/[0.06] px-3.5 py-1.5 text-xs font-medium text-neutral-200 hover:bg-white/[0.1]"
+          >
+            Definir pacote de {unconfigured[0].name}
+          </button>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <p className="mt-5 text-sm text-neutral-500">
+          Nenhum cliente com pacote mensal definido. Informe as entregas por mês no cadastro do cliente para acompanhar o progresso aqui.
+        </p>
+      ) : (
+        <ul className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {rows.map((r) => {
+            const client = clientsById.get(r.clientId);
+            const st = PKG_STATUS[r.status];
+            const pct = Math.min(100, (r.delivered / r.target) * 100);
+            const expectedPct = Math.min(100, (r.expected / r.target) * 100);
+            return (
+              <li key={r.clientId} className="rounded-2xl bg-white/[0.03] p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium text-neutral-100">{client?.name ?? 'Cliente'}</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
+                </div>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-neutral-50">
+                  {r.delivered}
+                  <span className="text-base font-normal text-neutral-500"> / {r.target}</span>
+                </p>
+                <div className="relative mt-2 h-2 rounded-full bg-white/[0.06]" role="progressbar" aria-valuemin={0} aria-valuemax={r.target} aria-valuenow={r.delivered} aria-label={`Pacote de ${client?.name}`}>
+                  <motion.div
+                    initial={reduce ? false : { width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                    className={`h-full rounded-full ${st.bar}`}
+                  />
+                  {r.status !== 'done' && (
+                    <span className="absolute top-1/2 h-3.5 w-0.5 -translate-y-1/2 rounded-full bg-neutral-300" style={{ left: `${expectedPct}%` }} title={`Esperado até hoje: ${r.expected.toLocaleString('pt-BR')}`} />
+                  )}
+                </div>
+                <p className="mt-2 text-[11px] text-neutral-500">
+                  {r.inProgress} em andamento · {r.daysLeft} {r.daysLeft === 1 ? 'dia restante' : 'dias restantes'}
+                  {r.status === 'behind' ? ` · esperado até hoje: ${Math.round(r.expected)}` : ''}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+};

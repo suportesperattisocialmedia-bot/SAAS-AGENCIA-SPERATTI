@@ -7,6 +7,8 @@
  * state it explicitly instead of fabricating results.
  */
 
+import { formatDateTimeBR } from '../utils/dates';
+
 import { AudienceInsight, AudienceInsightCategory, Client } from '../types';
 import { storageService } from './storageService';
 import { apiClient, describeApiError } from './api/apiClient';
@@ -110,7 +112,7 @@ export const researchService = {
             sourceUrl: src.sourceUrl,
             sourceDate: src.publishedAt || src.retrievedAt,
             evidence: src.evidence || undefined,
-            context: `Coletado em ${new Date(src.retrievedAt).toLocaleString('pt-BR')}`,
+            context: `Coletado em ${formatDateTimeBR(src.retrievedAt)}`,
             interpretation: 'Fonte pública ainda não validada pela equipe.',
             isHypothesis: true,
             confidence: 'LOW'

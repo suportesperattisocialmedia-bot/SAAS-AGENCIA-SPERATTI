@@ -43,6 +43,7 @@ export const ClientSchema = z.object({
   targetAudience: z.string().default(''),
   persona: z.string().default(''),
   averageTicket: z.string().default(''),
+  monthlyDeliverables: z.number().int().min(1).max(300).optional(),
   products: z.string().default(''),
   services: z.string().default(''),
   objectives: z.array(z.string()).default([]),
@@ -292,7 +293,9 @@ export const CalendarItemSchema = z.object({
   cta: z.string().optional(),
   status: PipelineStatusSchema.optional().default('PLANEJADO'),
   notes: z.string().optional(),
-  orderIndex: z.number().int().default(0)
+  orderIndex: z.number().int().default(0),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  updatedAt: z.string().optional()
 });
 
 export const AlertSchema = z.object({
@@ -363,5 +366,21 @@ export const DeliveryTaskSchema = z.object({
   orderIndex: z.number().default(0),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
-  completedAt: z.string().optional()
+  completedAt: z.string().optional(),
+  clientCopy: z.string().max(5000).optional(),
+  previewUrl: z.string().url().regex(/^https:\/\//i, 'Use um link https://').optional(),
+  approvals: z
+    .array(z.object({ at: z.string().min(1), decision: z.enum(['approved', 'changes']), comment: z.string().optional() }))
+    .optional()
+});
+
+export const SnippetSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1).optional(),
+  kind: z.enum(['legenda', 'hashtags', 'cta', 'gancho']),
+  title: z.string().trim().min(1, 'Dê um nome curto').max(80),
+  text: z.string().trim().min(1, 'Escreva o texto').max(5000),
+  uses: z.number().int().min(0).default(0),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1)
 });

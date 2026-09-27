@@ -87,3 +87,26 @@ describe('buildPreview', () => {
     expect(Object.keys(preview.mapping).sort()).toEqual(['caption', 'comments', 'likes', 'permalink', 'publishedAt', 'reach', 'saves', 'shares', 'type', 'views'].sort());
   });
 });
+
+describe('regras de honestidade da importação', () => {
+  it('texto em coluna de métrica vira n/d, nunca 0 nem valor inventado', () => {
+    expect(parseNumber('abc')).toBeNull();
+    expect(parseNumber('1e9')).toBeNull();
+    expect(parseNumber('-50')).toBeNull();
+    expect(parseNumber('2,3 mil')).toBe(2300);
+  });
+
+  it('linha sem data válida é ignorada com aviso (não recebe a data de hoje)', () => {
+    const csv = 'Data;Link;Curtidas\n10/09/2026;https://x.com/p/1;5\nsem data;https://x.com/p/2;7\n';
+    const preview = buildPreview(csv);
+    expect(preview.posts).toHaveLength(1);
+    expect(preview.warnings.join(' ')).toContain('sem data de publicação válida');
+  });
+
+  it('só aceita links http(s)', () => {
+    const csv = 'Data;Link;Curtidas\n10/09/2026;javascript:alert(1);5\n11/09/2026;https://www.instagram.com/p/OK/;7\n';
+    const [a, b] = buildPreview(csv).posts;
+    expect(a.permalink).toBeNull();
+    expect(b.permalink).toBe('https://www.instagram.com/p/OK/');
+  });
+});

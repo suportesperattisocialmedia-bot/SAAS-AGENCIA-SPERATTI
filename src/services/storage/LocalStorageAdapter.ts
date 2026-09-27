@@ -6,6 +6,7 @@
 import { StorageAdapter } from './StorageAdapter';
 import { runMigrations, STORAGE_SCHEMA_VERSION } from './migration';
 import { logger } from '../../utils/logger';
+import { notifyStorageWrite } from './changeBus';
 
 export class LocalStorageAdapter implements StorageAdapter {
   private initialized = false;
@@ -45,6 +46,7 @@ export class LocalStorageAdapter implements StorageAdapter {
     this.ensureInitialized();
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      notifyStorageWrite(key);
     } catch (err) {
       logger.error(`Error writing item '${key}' to storage`, { error: String(err) });
     }
@@ -53,6 +55,7 @@ export class LocalStorageAdapter implements StorageAdapter {
   remove(key: string): void {
     try {
       localStorage.removeItem(key);
+      notifyStorageWrite(key);
     } catch (err) {
       logger.error(`Error removing item '${key}' from storage`, { error: String(err) });
     }

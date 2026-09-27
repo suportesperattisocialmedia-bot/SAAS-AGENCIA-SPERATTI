@@ -7,7 +7,9 @@
  * Similarity score and metrics default to null until real evidence is verified.
  */
 
-import { Client, Competitor, CompetitorStatus, ContentFormat } from '../types';
+import { formatDateBR } from '../utils/dates';
+
+import { Client, Competitor, ContentFormat } from '../types';
 import { storageService } from './storageService';
 import { logger } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
@@ -78,18 +80,27 @@ export const competitorService = {
     this.updateCompetitor(id, { status: 'archived' });
   },
 
-  generateBenchmarkTable(client: Client, clientFollowers: number | null = null, clientWeeklyFreq: number | null = null): CompetitorBenchmarkRow[] {
+  /** Tabela comparativa. A linha do cliente usa os dados reais importados (null quando não houver). */
+  generateBenchmarkTable(
+    client: Client,
+    stats: { followers: number | null; weeklyFrequency: number | null; avgViews: number | null; avgEngagementRate: number | null; topFormats?: ContentFormat[] } = {
+      followers: null,
+      weeklyFrequency: null,
+      avgViews: null,
+      avgEngagementRate: null
+    }
+  ): CompetitorBenchmarkRow[] {
     const approved = this.getApprovedCompetitors(client.id);
 
     const clientRow: CompetitorBenchmarkRow = {
       name: `${client.name} (Cliente)`,
       instagram: client.instagram,
       isClient: true,
-      followers: clientFollowers,
-      weeklyFrequency: clientWeeklyFreq,
-      avgViews: null,
-      avgEngagementRate: null,
-      topFormats: client.formats,
+      followers: stats.followers,
+      weeklyFrequency: stats.weeklyFrequency,
+      avgViews: stats.avgViews,
+      avgEngagementRate: stats.avgEngagementRate,
+      topFormats: stats.topFormats?.length ? stats.topFormats : client.formats,
       mainThemes: client.pillars
     };
 
@@ -238,7 +249,7 @@ export const competitorService = {
             recentThemes: [],
             notes: c.evidence ? `Evidência: ${c.evidence}` : '',
             status: 'candidate',
-            candidateReason: `Encontrado em ${c.source} em ${new Date(c.retrievedAt).toLocaleDateString('pt-BR')}.`,
+            candidateReason: `Encontrado em ${c.source} em ${formatDateBR(c.retrievedAt)}.`,
             evidenceUrl: c.sourceUrl
           })
         );

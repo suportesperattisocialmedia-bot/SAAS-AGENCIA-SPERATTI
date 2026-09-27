@@ -19,6 +19,7 @@ export type EntityStorageType =
   | 'content_ideas'
   | 'calendar_items'
   | 'tasks'
+  | 'snippets'
   | 'alerts'
   | 'reports'
   | 'sync_logs'

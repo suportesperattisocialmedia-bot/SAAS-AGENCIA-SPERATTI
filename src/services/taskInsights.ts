@@ -115,3 +115,43 @@ export function upcomingTasks(tasks: DeliveryTask[], limit = 5, now = new Date()
     .sort((a, b) => rank[dueState(a, now)] - rank[dueState(b, now)] || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999') || (a.priority === 'high' ? -1 : 0) - (b.priority === 'high' ? -1 : 0))
     .slice(0, limit);
 }
+
+// ---------------------------------------------------------------------------
+// Pacote mensal por cliente (entregas contratadas x entregues no mês)
+// ---------------------------------------------------------------------------
+
+const CONTENT_TYPES = new Set(['Post', 'Reels', 'Carrossel', 'Stories']);
+
+export interface PackageProgress {
+  clientId: string;
+  target: number;
+  delivered: number;
+  inProgress: number;
+  /** Entregas esperadas até hoje, no ritmo linear do mês. */
+  expected: number;
+  daysLeft: number;
+  status: 'done' | 'on-track' | 'behind';
+}
+
+export function packageProgress(
+  clients: Array<{ id: string; monthlyDeliverables?: number }>,
+  tasks: DeliveryTask[],
+  now = new Date()
+): PackageProgress[] {
+  const today = brasiliaDay(now);
+  const [y, m, d] = today.split('-').map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const monthPrefix = today.slice(0, 7);
+  return clients
+    .filter((c) => typeof c.monthlyDeliverables === 'number' && c.monthlyDeliverables > 0)
+    .map((c) => {
+      const target = c.monthlyDeliverables as number;
+      const mine = tasks.filter((t) => t.clientId === c.id && CONTENT_TYPES.has(t.type));
+      const delivered = mine.filter((t) => t.status === 'done' && t.completedAt && brasiliaDay(t.completedAt).startsWith(monthPrefix)).length;
+      const inProgress = mine.filter((t) => t.status !== 'done' && (!t.dueDate || t.dueDate.startsWith(monthPrefix))).length;
+      const expected = Math.round(((target * d) / daysInMonth) * 10) / 10;
+      const status: PackageProgress['status'] = delivered >= target ? 'done' : delivered + 0.5 >= expected ? 'on-track' : 'behind';
+      return { clientId: c.id, target, delivered, inProgress, expected, daysLeft: daysInMonth - d, status };
+    })
+    .sort((a, b) => ({ behind: 0, 'on-track': 1, done: 2 })[a.status] - ({ behind: 0, 'on-track': 1, done: 2 })[b.status]);
+}
