@@ -272,7 +272,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="[&_th]:px-3 [&_td]:px-3 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 w-full text-left text-xs tabular-nums">
             <thead>
               <tr className="border-b border-white/[0.06] text-neutral-500 text-[11px]">
