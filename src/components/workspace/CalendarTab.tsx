@@ -310,59 +310,64 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ client, calendarItems,
         <>
           {/* Grade do mês (tablet e desktop) */}
           <div className="hidden overflow-hidden rounded-[24px] border border-white/[0.06] bg-[#161618] md:block">
-            <div className="grid grid-cols-7 border-b border-white/[0.06] text-[11px] text-neutral-500">
-              {WEEK.map((d) => (
-                <div key={d} className="px-3 py-2">
-                  {weekDayLabel(d).slice(0, 3)}
+            <div className="grid grid-cols-7" role="grid" aria-label={`Calendário de ${monthLabel(month)}`}>
+              <div role="row" className="contents">
+                {WEEK.map((d) => (
+                  <div key={d} role="columnheader" aria-label={weekDayLabel(d)} className="border-b border-white/[0.06] px-3 py-2 text-[11px] text-neutral-500">
+                    {weekDayLabel(d).slice(0, 3)}
+                  </div>
+                ))}
+              </div>
+              {weeks.map((week, w) => (
+                <div key={week[0]} role="row" className="contents">
+                  {week.map((d, j) => {
+                    const idx = w * 7 + j;
+                    const items = byDate.get(d) ?? [];
+                    const inMonth = d.startsWith(month);
+                    const isToday = d === today;
+                    return (
+                      <div
+                        key={d}
+                        role="gridcell"
+                        aria-label={`${dayLabel(d)}: ${items.length} post(s)`}
+                        data-date={d}
+                        {...dropProps(d)}
+                        onClick={() => openNew(d)}
+                        className={`group relative min-h-[118px] cursor-pointer border-white/[0.05] p-1.5 transition-colors ${idx % 7 !== 6 ? 'border-r' : ''} ${idx < weeks.length * 7 - 7 ? 'border-b' : ''} ${
+                          dragOver === d ? 'bg-amber-500/10' : 'hover:bg-white/[0.02]'
+                        } ${inMonth ? '' : 'bg-black/20'}`}
+                      >
+                        <div className="mb-1 flex items-center justify-between px-1">
+                          <span
+                            className={`grid h-6 min-w-6 place-items-center rounded-full px-1 text-[11px] tabular-nums ${
+                              isToday ? 'bg-amber-500 font-semibold text-neutral-950' : inMonth ? 'text-neutral-300' : 'text-neutral-600'
+                            }`}
+                          >
+                            {Number(d.slice(8))}
+                          </span>
+                          <Plus className="h-3.5 w-3.5 text-neutral-500 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+                        </div>
+                        <div className="space-y-1">
+                          {items.slice(0, 3).map((item) => chip(item))}
+                          {items.length > 3 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWeekAnchor(d);
+                                changeView('week');
+                              }}
+                              className="w-full rounded-lg px-2 py-0.5 text-left text-[10px] text-neutral-400 hover:bg-white/[0.05]"
+                            >
+                              +{items.length - 3} mais
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
-            </div>
-            <div className="grid grid-cols-7" role="grid" aria-label={`Calendário de ${monthLabel(month)}`}>
-              {weeks.flat().map((d, idx) => {
-                const items = byDate.get(d) ?? [];
-                const inMonth = d.startsWith(month);
-                const isToday = d === today;
-                return (
-                  <div
-                    key={d}
-                    role="gridcell"
-                    aria-label={`${dayLabel(d)}: ${items.length} post(s)`}
-                    data-date={d}
-                    {...dropProps(d)}
-                    onClick={() => openNew(d)}
-                    className={`group relative min-h-[118px] cursor-pointer border-white/[0.05] p-1.5 transition-colors ${idx % 7 !== 6 ? 'border-r' : ''} ${idx < weeks.length * 7 - 7 ? 'border-b' : ''} ${
-                      dragOver === d ? 'bg-amber-500/10' : 'hover:bg-white/[0.02]'
-                    } ${inMonth ? '' : 'bg-black/20'}`}
-                  >
-                    <div className="mb-1 flex items-center justify-between px-1">
-                      <span
-                        className={`grid h-6 min-w-6 place-items-center rounded-full px-1 text-[11px] tabular-nums ${
-                          isToday ? 'bg-amber-500 font-semibold text-neutral-950' : inMonth ? 'text-neutral-300' : 'text-neutral-600'
-                        }`}
-                      >
-                        {Number(d.slice(8))}
-                      </span>
-                      <Plus className="h-3.5 w-3.5 text-neutral-500 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
-                    </div>
-                    <div className="space-y-1">
-                      {items.slice(0, 3).map((item) => chip(item))}
-                      {items.length > 3 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setWeekAnchor(d);
-                            changeView('week');
-                          }}
-                          className="w-full rounded-lg px-2 py-0.5 text-left text-[10px] text-neutral-400 hover:bg-white/[0.05]"
-                        >
-                          +{items.length - 3} mais
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
 

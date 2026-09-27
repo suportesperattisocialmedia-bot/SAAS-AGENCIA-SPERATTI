@@ -22,9 +22,18 @@ Botão **Piloto da semana** no dashboard (ou "Planejar a próxima semana" com um
 
 Código: `src/services/winningPatterns.ts`, `src/ai/weeklyPilot.ts`, `src/components/pilot/WeeklyPilotModal.tsx`.
 
+## Sincronização na nuvem
+
+Com login, tarefas, métricas importadas, ideias, calendário, biblioteca, diagnósticos e relatórios ficam também no banco (`/api/workspace`), um documento por coleção com versão.
+Abrir em outro computador ou celular traz tudo. O navegador continua sendo a cópia rápida: cada alteração sobe em ~1,5s; sem internet fica pendente e sobe quando a conexão volta.
+Se dois aparelhos gravarem ao mesmo tempo, o servidor responde 409 e o app mescla por item (o mais recente vence; exclusões não voltam).
+O ícone de nuvem no cabeçalho mostra o estado (salvo, sincronizando, offline, erro) e sincroniza ao clicar. O modo demonstração nunca vai para a nuvem.
+
+Código: `src/services/sync/`, `api/workspace.ts`, `server/repositories/workspaceRepository.ts`.
+
 ## Backup
 
-Configurações → **Backup dos dados**: baixa um `.json` com tudo que fica no navegador (posts, métricas, ideias, calendário, tarefas, diagnósticos, relatórios) e restaura em qualquer computador. O dashboard avisa quando o último backup tem mais de 7 dias.
+Configurações → **Backup dos dados**: baixa um `.json` com tudo que fica no navegador (posts, métricas, ideias, calendário, tarefas, biblioteca, diagnósticos, relatórios) e restaura em qualquer computador. O dashboard só lembra do backup quando a sincronização na nuvem não está ativa.
 
 Código: `src/services/backupService.ts`.
 
@@ -33,7 +42,20 @@ Código: `src/services/backupService.ts`.
 - Seletor no topo do dashboard: **Todos os clientes** ou um cliente específico (todo o resumo passa a mostrar só ele).
 - Alternância **Resumo | Tarefas**. Tarefas é um CRM de entregas em quadro: A fazer, Em produção, Aprovação do cliente, Aprovado, Entregue.
   Cada tarefa tem cliente (ou "Geral"), tipo, prazo, prioridade, notas e checklist; arrastar entre colunas, seta para avançar, visão em lista, filtros (atrasadas, hoje, 7 dias, prioridade alta) e busca.
-- As tarefas ficam no armazenamento local do navegador, como ideias e calendário. Excluir um cliente exclui as tarefas dele.
+- As tarefas ficam no navegador e na nuvem (ver Sincronização). Excluir um cliente exclui as tarefas dele.
+
+## Portal de aprovação do cliente
+
+Tarefas → **Link de aprovação**: gera um link por cliente (`/aprovar/<token>`, válido 30 dias, um ativo por cliente). O cliente abre sem conta e vê só as entregas em "Aprovação do cliente", com o **texto para aprovação** e o **link da arte** preenchidos na tarefa; as notas internas nunca aparecem.
+Ele aprova (a tarefa vai para Aprovado) ou pede ajuste com comentário (volta para Em produção com o pedido). A agência recebe aviso e o histórico fica na tarefa.
+O token é guardado só como hash (busca) e criptografado (para copiar de novo); dá para gerar outro ou revogar a qualquer momento.
+
+Código: `api/portal.ts`, `server/services/portalService.ts`, `src/components/portal/`, `src/components/tasks/ApprovalLinkModal.tsx`.
+
+## Calendário e Biblioteca
+
+- **Calendário** com datas reais: visão Mês (agenda em lista no celular) e Semana, arrastar para reagendar, clicar num dia para agendar, formulário para mudar a data pelo teclado. Itens antigos sem data ficam numa bandeja. O Piloto da Semana e o Banco de Ideias já agendam com data.
+- **Biblioteca** (aba do cliente): legendas, grupos de hashtags, CTAs e ganchos para copiar com um clique, com contagem de uso e aviso dos limites do Instagram (30 hashtags, 2.200 caracteres). Textos "gerais" aparecem em todos os clientes.
 
 Código: `src/components/agency/`, `src/components/tasks/`, `src/services/dashboardInsights.ts`, `src/services/taskInsights.ts`.
 
@@ -104,7 +126,7 @@ Opcionais: `GEMINI_API_KEY`/`GEMINI_MODEL` (só para a rota `/api/ai`), `ADMIN_E
 
 ### Supabase
 1. Use a connection string **Transaction pooler** (Project Settings > Database) em `DATABASE_URL`.
-2. Aplique o schema: `DATABASE_URL=... npm run db:migrate` (ou cole `db/migrations/001_initial_schema.sql` no SQL Editor). É idempotente.
+2. Aplique o schema: `DATABASE_URL=... npm run db:migrate` (ou cole os arquivos de `db/migrations/` em ordem no SQL Editor). É idempotente.
 3. As tabelas têm RLS habilitado sem policies: a API REST pública do Supabase não acessa nada; só o backend (dono das tabelas).
 
 ### Primeiro usuário

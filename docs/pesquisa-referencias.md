@@ -32,9 +32,9 @@ Objetivo: trazer o que faz sentido para o uso real (uma agência, uso simples, s
 7. **Desempenho**: busca global e busca de tarefas com `useDeferredValue` (digitação não trava).
 8. Removida notificação inicial fictícia ("sistema inicializado").
 
-## Roadmap sugerido (depende de sincronizar dados na nuvem)
+## Implementado na rodada seguinte (roadmap)
 
-- Portal de aprovação do cliente por link (sem conta), como BrightBean/Fuorix.
-- Calendário com datas reais (mês/semana) e arrastar para reagendar.
-- Biblioteca de legendas, templates e grupos de hashtags por cliente (Mixpost).
-- Sincronização de tarefas, métricas, ideias e calendário com o banco (acesso de qualquer aparelho).
+1. **Sincronização na nuvem** de todas as coleções, com versão, mesclagem por item e fila offline.
+2. **Portal de aprovação do cliente** por link, sem conta (como BrightBean/Fuorix), com histórico de decisões.
+3. **Calendário com datas reais**: mês/semana, arrastar para reagendar.
+4. **Biblioteca** de legendas, hashtags, CTAs e ganchos por cliente (como Mixpost).
