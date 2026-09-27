@@ -132,7 +132,7 @@ export const InvoicesView: React.FC<FinanceData & { clients: ClientOption[]; age
             <GhostButton onClick={exportCsv}>
               <Download className="h-4 w-4" /> CSV
             </GhostButton>
-            <PrimaryButton onClick={() => setEditing('new')} disabled={clients.length === 0}>
+            <PrimaryButton onClick={() => setEditing('new')}>
               <Plus className="h-4 w-4" /> Nova cobrança
             </PrimaryButton>
           </>
@@ -197,13 +197,11 @@ export const InvoicesView: React.FC<FinanceData & { clients: ClientOption[]; age
       {invoices.length === 0 ? (
         <EmptyState
           title="Nenhuma cobrança ainda"
-          text={clients.length === 0 ? 'Cadastre um cliente no modo Agência para começar a cobrar.' : 'Crie uma cobrança avulsa ou cadastre um contrato recorrente para gerar as cobranças de cada mês.'}
+          text="Crie uma cobrança avulsa ou cadastre um contrato recorrente para gerar as cobranças de cada mês. O cliente pode ser um dos cadastrados ou qualquer nome que você digitar."
           action={
-            clients.length > 0 && (
-              <PrimaryButton onClick={() => setEditing('new')}>
-                <Plus className="h-4 w-4" /> Nova cobrança
-              </PrimaryButton>
-            )
+            <PrimaryButton onClick={() => setEditing('new')}>
+              <Plus className="h-4 w-4" /> Nova cobrança
+            </PrimaryButton>
           }
         />
       ) : list.length === 0 ? (

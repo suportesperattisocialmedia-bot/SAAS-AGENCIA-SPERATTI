@@ -53,7 +53,7 @@ export const ContractsView: React.FC<FinanceData & { clients: ClientOption[]; re
           </>
         }
         actions={
-          <PrimaryButton onClick={() => setEditing('new')} disabled={clients.length === 0}>
+          <PrimaryButton onClick={() => setEditing('new')}>
             <Plus className="h-4 w-4" /> Novo contrato
           </PrimaryButton>
         }
@@ -74,11 +74,9 @@ export const ContractsView: React.FC<FinanceData & { clients: ClientOption[]; re
           title="Nenhum contrato cadastrado"
           text="Cadastre as mensalidades (gestão de redes, tráfego...) e os projetos fechados. Os recorrentes geram a cobrança de cada mês com um clique."
           action={
-            clients.length > 0 && (
-              <PrimaryButton onClick={() => setEditing('new')}>
-                <Plus className="h-4 w-4" /> Novo contrato
-              </PrimaryButton>
-            )
+            <PrimaryButton onClick={() => setEditing('new')}>
+              <Plus className="h-4 w-4" /> Novo contrato
+            </PrimaryButton>
           }
         />
       ) : list.length === 0 ? (

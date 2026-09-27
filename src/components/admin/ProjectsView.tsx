@@ -53,7 +53,7 @@ export const ProjectsView: React.FC<FinanceData & { clients: ClientOption[]; rel
           </>
         }
         actions={
-          <PrimaryButton onClick={() => setEditing({ stage: 'proposta' })} disabled={clients.length === 0}>
+          <PrimaryButton onClick={() => setEditing({ stage: 'proposta' })}>
             <Plus className="h-4 w-4" /> Novo projeto
           </PrimaryButton>
         }
@@ -64,11 +64,9 @@ export const ProjectsView: React.FC<FinanceData & { clients: ClientOption[]; rel
           title="Nenhum projeto ainda"
           text="Cadastre cada trabalho (site, identidade visual, campanha, mês de gestão) e acompanhe as etapas: proposta, aprovado, produção, revisão, entregue, faturado e recebido."
           action={
-            clients.length > 0 && (
-              <PrimaryButton onClick={() => setEditing({ stage: 'proposta' })}>
-                <Plus className="h-4 w-4" /> Novo projeto
-              </PrimaryButton>
-            )
+            <PrimaryButton onClick={() => setEditing({ stage: 'proposta' })}>
+              <Plus className="h-4 w-4" /> Novo projeto
+            </PrimaryButton>
           }
         />
       ) : (
