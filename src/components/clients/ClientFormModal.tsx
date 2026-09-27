@@ -82,6 +82,10 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
   const [customObjective, setCustomObjective] = useState('');
   const [customPillar, setCustomPillar] = useState('');
+  // Itens personalizados continuam na lista mesmo quando desmarcados.
+  const [extraObjectives, setExtraObjectives] = useState<string[]>([]);
+  const [extraPillars, setExtraPillars] = useState<string[]>([]);
+  const withExtras = (defaults: string[], selected: string[], extras: string[]) => [...new Set([...defaults, ...selected, ...extras])];
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isDirty, setIsDirty] = useState(false);
 
@@ -113,6 +117,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
       setObjectives(initialData.objectives || []);
       setFormats(initialData.formats || ['Reels', 'Carrossel']);
       setPillars(initialData.pillars || []);
+      setExtraObjectives([]);
+      setExtraPillars([]);
       setIsDirty(false);
     } else {
       setFormData({
@@ -141,6 +147,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
       setObjectives(['Autoridade', 'Leads']);
       setFormats(['Reels', 'Carrossel']);
       setPillars(['Educação', 'Autoridade']);
+      setExtraObjectives([]);
+      setExtraPillars([]);
       setIsDirty(false);
     }
     setErrors({});
@@ -179,22 +187,24 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     );
   };
 
-  const addCustomObjective = (e: React.FormEvent) => {
+  const addCustomObjective = (e: React.SyntheticEvent) => {
     e.preventDefault();
-    if (customObjective.trim() && !objectives.includes(customObjective.trim())) {
-      setObjectives(prev => [...prev, customObjective.trim()]);
-      setCustomObjective('');
-      setIsDirty(true);
-    }
+    const value = customObjective.trim();
+    if (!value) return;
+    setObjectives(prev => (prev.includes(value) ? prev : [...prev, value]));
+    setExtraObjectives(prev => (prev.includes(value) ? prev : [...prev, value]));
+    setCustomObjective('');
+    setIsDirty(true);
   };
 
-  const addCustomPillar = (e: React.FormEvent) => {
+  const addCustomPillar = (e: React.SyntheticEvent) => {
     e.preventDefault();
-    if (customPillar.trim() && !pillars.includes(customPillar.trim())) {
-      setPillars(prev => [...prev, customPillar.trim()]);
-      setCustomPillar('');
-      setIsDirty(true);
-    }
+    const value = customPillar.trim();
+    if (!value) return;
+    setPillars(prev => (prev.includes(value) ? prev : [...prev, value]));
+    setExtraPillars(prev => (prev.includes(value) ? prev : [...prev, value]));
+    setCustomPillar('');
+    setIsDirty(true);
   };
 
   const handleSafeClose = () => {
@@ -531,7 +541,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               Pilares de Conteúdo
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {DEFAULT_PILLARS.map(p => {
+              {withExtras(DEFAULT_PILLARS, pillars, extraPillars).map(p => {
                 const active = pillars.includes(p);
                 return (
                   <button
@@ -555,6 +565,10 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 type="text"
                 value={customPillar}
                 onChange={e => setCustomPillar(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') addCustomPillar(e);
+                }}
+                aria-label="Novo pilar de conteúdo"
                 placeholder="Adicionar pilar personalizado..."
                 className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-2xl px-2.5 py-1 text-xs text-neutral-200 focus:outline-hidden focus:border-amber-500"
               />
@@ -575,7 +589,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               Objetivos de Negócio
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {DEFAULT_OBJECTIVES.map(obj => {
+              {withExtras(DEFAULT_OBJECTIVES, objectives, extraObjectives).map(obj => {
                 const active = objectives.includes(obj);
                 return (
                   <button
@@ -599,6 +613,10 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 type="text"
                 value={customObjective}
                 onChange={e => setCustomObjective(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') addCustomObjective(e);
+                }}
+                aria-label="Novo objetivo de negócio"
                 placeholder="Adicionar objetivo personalizado..."
                 className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-2xl px-2.5 py-1 text-xs text-neutral-200 focus:outline-hidden focus:border-amber-500"
               />
