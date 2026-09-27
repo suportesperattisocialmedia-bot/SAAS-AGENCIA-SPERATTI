@@ -16,6 +16,8 @@ import { generateUUID } from '../utils/uuid';
 import { apiClient, describeApiError } from './api/apiClient';
 
 export interface CompetitorBenchmarkRow {
+  /** id do concorrente (ausente na linha do próprio cliente). */
+  id?: string;
   name: string;
   instagram: string;
   isClient: boolean;
@@ -105,6 +107,7 @@ export const competitorService = {
     };
 
     const competitorRows: CompetitorBenchmarkRow[] = approved.map(c => ({
+      id: c.id,
       name: c.name,
       instagram: c.instagram,
       isClient: false,

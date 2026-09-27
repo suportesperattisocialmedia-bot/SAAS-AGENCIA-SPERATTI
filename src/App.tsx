@@ -41,6 +41,7 @@ import { ProfileDiagnosticResponseSchema } from './schemas/aiSchemas';
 // Layout & Common Components
 import { Sidebar, MainNavSection } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { ClientsView } from './components/clients/ClientsView';
 import { GlobalSearchModal, type CommandAction } from './components/layout/GlobalSearchModal';
 import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked } from 'lucide-react';
 import { backupStats, downloadBackup } from './services/backupService';
@@ -601,6 +602,20 @@ export default function App() {
     reloadAllData();
   };
 
+  const handleDuplicateClient = (client: Client) => {
+    // Novo id: a cópia não pode compartilhar identidade (nem conexão) com o original.
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = client;
+    const dup = storageService.clients.create({
+      ...rest,
+      name: `${client.name} (Cópia)`,
+      instagram: `${client.instagram}_copy`,
+      healthStatus: 'not_connected'
+    });
+    registerOnServer(dup);
+    notificationService.showToast(`Cliente duplicado como "${dup.name}".`, 'info');
+    reloadAllData();
+  };
+
   const handleDeleteClient = (client: Client) => {
     if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Todos os dados associados serão removidos.`)) {
       storageService.clients.delete(client.id);
@@ -940,6 +955,28 @@ export default function App() {
                   </motion.div>
                   </Suspense>
                 </div>
+              ) : currentSection === 'clients' ? (
+                <ClientsView
+                  clients={clients}
+                  snapshots={storageService.history.getAll()}
+                  contents={storageService.contents.getAll()}
+                  onOpenWorkspace={(client) => {
+                    setActiveClient(client);
+                    loadClientData(client);
+                    setCurrentSection('performance');
+                    setWorkspaceTab('overview');
+                  }}
+                  onOpenNewClient={() => {
+                    setEditingClient(null);
+                    setClientFormModalOpen(true);
+                  }}
+                  onEditClient={(client) => {
+                    setEditingClient(client);
+                    setClientFormModalOpen(true);
+                  }}
+                  onDuplicateClient={handleDuplicateClient}
+                  onDeleteClient={handleDeleteClient}
+                />
               ) : (
                 /* Agency Dashboard / All Clients */
                 <AgencyDashboardView
@@ -975,19 +1012,7 @@ export default function App() {
                     setEditingClient(client);
                     setClientFormModalOpen(true);
                   }}
-                  onDuplicateClient={(client) => {
-                    // Novo id: a cópia não pode compartilhar identidade (nem conexão) com o original.
-                    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = client;
-                    const dup = storageService.clients.create({
-                      ...rest,
-                      name: `${client.name} (Cópia)`,
-                      instagram: `${client.instagram}_copy`,
-                      healthStatus: 'not_connected'
-                    });
-                    registerOnServer(dup);
-                    notificationService.showToast(`Cliente duplicado como "${dup.name}".`, 'info');
-                    reloadAllData();
-                  }}
+                  onDuplicateClient={handleDuplicateClient}
                   onDeleteClient={handleDeleteClient}
                   onOpenAlerts={() => setAlertsModalOpen(true)}
                   onSeedDemoData={() => {

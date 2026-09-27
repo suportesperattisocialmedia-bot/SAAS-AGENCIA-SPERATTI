@@ -56,3 +56,9 @@ export function formatCompact(value: Metric | undefined, fallback = NOT_AVAILABL
   if (!isMetric(value)) return fallback;
   return new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
+
+/** Variação percentual com sinal, no formato brasileiro: "+75,3%" / "-2%". */
+export function signedPct(value: number | null | undefined): string | null {
+  if (value === null || value === undefined || Number.isNaN(value)) return null;
+  return `${value >= 0 ? '+' : ''}${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+}

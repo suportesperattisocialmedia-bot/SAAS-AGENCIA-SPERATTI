@@ -12,7 +12,9 @@ import {
   Plus,
   ExternalLink,
   Sparkles,
-  TrendingUp} from 'lucide-react';
+  TrendingUp,
+  Trash2
+} from 'lucide-react';
 import { formatMetric } from '../../utils/metrics';
 
 interface CompetitorTabProps {
@@ -61,12 +63,23 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
   });
   const patternInsights = competitorService.detectCompetitorPatterns(approvedCompetitors);
 
+  const handleRemoveCompetitor = (id: string) => {
+    const comp = storageService.competitors.getAll().find((c) => c.id === id);
+    if (!comp) return;
+    storageService.competitors.delete(id);
+    onRefresh();
+    notificationService.undoable(`"${comp.name}" removido dos concorrentes.`, () => {
+      storageService.competitors.create(comp);
+      onRefresh();
+    });
+  };
+
   const handleDiscover = async () => {
     setIsSearching(true);
     try {
       const result = await competitorService.discoverCandidates(client);
       if (!result.configured) {
-        notificationService.showToast(result.message || 'Pesquisa externa não configurada.', 'info');
+        notificationService.showToast('A busca automática precisa da chave SERPAPI_KEY na Vercel. Enquanto isso, cadastre em "Adicionar Concorrente".', 'info');
       } else {
         notificationService.addNotification(
           'Busca de concorrentes concluída',
@@ -270,6 +283,7 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                 <th className="pb-3 font-semibold text-right">Engajamento</th>
                 <th className="pb-3 font-semibold">Formatos Chave</th>
                 <th className="pb-3 font-semibold">Temas Recentes</th>
+                <th className="pb-3"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.05] text-neutral-300">
@@ -314,6 +328,19 @@ export const CompetitorTab: React.FC<CompetitorTabProps> = ({
                   </td>
                   <td className="py-3 text-neutral-400 text-[11px]">
                     {row.mainThemes.join(', ')}
+                  </td>
+                  <td className="py-3 text-right">
+                    {row.id && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCompetitor(row.id as string)}
+                        aria-label={`Excluir ${row.name}`}
+                        title="Excluir concorrente"
+                        className="grid h-7 w-7 place-items-center rounded-full text-neutral-500 hover:bg-rose-500/10 hover:text-rose-300"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
