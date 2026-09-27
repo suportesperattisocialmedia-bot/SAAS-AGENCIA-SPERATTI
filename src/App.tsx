@@ -552,6 +552,10 @@ export default function App() {
   // Profile Analysis handler
   // IA manual: abre o modal com o prompt completo do cliente.
   /** Ações da paleta de comandos (Ctrl+K). */
+  // Selo de vencidas no menu acompanha qualquer gravação no financeiro.
+  const [, setFinanceTick] = useState(0);
+  useEffect(() => onStorageWrite((key) => key.startsWith('gs_fin_') && setFinanceTick((n) => n + 1)), []);
+
   // Administração só para dono/administrador logado, fora do modo demonstração.
   const adminAvailable = Boolean(sessionUser && (sessionUser.role === 'owner' || sessionUser.role === 'admin') && !isDemoLoaded);
   const inAdmin = adminAvailable && appMode === 'admin';

@@ -51,6 +51,13 @@ describe.skipIf(!dbAvailable)('workspace sync', () => {
     expect(bDocs.data.documents).toEqual([]);
   });
 
+  it('aceita as coleções do financeiro', async () => {
+    const { cookie } = await createTenant('A');
+    for (const key of ['gs_fin_contracts', 'gs_fin_invoices', 'gs_fin_projects', 'gs_fin_expenses']) {
+      expect((await put(cookie, { key, baseVersion: 0, data: [{ id: `${key}-1` }] })).status).toBe(200);
+    }
+  });
+
   it('aceita coleções grandes (acima de 256KB) até o limite próprio', async () => {
     const { cookie } = await createTenant('A');
     const data = Array.from({ length: 3000 }, (_, i) => ({ id: `c${i}`, title: 'x'.repeat(150) }));
