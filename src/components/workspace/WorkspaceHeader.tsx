@@ -124,6 +124,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-neutral-100">{client.name}</h1>
+                {client.isOwnProfile && <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-neutral-950">Meu perfil</span>}
                 <span className="text-xs tabular-nums text-amber-400 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded-full">
                   {client.instagram}
                 </span>

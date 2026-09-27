@@ -15,8 +15,10 @@ export const ApprovalLinkModal: React.FC<{
   clients: Client[];
   tasks: DeliveryTask[];
   initialClientId?: string;
-}> = ({ open, onClose, clients, tasks, initialClientId }) => {
-  const [clientId, setClientId] = useState(initialClientId || clients[0]?.id || '');
+}> = ({ open, onClose, clients: allClients, tasks, initialClientId }) => {
+  // Perfil próprio não tem aprovação de cliente.
+  const clients = allClients.filter((c) => !c.isOwnProfile);
+  const [clientId, setClientId] = useState((initialClientId && clients.some((c) => c.id === initialClientId) ? initialClientId : clients[0]?.id) || '');
   const [link, setLink] = useState<ApprovalLink | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

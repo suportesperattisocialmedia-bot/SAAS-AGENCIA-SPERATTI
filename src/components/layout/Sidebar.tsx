@@ -19,7 +19,8 @@ import {
   FileSignature,
   KanbanSquare,
   Wallet,
-  Briefcase
+  Briefcase,
+  Star
 } from 'lucide-react';
 import type { AdminSection } from '../admin/AdminOverview';
 import { Client } from '../../types';
@@ -57,6 +58,10 @@ interface SidebarProps {
   adminSection?: AdminSection;
   onAdminNavigate?: (section: AdminSection) => void;
   overdueCount?: number;
+  /** Perfil próprio (marca pessoal) e ação para abrir/configurar. */
+  ownProfile?: Client | null;
+  onOpenOwnProfile?: () => void;
+  ownProfileActive?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -77,13 +82,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onModeChange,
   adminSection = 'overview',
   onAdminNavigate,
-  overdueCount = 0
+  overdueCount = 0,
+  ownProfile = null,
+  onOpenOwnProfile,
+  ownProfileActive = false
 }) => {
+  const clientCount = clients.filter((c) => !c.isOwnProfile).length;
   const admin = appMode === 'admin';
   const reduce = useReducedMotion();
   const navItems: Array<{ id: MainNavSection; label: string; icon: React.ReactNode; badge?: number }> = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
-    { id: 'clients', label: 'Clientes', icon: <Users className="w-4 h-4" />, badge: clients.length },
+    { id: 'clients', label: 'Clientes', icon: <Users className="w-4 h-4" />, badge: clientCount },
     { id: 'performance', label: 'Performance', icon: <TrendingUp className="w-4 h-4" /> },
     { id: 'competitors', label: 'Concorrentes', icon: <Swords className="w-4 h-4" /> },
     { id: 'research', label: 'Pesquisa', icon: <Search className="w-4 h-4" /> },
@@ -137,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {admin ? null : activeClient ? (
             <div className="mt-4 p-2.5 bg-[#161618] border border-white/[0.06] rounded-[24px] flex items-center justify-between">
               <div className="min-w-0 pr-2">
-                <div className="text-[11px] text-neutral-400">Workspace Ativo</div>
+                <div className="text-[11px] text-neutral-400">{activeClient.isOwnProfile ? 'Meu perfil' : 'Workspace Ativo'}</div>
                 <div className="text-xs font-semibold text-neutral-200 truncate">{activeClient.name}</div>
                 <div className="text-[11px] tabular-nums text-amber-400/80 truncate">{activeClient.instagram}</div>
               </div>
@@ -152,7 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <div className="mt-4 px-2.5 py-1.5 bg-[#161618] border border-white/[0.05] rounded-[24px] flex items-center justify-between text-[11px] text-neutral-400 tabular-nums">
               <span>Visão Consolidada</span>
-              <span className="text-neutral-500">{clients.length} clientes</span>
+              <span className="text-neutral-500">{clientCount} clientes</span>
             </div>
           )}
         </div>
@@ -182,6 +191,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {!admin && onOpenOwnProfile && (
+          <div className="px-3 pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                onOpenOwnProfile();
+                onCloseMobile();
+              }}
+              aria-current={ownProfileActive ? 'page' : undefined}
+              className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-colors ${
+                ownProfileActive ? 'border-amber-500/40 bg-amber-500/10' : 'border-white/[0.06] bg-[#161618] hover:border-white/[0.14]'
+              }`}
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-500 text-neutral-950">
+                <Star className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0">
+                <span className={`block text-xs font-semibold ${ownProfileActive ? 'text-amber-300' : 'text-neutral-100'}`}>Meu perfil</span>
+                <span className="block truncate text-[11px] text-neutral-500">{ownProfile ? ownProfile.instagram : 'Configurar minha marca pessoal'}</span>
+              </span>
+            </button>
           </div>
         )}
 
@@ -236,7 +269,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ) : (
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
           {navItems.map(item => {
-            const isActive = currentSection === item.id;
+            // No Meu perfil só o atalho próprio fica destacado.
+            const isActive = !ownProfileActive && currentSection === item.id;
             return (
               <button
                 key={item.id}

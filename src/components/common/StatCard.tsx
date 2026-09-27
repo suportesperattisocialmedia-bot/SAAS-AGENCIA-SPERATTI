@@ -1,3 +1,4 @@
+import { signedPct } from '../../utils/metrics';
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { DemoProvider } from '../../services/demo/DemoProvider';
@@ -74,7 +75,7 @@ export const StatCard: React.FC<StatCardProps> = ({
             {isNegative && <ArrowDownRight className={`w-3.5 h-3.5 ${isBad ? 'text-rose-400' : 'text-emerald-400'}`} />}
             {isNeutral && <Minus className="w-3.5 h-3.5 text-neutral-500" />}
             <span className={isGood ? 'text-emerald-400 font-semibold' : isBad ? 'text-rose-400 font-semibold' : 'text-neutral-400'}>
-              {diffPercent > 0 ? `+${diffPercent}%` : `${diffPercent}%`}
+              {signedPct(diffPercent)}
             </span>
             <span className="text-neutral-500 ml-1 hidden sm:inline">vs anterior</span>
           </div>

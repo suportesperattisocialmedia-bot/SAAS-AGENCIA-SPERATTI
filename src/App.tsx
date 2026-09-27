@@ -43,7 +43,7 @@ import { Sidebar, MainNavSection } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { ClientsView } from './components/clients/ClientsView';
 import { GlobalSearchModal, type CommandAction } from './components/layout/GlobalSearchModal';
-import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked, Scale, Receipt, FileSignature, KanbanSquare, Wallet } from 'lucide-react';
+import { Star, ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked, Scale, Receipt, FileSignature, KanbanSquare, Wallet } from 'lucide-react';
 import { AdminView, type AdminSection } from './components/admin/AdminView';
 import { invoiceState, todayBR } from './services/finance';
 import { backupStats, downloadBackup } from './services/backupService';
@@ -121,6 +121,7 @@ export default function App() {
   // Modal Controls
   const [clientFormModalOpen, setClientFormModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [ownProfileForm, setOwnProfileForm] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [dashboardKey, setDashboardKey] = useState(0);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
@@ -339,6 +340,7 @@ export default function App() {
             persona: p.persona ?? '',
             averageTicket: p.averageTicket ?? '',
             monthlyDeliverables: typeof p.monthlyDeliverables === 'number' ? p.monthlyDeliverables : undefined,
+            isOwnProfile: p.isOwnProfile === true || undefined,
             products: '',
             services: '',
             objectives: p.objectives ?? [],
@@ -556,6 +558,23 @@ export default function App() {
   const [, setFinanceTick] = useState(0);
   useEffect(() => onStorageWrite((key) => key.startsWith('gs_fin_') && setFinanceTick((n) => n + 1)), []);
 
+  // Perfil próprio (marca pessoal): mesmo workspace dos clientes, fora da carteira e do financeiro.
+  const ownProfile = clients.find((c) => c.isOwnProfile) ?? null;
+  const clientList = clients.filter((c) => !c.isOwnProfile);
+  const openOwnProfile = () => {
+    setAppMode('agency');
+    if (ownProfile) {
+      setActiveClient(ownProfile);
+      loadClientData(ownProfile);
+      setCurrentSection('performance');
+      setWorkspaceTab('overview');
+    } else {
+      setEditingClient(null);
+      setOwnProfileForm(true);
+      setClientFormModalOpen(true);
+    }
+  };
+
   // Administração só para dono/administrador logado, fora do modo demonstração.
   const adminAvailable = Boolean(sessionUser && (sessionUser.role === 'owner' || sessionUser.role === 'admin') && !isDemoLoaded);
   const inAdmin = adminAvailable && appMode === 'admin';
@@ -583,6 +602,7 @@ export default function App() {
             { id: 'admin-expenses', label: 'Despesas', keywords: 'despesa custo gasto pagar', icon: Wallet, run: () => setAdminSection('expenses') }
           ]
         : []),
+      { id: 'own-profile', label: ownProfile ? 'Meu perfil' : 'Configurar meu perfil', hint: 'Sua marca pessoal no Instagram', keywords: 'meu perfil marca pessoal eu proprio', icon: Star, run: openOwnProfile },
       { id: 'new-task', label: 'Nova tarefa', hint: 'Criar entrega no CRM', keywords: 'tarefa crm entrega', icon: ListChecks, run: () => { goDashboard('tasks'); setDashboardAction('newTask'); } },
       { id: 'pilot', label: 'Piloto da semana', hint: 'Planejar a próxima semana de um cliente', keywords: 'planejar semana ia prompt', icon: Rocket, run: () => { goDashboard('summary'); setDashboardAction('pilot'); } },
       { id: 'tasks', label: 'Abrir minhas tarefas', keywords: 'crm quadro kanban', icon: ListChecks, run: () => goDashboard('tasks') },
@@ -674,11 +694,18 @@ export default function App() {
     } else {
       const created = storageService.clients.create(data);
       registerOnServer(created);
-      notificationStore.notify(
-        'Novo Cliente Cadastrado',
-        `Workspace criado para ${created.name} (${created.instagram}).`,
-        'success'
-      );
+      if (created.isOwnProfile) {
+        notificationService.showToast('Seu perfil foi criado. Importe suas métricas na aba Métricas.', 'success');
+        setAppMode('agency');
+        setCurrentSection('performance');
+        setWorkspaceTab('overview');
+      } else {
+        notificationStore.notify(
+          'Novo Cliente Cadastrado',
+          `Workspace criado para ${created.name} (${created.instagram}).`,
+          'success'
+        );
+      }
       setActiveClient(created);
       loadClientData(created);
     }
@@ -846,6 +873,9 @@ export default function App() {
           adminSection={adminSection}
           onAdminNavigate={setAdminSection}
           overdueCount={overdueCount}
+          ownProfile={isDemoLoaded ? null : ownProfile}
+          onOpenOwnProfile={isDemoLoaded ? undefined : openOwnProfile}
+          ownProfileActive={!inAdmin && !!activeClient?.isOwnProfile && currentSection !== 'dashboard' && currentSection !== 'clients'}
         />
 
         {/* Main App Container */}
@@ -877,7 +907,7 @@ export default function App() {
                 <AdminView
                   section={adminSection}
                   onNavigate={setAdminSection}
-                  clients={clients}
+                  clients={clientList}
                   agencyName={storageService.settings.get().agencyName || sessionUser?.agencyName || 'Gabriel Speratti | Social Intelligence'}
                 />
               ) : !activeClient && SECTION_TO_TAB[currentSection] ? (
@@ -1057,7 +1087,7 @@ export default function App() {
                 </div>
               ) : currentSection === 'clients' ? (
                 <ClientsView
-                  clients={clients}
+                  clients={clientList}
                   snapshots={storageService.history.getAll()}
                   contents={storageService.contents.getAll()}
                   onOpenWorkspace={(client) => {
@@ -1133,9 +1163,15 @@ export default function App() {
         onClose={() => {
           setClientFormModalOpen(false);
           setEditingClient(null);
+          setOwnProfileForm(false);
         }}
-        onSave={handleSaveClient}
+        onSave={(data) => {
+          handleSaveClient(ownProfileForm ? { ...data, isOwnProfile: true } : data);
+          setOwnProfileForm(false);
+        }}
         initialData={editingClient}
+        ownProfile={ownProfileForm}
+        presetName={sessionUser?.name ?? ''}
       />
 
       <GlobalSearchModal

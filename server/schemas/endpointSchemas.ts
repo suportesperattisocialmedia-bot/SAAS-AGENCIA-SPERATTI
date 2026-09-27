@@ -23,6 +23,7 @@ export const ClientProfileSchema = z.object({
   persona: shortText(1000).optional().default(''),
   averageTicket: shortText(80).optional().default(''),
   monthlyDeliverables: z.number().int().min(1).max(300).optional(),
+  isOwnProfile: z.boolean().optional(),
   pillars: z.array(shortText(120)).max(20).optional().default([]),
   objectives: z.array(shortText(160)).max(20).optional().default([]),
   formats: z.array(shortText(40)).max(10).optional().default([]),

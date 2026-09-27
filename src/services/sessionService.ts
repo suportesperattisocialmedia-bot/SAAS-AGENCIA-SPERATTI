@@ -81,6 +81,7 @@ export function clientProfile(client: Client) {
     persona: client.persona,
     averageTicket: client.averageTicket,
     monthlyDeliverables: client.monthlyDeliverables,
+    isOwnProfile: client.isOwnProfile || undefined,
     pillars: client.pillars,
     objectives: client.objectives,
     formats: client.formats,
