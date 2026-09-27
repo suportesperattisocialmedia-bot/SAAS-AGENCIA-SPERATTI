@@ -602,10 +602,10 @@ export default function App() {
             { id: 'admin-expenses', label: 'Despesas', keywords: 'despesa custo gasto pagar', icon: Wallet, run: () => setAdminSection('expenses') }
           ]
         : []),
-      { id: 'own-profile', label: ownProfile ? 'Meu perfil' : 'Configurar meu perfil', hint: 'Sua marca pessoal no Instagram', keywords: 'meu perfil marca pessoal eu proprio', icon: Star, run: openOwnProfile },
       { id: 'new-task', label: 'Nova tarefa', hint: 'Criar entrega no CRM', keywords: 'tarefa crm entrega', icon: ListChecks, run: () => { goDashboard('tasks'); setDashboardAction('newTask'); } },
       { id: 'pilot', label: 'Piloto da semana', hint: 'Planejar a próxima semana de um cliente', keywords: 'planejar semana ia prompt', icon: Rocket, run: () => { goDashboard('summary'); setDashboardAction('pilot'); } },
       { id: 'tasks', label: 'Abrir minhas tarefas', keywords: 'crm quadro kanban', icon: ListChecks, run: () => goDashboard('tasks') },
+      { id: 'own-profile', label: ownProfile ? 'Meu perfil' : 'Configurar meu perfil', hint: 'Sua marca pessoal no Instagram', keywords: 'meu perfil marca pessoal eu proprio', icon: Star, run: openOwnProfile },
       { id: 'new-client', label: 'Novo cliente', keywords: 'cadastrar cliente', icon: UserPlus, run: () => { setEditingClient(null); setClientFormModalOpen(true); } },
       {
         id: 'backup',
