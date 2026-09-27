@@ -180,7 +180,6 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
   const reachPrev = sumOf((p) => p.totalReach.previous);
   const posts = sumOf((p) => p.postsPublished.current) ?? 0;
   const postsPrev = sumOf((p) => p.postsPublished.previous);
-  const followers = sumOf((p) => p.followersGrowth.current);
   const weightedEngagement = (key: 'current' | 'previous') => {
     const list = periods.filter((p) => isMetric(p.avgEngagementRate[key]) && isMetric(p.totalReach[key]) && (p.totalReach[key] ?? 0) > 0);
     const base = list.reduce((acc, p) => acc + (p.totalReach[key] ?? 0), 0);
@@ -402,7 +401,10 @@ export const AgencyDashboardView: React.FC<AgencyDashboardViewProps> = ({
                 value: plannedThisWeek,
                 unit: plannedThisWeek === 1 ? 'post planejado' : 'posts planejados',
                 icon: FileText,
-                text: followers !== null ? <>Base somada de <span className="text-neutral-200">{formatMetric(followers)}</span> seguidores.</> : 'Registre os seguidores na aba Métricas.'
+                text:
+                  plannedThisWeek > 0
+                    ? `No calendário desta semana${scope === 'all' ? ', somando todos os clientes' : ''}.`
+                    : 'Nada agendado nesta semana. O Piloto da semana monta o plano.'
               }}
               onCenter={() => setMode('tasks')}
               centerLabel="Abrir minhas tarefas"

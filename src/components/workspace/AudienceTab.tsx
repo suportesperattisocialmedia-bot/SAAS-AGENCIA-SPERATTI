@@ -46,7 +46,7 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
       const category = selectedCategory === 'all' ? 'Dores' : (selectedCategory as AudienceInsightCategory);
       const result = await researchService.runAudienceDiscovery(client, category);
       if (!result.configured) {
-        notificationService.showToast(result.message || 'Pesquisa externa não configurada.', 'info');
+        notificationService.showToast('A busca automática precisa da chave SERPAPI_KEY na Vercel. Enquanto isso, registre o que você observa em "Novo Insight".', 'info');
       } else if (!result.success) {
         notificationService.showToast(result.message || 'Falha na pesquisa externa.', 'error');
       } else {
@@ -162,6 +162,15 @@ export const AudienceTab: React.FC<AudienceTabProps> = ({
           );
         })}
       </div>
+
+      {filteredInsights.length === 0 && (
+        <div className="rounded-[24px] border border-dashed border-white/[0.08] bg-[#161618] px-6 py-10 text-center">
+          <p className="text-sm text-neutral-200">{insights.length === 0 ? 'Nenhum insight registrado ainda.' : 'Nada nesta categoria.'}</p>
+          <p className="mx-auto mt-1 max-w-[56ch] text-xs text-neutral-500">
+            Registre dores, desejos, objeções e dúvidas que aparecem nos comentários, no direct e nas reuniões com o cliente. Eles alimentam as ideias e a análise.
+          </p>
+        </div>
+      )}
 
       {/* Insights Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

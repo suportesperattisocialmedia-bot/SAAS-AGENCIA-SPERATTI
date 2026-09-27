@@ -52,6 +52,26 @@ O token é guardado só como hash (busca) e criptografado (para copiar de novo);
 
 Código: `api/portal.ts`, `server/services/portalService.ts`, `src/components/portal/`, `src/components/tasks/ApprovalLinkModal.tsx`.
 
+## Administração (financeiro)
+
+Alternância **Agência | Administração** no topo do menu (dono ou administrador, fora do modo demonstração). O sistema lembra o modo em que você parou.
+
+- **Visão geral**: recebido no mês (pela data do pagamento), a receber, vencido, receita recorrente (MRR), despesas pagas e resultado; últimos 12 meses; próximos vencimentos; entregas do mês x pacote e faturamento por cliente; receita por cliente; contas a receber por atraso; previsão de 3 meses; projetos por etapa; **fechamento do mês** em CSV.
+- **Cobranças**: número sequencial (#0001), itens com quantidade, desconto, emissão, vencimento, forma de pagamento e nº da nota fiscal (quando emitida à parte). Registrar pagamento (data, valor, forma), cancelar/reabrir, excluir com desfazer, **recibo/cobrança em PDF**, CSV com filtros. "Vencida" é calculado pela data.
+- **Contratos**: recorrentes (valor mensal e dia do vencimento) ou avulsos. As mensalidades do mês são geradas com um clique, sem duplicar.
+- **Projetos**: etapas Proposta → Aprovado → Em produção → Revisão → Entregue → Faturado → Recebido. "Faturar" cria a cobrança; o pagamento move o projeto para Recebido.
+- **Despesas**: por mês e categoria, pagas e a pagar, recorrentes (lançar as do mês anterior), CSV.
+
+Valores em centavos (sem erro de arredondamento), validados, sincronizados na nuvem e incluídos no backup. Excluir um cliente **não** apaga o histórico financeiro.
+Os recibos são documentos internos de controle: o sistema **não emite nota fiscal eletrônica**.
+
+Código: `src/services/finance.ts` (regras, com testes), `src/components/admin/`, `src/services/receiptPdf.ts`.
+
+## Aplicativo (abrir ao ligar o computador)
+
+O site é instalável (Chrome/Edge): Configurações → **Instalar aplicativo**, ou o ícone de instalar na barra de endereço. Clique com o botão direito no ícone do app para os atalhos Financeiro, Cobranças e Minhas tarefas.
+Para abrir junto com o Windows: `Windows + R` → `shell:startup` → cole ali o atalho do aplicativo.
+
 ## Calendário e Biblioteca
 
 - **Calendário** com datas reais: visão Mês (agenda em lista no celular) e Semana, arrastar para reagendar, clicar num dia para agendar, formulário para mudar a data pelo teclado. Itens antigos sem data ficam numa bandeja. O Piloto da Semana e o Banco de Ideias já agendam com data.

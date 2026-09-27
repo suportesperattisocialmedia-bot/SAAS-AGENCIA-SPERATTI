@@ -1,12 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { backupStats, daysSinceBackup, downloadBackup, parseBackup, restoreBackup } from '../../services/backupService';
 import { AppSettings } from '../../types';
 import { storageService } from '../../services/storageService';
 import { notificationService } from '../../services/notificationService';
 import { Modal } from '../common/Modal';
+import { sessionService, type BackendStatus } from '../../services/sessionService';
+import { syncService } from '../../services/sync/syncService';
+import { installPrompt } from '../../services/installPrompt';
 import {
   CheckCircle2,
+  CircleAlert,
+  CircleDashed,
   Download,
+  MonitorDown,
   Upload
 } from 'lucide-react';
 
@@ -101,39 +107,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        {/* Integrações & Arquitetura */}
+        {/* Integrações: estado real lido do servidor */}
         <div className="space-y-3">
           <div className="text-[11px] text-amber-400 font-semibold border-b border-white/[0.06] pb-1">
-            02. Status das Integrações
+            02. Status das integrações
           </div>
+          <IntegrationStatus />
+        </div>
 
-          <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-neutral-300 font-medium">Motor de Inteligência Artificial</span>
-              <span className="flex items-center gap-1 text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Servidor Ativo (Gemini 3.8 Flash)
-              </span>
-            </div>
-            <div className="text-[11px] text-neutral-500 font-sans">
-              Proxy server-side com schemas estruturados e fallback analítico especialista.
-            </div>
+        {/* Aplicativo */}
+        <div className="space-y-3">
+          <div className="text-[11px] text-amber-400 font-semibold border-b border-white/[0.06] pb-1">
+            03. Aplicativo e abrir ao ligar o computador
           </div>
-
-          <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-neutral-300 font-medium">Persistência de Dados</span>
-              <span className="text-amber-400">Repository Layer (LocalStorage / Supabase Ready)</span>
-            </div>
-            <div className="text-[11px] text-neutral-500 font-sans">
-              Desacoplada para permitir migração instantânea para Cloud SQL / PostgreSQL sem refatorar componentes.
-            </div>
-          </div>
+          <AppInstallSection />
         </div>
 
         {/* Gerenciamento de Dados & Demo */}
         <div className="space-y-3">
           <div className="text-[11px] text-amber-400 font-semibold border-b border-white/[0.06] pb-1">
-            03. Dados de Demonstração e Reset
+            04. Dados de Demonstração e Reset
           </div>
 
           <div className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
@@ -167,11 +160,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Backup */}
         <div className="space-y-3">
           <div className="text-[11px] text-amber-400 font-semibold border-b border-white/[0.06] pb-1">
-            04. Backup dos dados
+            05. Backup dos dados
           </div>
           <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
-            Posts importados, métricas, ideias, calendário, tarefas, diagnósticos e relatórios ficam salvos neste navegador.
-            Baixe um backup toda semana para não perder nada se o navegador for limpo ou se trocar de computador.
+            Com login, tudo (posts, métricas, ideias, calendário, tarefas, biblioteca, financeiro) fica salvo neste navegador e na nuvem.
+            O backup é uma cópia extra em arquivo, para guardar fora do sistema.
           </p>
           <div className="flex flex-wrap items-center gap-2 font-sans">
             <button
@@ -214,5 +207,86 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       </form>
     </Modal>
+  );
+};
+
+const Row: React.FC<{ label: string; ok: boolean | null; value: string; hint?: string }> = ({ label, ok, value, hint }) => (
+  <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-neutral-300 font-medium">{label}</span>
+      <span className={`flex items-center gap-1 text-right ${ok === true ? 'text-emerald-400' : ok === false ? 'text-amber-300' : 'text-neutral-400'}`}>
+        {ok === true ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : ok === false ? <CircleAlert className="w-3.5 h-3.5 shrink-0" /> : <CircleDashed className="w-3.5 h-3.5 shrink-0" />}
+        {value}
+      </span>
+    </div>
+    {hint && <div className="mt-1 text-[11px] text-neutral-500 font-sans">{hint}</div>}
+  </div>
+);
+
+/** Estado real das integrações (servidor + sincronização), sem nada inventado. */
+const IntegrationStatus: React.FC = () => {
+  const [status, setStatus] = useState<BackendStatus | null | undefined>(undefined);
+  const sync = syncService.getStatus();
+  useEffect(() => {
+    let alive = true;
+    sessionService.getStatus().then((st) => alive && setStatus(st));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (status === undefined) return <p className="text-[11px] text-neutral-500">Verificando o servidor...</p>;
+  if (status === null) return <Row label="Servidor" ok={false} value="Sem resposta" hint="Verifique a conexão. Os dados continuam salvos neste navegador." />;
+  const i = status.integrations;
+  const syncLabel = { saved: 'Salvo', syncing: 'Sincronizando', pending: 'Salvando', offline: 'Offline', error: 'Erro', disabled: 'Desligada' }[sync.state];
+  return (
+    <div className="space-y-2">
+      <Row label="Banco de dados" ok={i.database.reachable === true} value={i.database.reachable ? 'Conectado' : i.database.configured ? 'Sem conexão' : 'Não configurado'} />
+      <Row
+        label="Sincronização na nuvem"
+        ok={sync.state === 'saved' ? true : sync.state === 'disabled' || sync.state === 'error' ? false : null}
+        value={syncLabel}
+        hint={sync.state === 'disabled' ? 'Ativa quando você entra com login (fora da demonstração).' : sync.message ?? undefined}
+      />
+      <Row label="Instagram (API oficial)" ok={i.instagram.configured} value={i.instagram.configured ? 'Configurada' : 'Não configurada'} hint={i.instagram.configured ? undefined : 'As métricas vêm do CSV do Meta Business Suite (aba Métricas).'} />
+      <Row label="Inteligência artificial" ok={null} value={i.gemini.configured ? `Gemini configurado (${i.gemini.model ?? 'modelo padrão'})` : 'Fluxo manual'} hint="Diagnóstico, ideias e piloto usam o prompt para copiar e colar na IA de sua preferência." />
+      <Row label="Pesquisa externa" ok={i.research.configured} value={i.research.configured ? 'Configurada' : 'Não configurada'} hint={i.research.configured ? undefined : 'Opcional (SERPAPI_KEY). Sem ela, cadastre concorrentes e insights manualmente.'} />
+    </div>
+  );
+};
+
+/** Instalar como aplicativo e abrir junto com o Windows. */
+const AppInstallSection: React.FC = () => {
+  const [, force] = useState(0);
+  useEffect(() => installPrompt.subscribe(() => force((n) => n + 1)), []);
+  const installed = installPrompt.isInstalled();
+  return (
+    <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl space-y-3 font-sans">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-neutral-200 font-medium text-xs">
+          {installed ? 'Aberto como aplicativo instalado.' : 'Instale para abrir em janela própria, com ícone na barra de tarefas.'}
+        </span>
+        {installPrompt.canInstall() && (
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await installPrompt.install();
+              notificationService.showToast(ok ? 'Aplicativo instalado.' : 'Instalação cancelada.', ok ? 'success' : 'info');
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-neutral-950 hover:bg-amber-400"
+          >
+            <MonitorDown className="h-3.5 w-3.5" /> Instalar aplicativo
+          </button>
+        )}
+      </div>
+      {!installed && !installPrompt.canInstall() && (
+        <p className="text-[11px] text-neutral-500">No Chrome ou no Edge, use o ícone de instalar na barra de endereço (ou menu ⋮ → Transmitir, salvar e compartilhar → Instalar página como app).</p>
+      )}
+      <ol className="list-decimal space-y-1 pl-4 text-[11px] text-neutral-400">
+        <li>Depois de instalar, aperte <kbd className="rounded bg-white/[0.08] px-1">Windows + R</kbd>, digite <code className="rounded bg-white/[0.08] px-1">shell:startup</code> e confirme.</li>
+        <li>Na pasta que abrir, cole o atalho do aplicativo (copie o ícone "Speratti" da área de trabalho ou do menu Iniciar).</li>
+        <li>Pronto: ao ligar o computador o sistema abre sozinho, no modo em que você parou (Agência ou Administração).</li>
+        <li>No Edge também dá para marcar "Iniciar automaticamente ao entrar no dispositivo" em edge://apps.</li>
+      </ol>
+    </div>
   );
 };

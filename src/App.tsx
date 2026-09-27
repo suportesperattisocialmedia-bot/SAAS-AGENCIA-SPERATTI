@@ -41,8 +41,11 @@ import { ProfileDiagnosticResponseSchema } from './schemas/aiSchemas';
 // Layout & Common Components
 import { Sidebar, MainNavSection } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { ClientsView } from './components/clients/ClientsView';
 import { GlobalSearchModal, type CommandAction } from './components/layout/GlobalSearchModal';
-import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked } from 'lucide-react';
+import { ListChecks, Rocket, UserPlus, HardDriveDownload, Upload, Sparkles, FileText, BookMarked, Scale, Receipt, FileSignature, KanbanSquare, Wallet } from 'lucide-react';
+import { AdminView, type AdminSection } from './components/admin/AdminView';
+import { invoiceState, todayBR } from './services/finance';
 import { backupStats, downloadBackup } from './services/backupService';
 import { BootLoader } from './components/common/BootLoader';
 import { DemoBanner } from './components/common/DemoBanner';
@@ -123,6 +126,40 @@ export default function App() {
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const [dashboardAction, setDashboardAction] = useState<'pilot' | 'newTask' | null>(null);
+
+  // Modo Administração (financeiro). Lembrado entre aberturas: quem liga o computador cai onde parou.
+  const [appMode, setAppModeState] = useState<'agency' | 'admin'>(() => {
+    try {
+      return localStorage.getItem('gs_app_mode') === 'admin' ? 'admin' : 'agency';
+    } catch {
+      return 'agency';
+    }
+  });
+  const [adminSection, setAdminSectionState] = useState<AdminSection>(() => {
+    try {
+      const v = localStorage.getItem('gs_admin_section');
+      return (['overview', 'invoices', 'contracts', 'projects', 'expenses'] as const).includes(v as AdminSection) ? (v as AdminSection) : 'overview';
+    } catch {
+      return 'overview';
+    }
+  });
+  const setAppMode = (m: 'agency' | 'admin') => {
+    setAppModeState(m);
+    try {
+      localStorage.setItem('gs_app_mode', m);
+    } catch {
+      /* preferência opcional */
+    }
+  };
+  const setAdminSection = (s: AdminSection) => {
+    setAdminSectionState(s);
+    setAppMode('admin');
+    try {
+      localStorage.setItem('gs_admin_section', s);
+    } catch {
+      /* preferência opcional */
+    }
+  };
 
   // Sessão expirou no meio do uso: volta ao login com aviso (os dados deste navegador ficam salvos).
   const sessionUserRef = useRef<SessionUser | null>(null);
@@ -446,6 +483,32 @@ export default function App() {
     if (!isBooting && sessionUser && !isDemoLoaded) void handleOAuthReturn();
   }, [isBooting, sessionUser, isDemoLoaded, handleOAuthReturn]);
 
+  // Atalhos do aplicativo instalado (/?abrir=financeiro|cobrancas|tarefas).
+  useEffect(() => {
+    if (isBooting || !sessionUser) return;
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get('abrir');
+    if (!target && !params.has('origem')) return;
+    params.delete('abrir');
+    params.delete('origem');
+    const qs = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    const canAdmin = (sessionUser.role === 'owner' || sessionUser.role === 'admin') && !isDemoLoaded;
+    if (target === 'financeiro' && canAdmin) setAdminSection('overview');
+    else if (target === 'cobrancas' && canAdmin) setAdminSection('invoices');
+    else if (target === 'tarefas') {
+      setAppMode('agency');
+      try {
+        localStorage.setItem('gs_dash_mode', 'tasks');
+      } catch {
+        /* preferência opcional */
+      }
+      setCurrentSection('dashboard');
+      setDashboardKey((k) => k + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBooting, sessionUser, isDemoLoaded]);
+
   useEffect(() => {
     initializeApplication();
   }, [initializeApplication]);
@@ -489,6 +552,15 @@ export default function App() {
   // Profile Analysis handler
   // IA manual: abre o modal com o prompt completo do cliente.
   /** Ações da paleta de comandos (Ctrl+K). */
+  // Selo de vencidas no menu acompanha qualquer gravação no financeiro.
+  const [, setFinanceTick] = useState(0);
+  useEffect(() => onStorageWrite((key) => key.startsWith('gs_fin_') && setFinanceTick((n) => n + 1)), []);
+
+  // Administração só para dono/administrador logado, fora do modo demonstração.
+  const adminAvailable = Boolean(sessionUser && (sessionUser.role === 'owner' || sessionUser.role === 'admin') && !isDemoLoaded);
+  const inAdmin = adminAvailable && appMode === 'admin';
+  const overdueCount = adminAvailable ? storageService.finance.invoices.getAll().filter((i) => invoiceState(i, todayBR()) === 'vencida').length : 0;
+
   const buildCommands = (): CommandAction[] => {
     const goDashboard = (mode?: 'tasks' | 'summary') => {
       if (mode) {
@@ -502,6 +574,15 @@ export default function App() {
       setDashboardKey((k) => k + 1);
     };
     const list: CommandAction[] = [
+      ...(adminAvailable
+        ? [
+            { id: 'admin', label: 'Financeiro: visão geral', hint: 'Modo Administração', keywords: 'administracao financeiro faturamento dinheiro admin', icon: Scale, run: () => setAdminSection('overview') },
+            { id: 'admin-invoices', label: 'Cobranças', hint: 'Recebimentos, vencidos, recibos', keywords: 'cobranca recebimento nota fatura receber pagamento', icon: Receipt, run: () => setAdminSection('invoices') },
+            { id: 'admin-contracts', label: 'Contratos', hint: 'Mensalidades e projetos fechados', keywords: 'contrato mensalidade recorrente mrr', icon: FileSignature, run: () => setAdminSection('contracts') },
+            { id: 'admin-projects', label: 'Projetos (etapas de produção)', keywords: 'projeto producao etapa job faturar', icon: KanbanSquare, run: () => setAdminSection('projects') },
+            { id: 'admin-expenses', label: 'Despesas', keywords: 'despesa custo gasto pagar', icon: Wallet, run: () => setAdminSection('expenses') }
+          ]
+        : []),
       { id: 'new-task', label: 'Nova tarefa', hint: 'Criar entrega no CRM', keywords: 'tarefa crm entrega', icon: ListChecks, run: () => { goDashboard('tasks'); setDashboardAction('newTask'); } },
       { id: 'pilot', label: 'Piloto da semana', hint: 'Planejar a próxima semana de um cliente', keywords: 'planejar semana ia prompt', icon: Rocket, run: () => { goDashboard('summary'); setDashboardAction('pilot'); } },
       { id: 'tasks', label: 'Abrir minhas tarefas', keywords: 'crm quadro kanban', icon: ListChecks, run: () => goDashboard('tasks') },
@@ -531,7 +612,11 @@ export default function App() {
         { id: 'library', label: `Biblioteca de legendas: ${activeClient.name}`, hint: 'Legendas, hashtags, CTAs e ganchos', keywords: 'legenda hashtag cta gancho copiar texto biblioteca', icon: BookMarked, run: () => openTab('library') }
       );
     }
-    return list;
+    // Ações da agência saem do modo Administração. As do modo atual aparecem primeiro.
+    const wrapped = list.map((c) => (c.id.startsWith('admin') ? c : { ...c, run: () => { setAppMode('agency'); c.run(); } }));
+    const adminCmds = wrapped.filter((c) => c.id.startsWith('admin'));
+    const agencyCmds = wrapped.filter((c) => !c.id.startsWith('admin'));
+    return inAdmin ? [...adminCmds, ...agencyCmds] : [...agencyCmds, ...adminCmds];
   };
 
   const handleAnalyzeProfile = () => {
@@ -601,6 +686,20 @@ export default function App() {
     reloadAllData();
   };
 
+  const handleDuplicateClient = (client: Client) => {
+    // Novo id: a cópia não pode compartilhar identidade (nem conexão) com o original.
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = client;
+    const dup = storageService.clients.create({
+      ...rest,
+      name: `${client.name} (Cópia)`,
+      instagram: `${client.instagram}_copy`,
+      healthStatus: 'not_connected'
+    });
+    registerOnServer(dup);
+    notificationService.showToast(`Cliente duplicado como "${dup.name}".`, 'info');
+    reloadAllData();
+  };
+
   const handleDeleteClient = (client: Client) => {
     if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Todos os dados associados serão removidos.`)) {
       storageService.clients.delete(client.id);
@@ -634,6 +733,9 @@ export default function App() {
 
   // Navigation title mapper
   const getSectionTitle = () => {
+    if (inAdmin) {
+      return { overview: 'Visão geral', invoices: 'Cobranças', contracts: 'Contratos', projects: 'Projetos', expenses: 'Despesas' }[adminSection];
+    }
     if (activeClient) {
       return activeClient.name;
     }
@@ -739,13 +841,19 @@ export default function App() {
           userName={sessionUser?.name ?? null}
           userRole={sessionUser?.role ?? null}
           onLogout={sessionUser ? handleLogout : undefined}
+          appMode={inAdmin ? 'admin' : 'agency'}
+          onModeChange={adminAvailable ? setAppMode : undefined}
+          adminSection={adminSection}
+          onAdminNavigate={setAdminSection}
+          overdueCount={overdueCount}
         />
 
         {/* Main App Container */}
         <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
           {/* Top Bar Header */}
           <Header
-            activeClient={activeClient}
+            rootLabel={inAdmin ? 'Administração' : 'Agência'}
+            activeClient={inAdmin ? null : activeClient}
             clients={clients}
             currentSectionTitle={getSectionTitle()}
             onOpenSearch={() => setGlobalSearchOpen(true)}
@@ -765,7 +873,14 @@ export default function App() {
           <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             <ErrorBoundary>
               {/* Workspace Tab View */}
-              {!activeClient && SECTION_TO_TAB[currentSection] ? (
+              {inAdmin ? (
+                <AdminView
+                  section={adminSection}
+                  onNavigate={setAdminSection}
+                  clients={clients}
+                  agencyName={storageService.settings.get().agencyName || sessionUser?.agencyName || 'Gabriel Speratti | Social Intelligence'}
+                />
+              ) : !activeClient && SECTION_TO_TAB[currentSection] ? (
                 <div className="max-w-lg mx-auto mt-16 text-center bg-neutral-900/60 border border-neutral-800 rounded-2xl p-8 space-y-4">
                   <h2 className="text-lg font-semibold text-neutral-100">Cadastre um cliente primeiro</h2>
                   <p className="text-sm text-neutral-400">
@@ -940,6 +1055,28 @@ export default function App() {
                   </motion.div>
                   </Suspense>
                 </div>
+              ) : currentSection === 'clients' ? (
+                <ClientsView
+                  clients={clients}
+                  snapshots={storageService.history.getAll()}
+                  contents={storageService.contents.getAll()}
+                  onOpenWorkspace={(client) => {
+                    setActiveClient(client);
+                    loadClientData(client);
+                    setCurrentSection('performance');
+                    setWorkspaceTab('overview');
+                  }}
+                  onOpenNewClient={() => {
+                    setEditingClient(null);
+                    setClientFormModalOpen(true);
+                  }}
+                  onEditClient={(client) => {
+                    setEditingClient(client);
+                    setClientFormModalOpen(true);
+                  }}
+                  onDuplicateClient={handleDuplicateClient}
+                  onDeleteClient={handleDeleteClient}
+                />
               ) : (
                 /* Agency Dashboard / All Clients */
                 <AgencyDashboardView
@@ -975,19 +1112,7 @@ export default function App() {
                     setEditingClient(client);
                     setClientFormModalOpen(true);
                   }}
-                  onDuplicateClient={(client) => {
-                    // Novo id: a cópia não pode compartilhar identidade (nem conexão) com o original.
-                    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = client;
-                    const dup = storageService.clients.create({
-                      ...rest,
-                      name: `${client.name} (Cópia)`,
-                      instagram: `${client.instagram}_copy`,
-                      healthStatus: 'not_connected'
-                    });
-                    registerOnServer(dup);
-                    notificationService.showToast(`Cliente duplicado como "${dup.name}".`, 'info');
-                    reloadAllData();
-                  }}
+                  onDuplicateClient={handleDuplicateClient}
                   onDeleteClient={handleDeleteClient}
                   onOpenAlerts={() => setAlertsModalOpen(true)}
                   onSeedDemoData={() => {
@@ -1024,6 +1149,7 @@ export default function App() {
         tasks={globalSearchOpen ? storageService.tasks.getAll().filter((t) => (t.clientId ? visibleIds.has(t.clientId) : !isDemoLoaded)) : []}
         commands={buildCommands()}
         onOpenTask={(task) => {
+          setAppMode('agency');
           // Abre o dashboard em "Tarefas", filtrado pelo cliente da tarefa.
           try {
             localStorage.setItem('gs_dash_mode', 'tasks');
@@ -1035,10 +1161,12 @@ export default function App() {
           setDashboardKey((k) => k + 1);
         }}
         onSelectClient={(client) => {
+          setAppMode('agency');
           setActiveClient(client);
           loadClientData(client);
         }}
         onNavigateSection={(target: string) => {
+          setAppMode('agency');
           // Resultado da busca abre o workspace do cliente na aba correspondente.
           const tab: WorkspaceSubTab =
             target === 'content' ? 'content' : SECTION_TO_TAB[target as MainNavSection] ?? 'overview';

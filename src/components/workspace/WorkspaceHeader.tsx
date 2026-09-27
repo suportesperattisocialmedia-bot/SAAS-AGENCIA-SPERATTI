@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Client, InstagramAccount } from '../../types';
 import {
   BarChart3,
@@ -15,7 +15,7 @@ import {
   FileText,
   History,
   Activity,
-  Link2, BookMarked } from 'lucide-react';
+  Link2, BookMarked, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ConnectionBadge } from '../common/ConnectionBadge';
 
 export type WorkspaceSubTab =
@@ -58,6 +58,25 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
 }) => {
   const reduce = useReducedMotion();
   const avatarUrl = client.avatarUrl;
+
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const updateEdges = () => {
+    const el = tabsRef.current;
+    if (!el) return;
+    setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  };
+  const scrollTabs = (dir: 1 | -1) => tabsRef.current?.scrollBy({ left: dir * 320, behavior: reduce ? 'auto' : 'smooth' });
+  useEffect(() => {
+    updateEdges();
+    window.addEventListener('resize', updateEdges);
+    return () => window.removeEventListener('resize', updateEdges);
+  }, []);
+  // A aba aberta sempre fica visível (ex.: abrir Relatórios pelo menu lateral).
+  useEffect(() => {
+    tabsRef.current?.querySelector<HTMLElement>('[data-active]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    updateEdges();
+  }, [activeTab]);
 
   const tabs: Array<{ id: WorkspaceSubTab; label: string; icon: React.ReactNode }> = [
     { id: 'overview', label: 'Overview', icon: <Activity className="w-3.5 h-3.5" /> },
@@ -142,13 +161,35 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
         </div>
       </div>
 
-      {/* Horizontal Tab Navigation */}
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar border-t border-white/[0.04] pt-2">
+      {/* Horizontal Tab Navigation (setas quando nem todas as abas cabem) */}
+      <div className="relative border-t border-white/[0.04] pt-2">
+      {edges.left && (
+        <button
+          type="button"
+          onClick={() => scrollTabs(-1)}
+          aria-label="Ver abas anteriores"
+          className="absolute left-0 top-2 z-10 flex h-[calc(100%-0.5rem)] w-12 items-center justify-start bg-gradient-to-r from-[#111111] via-[#111111]/90 to-transparent pl-1 text-neutral-400 hover:text-neutral-100"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      )}
+      {edges.right && (
+        <button
+          type="button"
+          onClick={() => scrollTabs(1)}
+          aria-label="Ver mais abas"
+          className="absolute right-0 top-2 z-10 flex h-[calc(100%-0.5rem)] w-12 items-center justify-end bg-gradient-to-l from-[#111111] via-[#111111]/90 to-transparent pr-1 text-neutral-400 hover:text-neutral-100"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      )}
+      <div ref={tabsRef} onScroll={updateEdges} className="flex items-center gap-1 overflow-x-auto no-scrollbar">
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
+              data-active={isActive || undefined}
               onClick={() => onTabChange(tab.id)}
               aria-current={isActive ? 'page' : undefined}
               className={`relative flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium whitespace-nowrap transition-colors ${
@@ -170,6 +211,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             </button>
           );
         })}
+      </div>
       </div>
       {/* Título da aba aberta para leitores de tela (hierarquia h1 > h2 > h3). */}
       <h2 className="sr-only">{tabs.find((t) => t.id === activeTab)?.label}</h2>

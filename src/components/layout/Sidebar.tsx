@@ -13,8 +13,15 @@ import {
   Settings,
   ShieldCheck,
   LogOut,
-  Database
+  Database,
+  Scale,
+  Receipt,
+  FileSignature,
+  KanbanSquare,
+  Wallet,
+  Briefcase
 } from 'lucide-react';
+import type { AdminSection } from '../admin/AdminOverview';
 import { Client } from '../../types';
 import { ASSETS } from '../../data/assets';
 
@@ -44,6 +51,12 @@ interface SidebarProps {
   userName?: string | null;
   userRole?: string | null;
   onLogout?: () => void;
+  /** Modo Administração (financeiro): disponível só para dono/administrador fora da demonstração. */
+  appMode?: 'agency' | 'admin';
+  onModeChange?: (mode: 'agency' | 'admin') => void;
+  adminSection?: AdminSection;
+  onAdminNavigate?: (section: AdminSection) => void;
+  overdueCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -59,8 +72,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   userName,
   userRole,
-  onLogout
+  onLogout,
+  appMode = 'agency',
+  onModeChange,
+  adminSection = 'overview',
+  onAdminNavigate,
+  overdueCount = 0
 }) => {
+  const admin = appMode === 'admin';
   const reduce = useReducedMotion();
   const navItems: Array<{ id: MainNavSection; label: string; icon: React.ReactNode; badge?: number }> = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
@@ -73,6 +92,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'reports', label: 'Relatórios', icon: <FileText className="w-4 h-4" /> },
     { id: 'alerts', label: 'Alertas', icon: <Bell className="w-4 h-4" />, badge: unreadAlertsCount },
     { id: 'settings', label: 'Configurações', icon: <Settings className="w-4 h-4" /> }
+  ];
+
+  const adminItems: Array<{ id: AdminSection; label: string; icon: React.ReactNode; badge?: number }> = [
+    { id: 'overview', label: 'Visão geral', icon: <Scale className="w-4 h-4" /> },
+    { id: 'invoices', label: 'Cobranças', icon: <Receipt className="w-4 h-4" />, badge: overdueCount },
+    { id: 'contracts', label: 'Contratos', icon: <FileSignature className="w-4 h-4" /> },
+    { id: 'projects', label: 'Projetos', icon: <KanbanSquare className="w-4 h-4" /> },
+    { id: 'expenses', label: 'Despesas', icon: <Wallet className="w-4 h-4" /> }
   ];
 
   return (
@@ -107,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* Active Client Context Banner */}
-          {activeClient ? (
+          {admin ? null : activeClient ? (
             <div className="mt-4 p-2.5 bg-[#161618] border border-white/[0.06] rounded-[24px] flex items-center justify-between">
               <div className="min-w-0 pr-2">
                 <div className="text-[11px] text-neutral-400">Workspace Ativo</div>
@@ -130,7 +157,83 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
+        {onModeChange && (
+          <div className="px-3 pt-3">
+            <div className="grid grid-cols-2 rounded-full border border-white/[0.06] bg-[#161618] p-1" role="group" aria-label="Modo do sistema">
+              {([
+                ['agency', 'Agência', Briefcase],
+                ['admin', 'Administração', Scale]
+              ] as const).map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={appMode === id}
+                  onClick={() => {
+                    onModeChange(id);
+                    onCloseMobile();
+                  }}
+                  className={`relative flex items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-[11px] font-medium transition-colors ${appMode === id ? 'text-neutral-950' : 'text-neutral-400 hover:text-neutral-200'}`}
+                >
+                  {appMode === id && (
+                    <motion.span layoutId="mode-pill" transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 480, damping: 38 }} className="absolute inset-0 rounded-full bg-amber-500" aria-hidden="true" />
+                  )}
+                  <Icon className="relative h-3.5 w-3.5" />
+                  <span className="relative">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Navigation items */}
+        {admin ? (
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar" aria-label="Administração">
+          {adminItems.map((item) => {
+            const isActive = adminSection === item.id;
+            return (
+              <button
+                key={item.id}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => {
+                  onAdminNavigate?.(item.id);
+                  onCloseMobile();
+                }}
+                className={`relative w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-2xl transition-colors group ${
+                  isActive ? 'text-amber-300 font-semibold' : 'text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.04]'
+                }`}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="sidebar-active"
+                    transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 36 }}
+                    className="absolute inset-0 rounded-2xl border border-white/[0.08] bg-neutral-800/90"
+                    aria-hidden="true"
+                  />
+                )}
+                <div className="relative flex items-center gap-3">
+                  <span className={isActive ? 'text-amber-400' : 'text-neutral-500 group-hover:text-neutral-300'}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </div>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="relative rounded-full bg-rose-500/20 px-1.5 text-[10px] tabular-nums text-rose-300" aria-label={`${item.badge} vencidas`}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => {
+              onNavigate('settings');
+              onCloseMobile();
+            }}
+            className="relative w-full flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-2xl text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.04]"
+          >
+            <span className="text-neutral-500"><Settings className="w-4 h-4" /></span>
+            <span>Configurações</span>
+          </button>
+        </nav>
+        ) : (
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
           {navItems.map(item => {
             const isActive = currentSection === item.id;
@@ -177,10 +280,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </nav>
+        )}
 
         {/* Bottom Profile & Demo Trigger */}
         <div className="p-3 border-t border-white/[0.06] space-y-2">
           {/* Demo Data Quick Switch */}
+          {!admin && (
           <button
             onClick={onToggleDemoData}
             className={`w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] tabular-nums rounded-2xl border transition-colors ${
@@ -197,6 +302,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {isDemoLoaded ? 'Limpar' : 'Demo'}
             </span>
           </button>
+          )}
 
           {/* User Profile */}
           <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-[24px] bg-[#161618] border border-white/[0.05]">

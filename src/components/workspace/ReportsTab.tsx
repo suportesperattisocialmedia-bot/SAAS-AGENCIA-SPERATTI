@@ -1,4 +1,5 @@
 import { formatDateBR } from '../../utils/dates';
+import { signedPct } from '../../utils/metrics';
 import React, { useState } from 'react';
 import { Client, Report, Content, AccountSnapshot } from '../../types';
 import { reportService } from '../../services/reportService';
@@ -62,7 +63,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   };
 
   const handleExportCsv = () => {
-    reportService.exportHistoryCsv(client.id);
+    if (activeReport) reportService.exportReportCsv(activeReport);
   };
 
   const formatDiff = (diff: number | null | undefined) => {
@@ -72,7 +73,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
     const isPos = diff >= 0;
     return (
       <span className={isPos ? 'text-emerald-400' : 'text-rose-400'}>
-        {isPos ? '+' : ''}{diff}% vs anterior
+        {signedPct(diff)} vs anterior
       </span>
     );
   };

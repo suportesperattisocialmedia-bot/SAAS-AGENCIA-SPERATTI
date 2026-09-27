@@ -384,3 +384,85 @@ export const SnippetSchema = z.object({
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1)
 });
+
+// ---------------------------------------------------------------------------
+// Financeiro
+// ---------------------------------------------------------------------------
+const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida');
+const Cents = z.number().int('Valor inválido').min(0, 'Valor não pode ser negativo').max(100_000_000_00);
+export const PaymentMethodSchema = z.enum(['pix', 'boleto', 'transferencia', 'cartao', 'dinheiro', 'outro']);
+
+export const ContractSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1, 'Escolha o cliente'),
+  clientName: z.string().min(1),
+  title: z.string().trim().min(1, 'Dê um nome ao serviço').max(120),
+  kind: z.enum(['recorrente', 'avulso']),
+  amountCents: Cents.refine((v) => v > 0, 'Informe o valor'),
+  billingDay: z.number().int().min(1).max(28).optional(),
+  startDate: Day,
+  endDate: Day.optional(),
+  status: z.enum(['ativo', 'pausado', 'encerrado']),
+  paymentMethod: PaymentMethodSchema,
+  notes: z.string().max(2000).optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1)
+});
+
+export const InvoiceSchema = z.object({
+  id: z.string().min(1),
+  number: z.number().int().min(1),
+  clientId: z.string().min(1, 'Escolha o cliente'),
+  clientName: z.string().min(1),
+  contractId: z.string().optional(),
+  projectId: z.string().optional(),
+  period: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  description: z.string().trim().min(1, 'Descreva a cobrança').max(200),
+  items: z
+    .array(z.object({ id: z.string().min(1), description: z.string().trim().min(1, 'Descreva o item').max(200), quantity: z.number().positive('Quantidade inválida').max(10_000), unitCents: Cents }))
+    .min(1, 'Adicione ao menos um item'),
+  discountCents: Cents.default(0),
+  issueDate: Day,
+  dueDate: Day,
+  status: z.enum(['aberta', 'paga', 'cancelada']),
+  paidAt: Day.optional(),
+  paidCents: Cents.optional(),
+  paymentMethod: PaymentMethodSchema,
+  fiscalNumber: z.string().trim().max(60).optional(),
+  notes: z.string().max(2000).optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1)
+});
+
+const StageSchema = z.enum(['proposta', 'aprovado', 'producao', 'revisao', 'entregue', 'faturado', 'recebido']);
+export const ProjectSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1, 'Escolha o cliente'),
+  clientName: z.string().min(1),
+  title: z.string().trim().min(1, 'Dê um nome ao projeto').max(120),
+  kind: z.enum(['recorrente', 'avulso']),
+  valueCents: Cents,
+  stage: StageSchema,
+  contractId: z.string().optional(),
+  startDate: Day.optional(),
+  deadline: Day.optional(),
+  notes: z.string().max(4000).optional(),
+  stageHistory: z.array(z.object({ stage: StageSchema, at: z.string().min(1) })).default([]),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1)
+});
+
+export const ExpenseSchema = z.object({
+  id: z.string().min(1),
+  description: z.string().trim().min(1, 'Descreva a despesa').max(160),
+  category: z.enum(['ferramentas', 'equipe', 'freelancer', 'anuncios', 'impostos', 'escritorio', 'outros']),
+  amountCents: Cents.refine((v) => v > 0, 'Informe o valor'),
+  date: Day,
+  paid: z.boolean(),
+  paidAt: Day.optional(),
+  recurring: z.boolean(),
+  clientId: z.string().optional(),
+  notes: z.string().max(2000).optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1)
+});

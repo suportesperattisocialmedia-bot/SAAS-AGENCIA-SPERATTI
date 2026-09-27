@@ -11,15 +11,29 @@ import { Client, Report} from '../types';
 import { storageService } from './storageService';
 import { analyticsService } from './analyticsService';
 import { aiService } from './aiService';
-import { formatMetric } from '../utils/metrics';
+import { formatMetric, signedPct } from '../utils/metrics';
 import { weekDayLabel } from './storage/migration';
 import { brasiliaDay } from './dashboardInsights';
+import { notificationService } from './notificationService';
 
 /** Próximas ações do último diagnóstico importado (se houver). */
 function latestDiagnosticActions(clientId: string): string[] | null {
   const last = storageService.aiAnalyses.getByClient(clientId).find((a) => a.analysisType === 'PROFILE_DIAGNOSTIC');
   const actions = (last?.output as { nextActions?: unknown } | undefined)?.nextActions;
   return Array.isArray(actions) && actions.length > 0 && actions.every((x) => typeof x === 'string') ? actions.slice(0, 5) : null;
+}
+
+/** De onde vieram os dados do cliente, dito com precisão (vai no rodapé do PDF). */
+function provenanceLines(clientId: string): string[] {
+  const contents = storageService.contents.getAll().filter((c) => c.clientId === clientId);
+  const snaps = storageService.history.getByClient(clientId);
+  const fromCsv = contents.some((c) => c.instagramMediaId?.startsWith('import:'));
+  const fromApi = contents.some((c) => c.instagramMediaId && !c.instagramMediaId.startsWith('import:')) || snaps.some((s) => s.source === 'META_API');
+  const sources = [fromCsv && 'importadas do Meta Business Suite (CSV)', fromApi && 'sincronizadas pela API oficial do Instagram'].filter(Boolean);
+  const lines = [sources.length ? `Métricas das publicações: ${sources.join(' e ')}.` : 'Nenhuma métrica de publicação registrada no período.'];
+  if (snaps.some((s) => s.source === 'MANUAL')) lines.push('Seguidores: registrados manualmente pelo gestor.');
+  lines.push('Comparações: calculadas contra o período anterior de mesma duração. Sem dado aparece como n/d; nada é estimado.');
+  return lines;
 }
 
 export const reportService = {
@@ -42,7 +56,7 @@ export const reportService = {
 
     const br = (iso: string) => iso.split('-').reverse().join('/');
     const periodLabel = `${br(period.startDate)} a ${br(period.endDate)} (${periodDays} dias)`;
-    const pct = (v: number | null) => (v === null ? null : `${v >= 0 ? '+' : ''}${v}%`);
+    const pct = (v: number | null) => signedPct(v);
     const postsInPeriod = period.postsPublished.current ?? 0;
 
     // Resumo honesto: só cita o que existe; nada de "valor não disponível" no meio da frase.
@@ -189,22 +203,22 @@ export const reportService = {
       {
         label: 'Seguidores',
         val: formatMetric(report.kpis.followers),
-        diff: report.kpis.followersDiffPct !== null ? `${report.kpis.followersDiffPct >= 0 ? '+' : ''}${report.kpis.followersDiffPct}%` : 'N/D'
+        diff: signedPct(report.kpis.followersDiffPct) ?? 'n/d'
       },
       {
         label: 'Visualizações',
         val: formatMetric(report.kpis.views),
-        diff: report.kpis.viewsDiffPct !== null ? `${report.kpis.viewsDiffPct >= 0 ? '+' : ''}${report.kpis.viewsDiffPct}%` : 'N/D'
+        diff: signedPct(report.kpis.viewsDiffPct) ?? 'n/d'
       },
       {
         label: 'Alcance Total',
         val: formatMetric(report.kpis.reach),
-        diff: report.kpis.reachDiffPct !== null ? `${report.kpis.reachDiffPct >= 0 ? '+' : ''}${report.kpis.reachDiffPct}%` : 'N/D'
+        diff: signedPct(report.kpis.reachDiffPct) ?? 'n/d'
       },
       {
         label: 'Engajamento',
         val: formatMetric(report.kpis.engagementRate, { suffix: '%' }),
-        diff: report.kpis.engagementDiffPct !== null ? `${report.kpis.engagementDiffPct >= 0 ? '+' : ''}${report.kpis.engagementDiffPct}%` : 'N/D'
+        diff: signedPct(report.kpis.engagementDiffPct) ?? 'n/d'
       }
     ];
 
@@ -294,9 +308,7 @@ export const reportService = {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text('• Métricas de conta e publicações: extraídas via Meta Graph API oficial (REAL_DATA).', margin + 4, y + 11);
-    doc.text('• Comparações percentuais: cálculo matemático auditável sobre snapshots cronológicos (CALCULATED_DATA).', margin + 4, y + 15);
-    doc.text('• Recomendações estratégicas: direcionadas por inteligência de marketing sem métricas simuladas.', margin + 4, y + 19);
+    provenanceLines(client.id).forEach((line, i) => doc.text(`• ${line}`, margin + 4, y + 11 + i * 4));
 
     // Save and download
     const cleanHandle = client.instagram.replace('@', '').replace(/[^a-zA-Z0-9_]/g, '');
@@ -309,7 +321,7 @@ export const reportService = {
    */
   exportToCsv(filename: string, rows: Record<string, string | number | boolean | null | undefined>[]): void {
     if (!rows || rows.length === 0) {
-      alert('Não há dados para exportar nesta tabela.');
+      notificationService.showToast('Não há dados para exportar nesta tabela ainda.', 'info');
       return;
     }
 
@@ -358,6 +370,40 @@ export const reportService = {
     this.exportToCsv(`conteudos_${clientId}`, rows);
   },
 
+  /** CSV do relatório: resumo (KPIs) + todos os posts do período, com todas as métricas (n/d quando indisponível). */
+  exportReportCsv(report: Report): void {
+    const nd = (v: number | null | undefined) => (v === null || v === undefined || Number.isNaN(v) ? 'n/d' : v);
+    const pct = (v: number | null | undefined) => (v === null || v === undefined || Number.isNaN(v) ? 'n/d' : `${Math.round(v * 100) / 100}%`);
+    const posts = storageService.contents
+      .getAll()
+      .filter((c) => c.clientId === report.clientId)
+      .filter((c) => {
+        const day = brasiliaDay(c.publishedAt);
+        return day >= report.startDate.slice(0, 10) && day <= report.endDate.slice(0, 10);
+      })
+      .sort((a, b) => a.publishedAt.localeCompare(b.publishedAt));
+    const k = report.kpis;
+    const rows: Record<string, string | number>[] = [
+      { Tipo: 'Resumo', Data: `${report.startDate.slice(0, 10)} a ${report.endDate.slice(0, 10)}`, Publicacao: 'Publicações no período', Formato: '', Visualizacoes: k.postsCount, Alcance: '', Curtidas: '', Comentarios: '', Salvamentos: '', Compartilhamentos: '', Engajamento: '' },
+      { Tipo: 'Resumo', Data: '', Publicacao: 'Totais do período', Formato: '', Visualizacoes: nd(k.views), Alcance: nd(k.reach), Curtidas: '', Comentarios: '', Salvamentos: '', Compartilhamentos: '', Engajamento: pct(k.engagementRate) },
+      ...posts.map((c) => ({
+        Tipo: 'Post',
+        Data: brasiliaDay(c.publishedAt),
+        Publicacao: c.title,
+        Formato: c.format,
+        Visualizacoes: nd(c.metrics.views),
+        Alcance: nd(c.metrics.reach),
+        Curtidas: nd(c.metrics.likes),
+        Comentarios: nd(c.metrics.comments),
+        Salvamentos: nd(c.metrics.saves),
+        Compartilhamentos: nd(c.metrics.shares),
+        Engajamento: pct(c.metrics.engagementRate)
+      }))
+    ];
+    const slug = report.clientName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').toLowerCase();
+    this.exportToCsv(`relatorio_${slug}_${report.startDate.slice(0, 10)}_${report.endDate.slice(0, 10)}`, rows);
+  },
+
   exportHistoryCsv(clientId: string): void {
     const snapshots = storageService.history.getByClient(clientId);
     const rows = snapshots.map(s => ({
@@ -371,7 +417,7 @@ export const reportService = {
       Compartilhamentos: s.shares,
       VisitasPerfil: s.profileVisits,
       PostsNoDia: s.postsPublished,
-      TaxaEngajamento: `${s.engagementRate}%`,
+      TaxaEngajamento: s.engagementRate === null || s.engagementRate === undefined ? 'n/d' : `${s.engagementRate}%`,
       Fonte: s.source
     }));
     this.exportToCsv(`historico_${clientId}`, rows);

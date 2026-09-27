@@ -20,6 +20,7 @@ export type EntityStorageType =
   | 'calendar_items'
   | 'tasks'
   | 'snippets'
+  | 'finance'
   | 'alerts'
   | 'reports'
   | 'sync_logs'
