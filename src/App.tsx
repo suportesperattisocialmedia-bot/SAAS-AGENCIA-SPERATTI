@@ -35,7 +35,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { DemoProvider } from './services/demo/DemoProvider';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { ManualAiModal } from './components/common/ManualAiModal';
-import { buildDiagnosticPrompt, parseDiagnosticResponse } from './ai/manualPrompts';
+import { buildDiagnosticPrompt, parseDiagnosticResponseDetailed } from './ai/manualPrompts';
 import { ProfileDiagnosticResponseSchema } from './schemas/aiSchemas';
 
 // Layout & Common Components
@@ -656,7 +656,7 @@ export default function App() {
 
   const handleImportDiagnostic = (response: string) => {
     if (!activeClient) return;
-    const parsed = parseDiagnosticResponse(response);
+    const { data: parsed, closedLines } = parseDiagnosticResponseDetailed(response);
     const diagnostic: ProfileDiagnosticResult = { ...parsed, analyzedAt: new Date().toISOString(), model: 'IA externa (prompt manual)' };
     storageService.aiAnalyses.create({
       clientId: activeClient.id,
@@ -673,6 +673,12 @@ export default function App() {
     setDiagnosticModalOpen(false);
     setWorkspaceTab('diagnostic');
     notificationStore.notify('Diagnóstico importado', `Análise salva para ${activeClient.name}.`, 'success');
+    if (closedLines > 0) {
+      notificationService.showToast(
+        `${closedLines} ${closedLines === 1 ? 'trecho da resposta parecia cortado' : 'trechos da resposta pareciam cortados'} no fim da linha e ${closedLines === 1 ? 'foi fechado' : 'foram fechados'} automaticamente. Confira o texto; se faltar algo, peça para a IA reenviar.`,
+        'warning'
+      );
+    }
   };
 
   // Client CRUD Handlers
