@@ -34,7 +34,7 @@ export const ScopePicker: React.FC<{
   const options: Array<{ id: string; label: string; sub?: string; badge: React.ReactNode }> = [
     { id: 'all', label: 'Todos os clientes', sub: `${clients.length} ${clients.length === 1 ? 'cliente' : 'clientes'}`, badge: <Users className="h-4 w-4" /> },
     ...(allowGeneral ? [{ id: 'general', label: 'Tarefas gerais', sub: 'Sem cliente vinculado', badge: 'AG' }] : []),
-    ...clients.map((c) => ({ id: c.id, label: c.name, sub: c.instagram, badge: initials(c.name) }))
+    ...clients.map((c) => ({ id: c.id, label: c.isOwnProfile ? `${c.name} (meu perfil)` : c.name, sub: c.instagram, badge: initials(c.name) }))
   ];
 
   return (

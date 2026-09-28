@@ -36,6 +36,8 @@ export interface Client {
   avatarUrl?: string;
   lastSyncAt?: string;
   healthStatus: HealthStatus;
+  /** Perfil próprio do dono da agência (marca pessoal): fora da carteira de clientes e do financeiro. */
+  isOwnProfile?: boolean;
   createdAt: string;
   updatedAt: string;
 }

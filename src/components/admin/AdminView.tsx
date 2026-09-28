@@ -18,7 +18,16 @@ export const AdminView: React.FC<{ section: AdminSection; onNavigate: (s: AdminS
   agencyName
 }) => {
   const fin = useFinance();
-  const options = clients.map((c) => ({ id: c.id, name: c.name }));
+  // Clientes cadastrados + os que só existem no financeiro (digitados nas cobranças/contratos).
+  const options = [...clients.map((c) => ({ id: c.id, name: c.name }))];
+  const seen = new Set(options.map((o) => o.id));
+  [...fin.contracts, ...fin.invoices, ...fin.projects].forEach((r) => {
+    if (!seen.has(r.clientId)) {
+      seen.add(r.clientId);
+      options.push({ id: r.clientId, name: r.clientName });
+    }
+  });
+  options.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   switch (section) {
     case 'invoices':
       return <InvoicesView {...fin} clients={options} agencyName={agencyName} />;

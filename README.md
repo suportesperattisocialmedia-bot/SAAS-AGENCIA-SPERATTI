@@ -52,6 +52,12 @@ O token é guardado só como hash (busca) e criptografado (para copiar de novo);
 
 Código: `api/portal.ts`, `server/services/portalService.ts`, `src/components/portal/`, `src/components/tasks/ApprovalLinkModal.tsx`.
 
+## Meu perfil (sua marca pessoal)
+
+Atalho **Meu perfil** no menu: um workspace igual ao dos clientes (métricas por CSV, diagnóstico, ideias, calendário, biblioteca, piloto da semana, tarefas) para o seu próprio Instagram.
+Ele fica fora da carteira: não conta como cliente, não entra no consolidado "Todos os clientes" do dashboard (dá para escolhê-lo no seletor), não aparece no financeiro nem no link de aprovação.
+Os prompts de IA avisam que é o perfil do dono da agência (autoridade e captação de clientes), e o piloto da semana não cria etapa de "aprovação do cliente".
+
 ## Administração (financeiro)
 
 Alternância **Agência | Administração** no topo do menu (dono ou administrador, fora do modo demonstração). O sistema lembra o modo em que você parou.

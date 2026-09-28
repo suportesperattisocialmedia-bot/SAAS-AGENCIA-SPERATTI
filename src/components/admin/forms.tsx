@@ -27,16 +27,71 @@ const Footer: React.FC<{ onCancel: () => void; submitLabel: string; left?: React
   </div>
 );
 
-const ClientSelect: React.FC<{ id: string; value: string; clients: ClientOption[]; onChange: (id: string) => void }> = ({ id, value, clients, onChange }) => (
-  <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={FIELD}>
-    <option value="">Escolha o cliente</option>
-    {clients.map((c) => (
-      <option key={c.id} value={c.id}>
-        {c.name}
-      </option>
-    ))}
-  </select>
-);
+const NEW = '__novo__';
+
+/** id estável para cliente só do financeiro (mesmo nome = mesmo cliente nos relatórios). */
+export function financeClientId(name: string): string {
+  const slug = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `fin-${slug || 'cliente'}`;
+}
+
+/**
+ * Cliente da cobrança/contrato/projeto: um dos cadastrados ou um nome digitado
+ * (empresas que só são clientes do financeiro, sem workspace de redes sociais).
+ */
+const ClientPicker: React.FC<{ id: string; clientId: string; clientName: string; clients: ClientOption[]; onChange: (id: string, name: string) => void }> = ({
+  id,
+  clientId,
+  clientName,
+  clients,
+  onChange
+}) => {
+  const known = clients.some((c) => c.id === clientId);
+  const [typing, setTyping] = useState(clients.length === 0 || (!!clientId && !known));
+  return (
+    <div className="space-y-2">
+      {clients.length > 0 && (
+        <select
+          id={typing ? undefined : id}
+          aria-label={typing ? 'Cliente' : undefined}
+          value={typing ? NEW : clientId}
+          onChange={(e) => {
+            if (e.target.value === NEW) {
+              setTyping(true);
+              onChange('', '');
+            } else {
+              setTyping(false);
+              onChange(e.target.value, clients.find((c) => c.id === e.target.value)?.name ?? '');
+            }
+          }}
+          className={FIELD}
+        >
+          <option value="">Escolha o cliente</option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+          <option value={NEW}>+ Outro cliente (digitar nome)</option>
+        </select>
+      )}
+      {typing && (
+        <input
+          id={id}
+          value={clientName}
+          autoFocus={clients.length > 0}
+          onChange={(e) => {
+            const name = e.target.value;
+            const existing = clients.find((c) => c.name.trim().toLowerCase() === name.trim().toLowerCase());
+            onChange(name.trim() ? existing?.id ?? financeClientId(name) : '', name);
+          }}
+          placeholder="Nome do cliente ou empresa"
+          className={FIELD}
+        />
+      )}
+    </div>
+  );
+};
 
 const MethodSelect: React.FC<{ id: string; value: PaymentMethod; onChange: (m: PaymentMethod) => void }> = ({ id, value, onChange }) => (
   <select id={id} value={value} onChange={(e) => onChange(e.target.value as PaymentMethod)} className={FIELD}>
@@ -63,6 +118,7 @@ export const InvoiceModal: React.FC<{ initial?: Invoice; clients: ClientOption[]
 }) => {
   const today = todayBR();
   const [clientId, setClientId] = useState(initial?.clientId ?? defaultClientId ?? '');
+  const [clientName, setClientName] = useState(initial?.clientName ?? nameOf(clients, defaultClientId ?? ''));
   const [description, setDescription] = useState(initial?.description ?? '');
   const [items, setItems] = useState<Array<InvoiceItem & { cents: number | null }>>(
     initial?.items.map((i) => ({ ...i, cents: i.unitCents })) ?? [{ id: generateUUID(), description: '', quantity: 1, unitCents: 0, cents: null }]
@@ -80,7 +136,7 @@ export const InvoiceModal: React.FC<{ initial?: Invoice; clients: ClientOption[]
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId) return setError('Escolha o cliente.');
+    if (!clientId || !clientName.trim()) return setError('Escolha ou digite o cliente.');
     if (items.some((i) => i.cents === null || i.cents <= 0)) return setError('Informe o valor de cada item.');
     if (dueDate < issueDate) return setError('O vencimento não pode ser antes da emissão.');
     try {
@@ -88,7 +144,7 @@ export const InvoiceModal: React.FC<{ initial?: Invoice; clients: ClientOption[]
         ...(initial ?? {}),
         id: initial?.id,
         clientId,
-        clientName: nameOf(clients, clientId, initial?.clientName),
+        clientName: clientName.trim(),
         description: description.trim() || cleanItems[0]?.description || '',
         items: cleanItems.map((i) => ({ ...i, description: i.description.trim() || description.trim() })),
         discountCents: discount ?? 0,
@@ -110,7 +166,7 @@ export const InvoiceModal: React.FC<{ initial?: Invoice; clients: ClientOption[]
       <form onSubmit={submit} noValidate className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="inv-client" label="Cliente">
-            <ClientSelect id="inv-client" value={clientId} clients={clients} onChange={setClientId} />
+            <ClientPicker id="inv-client" clientId={clientId} clientName={clientName} clients={clients} onChange={(i, n) => { setClientId(i); setClientName(n); }} />
           </Field>
           <Field id="inv-desc" label="Descrição">
             <input id="inv-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Gestão de redes · outubro" className={FIELD} />
@@ -259,6 +315,7 @@ export const ContractModal: React.FC<{ initial?: Contract; clients: ClientOption
   onDelete
 }) => {
   const [clientId, setClientId] = useState(initial?.clientId ?? '');
+  const [clientName, setClientName] = useState(initial?.clientName ?? '');
   const [title, setTitle] = useState(initial?.title ?? '');
   const [kind, setKind] = useState<Contract['kind']>(initial?.kind ?? 'recorrente');
   const [amount, setAmount] = useState<number | null>(initial?.amountCents ?? null);
@@ -272,7 +329,7 @@ export const ContractModal: React.FC<{ initial?: Contract; clients: ClientOption
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId) return setError('Escolha o cliente.');
+    if (!clientId || !clientName.trim()) return setError('Escolha ou digite o cliente.');
     if (!amount) return setError('Informe o valor.');
     if (endDate && endDate < startDate) return setError('O fim não pode ser antes do início.');
     try {
@@ -280,7 +337,7 @@ export const ContractModal: React.FC<{ initial?: Contract; clients: ClientOption
         storageService.finance.contracts.save({
           id: initial?.id,
           clientId,
-          clientName: nameOf(clients, clientId, initial?.clientName),
+          clientName: clientName.trim(),
           title,
           kind,
           amountCents: amount,
@@ -302,7 +359,7 @@ export const ContractModal: React.FC<{ initial?: Contract; clients: ClientOption
       <form onSubmit={submit} noValidate className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="ctr-client" label="Cliente">
-            <ClientSelect id="ctr-client" value={clientId} clients={clients} onChange={setClientId} />
+            <ClientPicker id="ctr-client" clientId={clientId} clientName={clientName} clients={clients} onChange={(i, n) => { setClientId(i); setClientName(n); }} />
           </Field>
           <Field id="ctr-title" label="Serviço">
             <input id="ctr-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Gestão de Instagram" className={FIELD} />
@@ -386,6 +443,7 @@ export const ProjectModal: React.FC<{ initial?: Project; defaultStage?: Project[
   onDelete
 }) => {
   const [clientId, setClientId] = useState(initial?.clientId ?? '');
+  const [clientName, setClientName] = useState(initial?.clientName ?? '');
   const [title, setTitle] = useState(initial?.title ?? '');
   const [kind, setKind] = useState<Project['kind']>(initial?.kind ?? 'avulso');
   const [value, setValue] = useState<number | null>(initial?.valueCents ?? null);
@@ -399,7 +457,7 @@ export const ProjectModal: React.FC<{ initial?: Project; defaultStage?: Project[
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId) return setError('Escolha o cliente.');
+    if (!clientId || !clientName.trim()) return setError('Escolha ou digite o cliente.');
     if (value === null) return setError('Informe o valor (0 se não for cobrado à parte).');
     try {
       const history = initial?.stageHistory ?? [];
@@ -407,7 +465,7 @@ export const ProjectModal: React.FC<{ initial?: Project; defaultStage?: Project[
         storageService.finance.projects.save({
           id: initial?.id,
           clientId,
-          clientName: nameOf(clients, clientId, initial?.clientName),
+          clientName: clientName.trim(),
           title,
           kind,
           valueCents: value,
@@ -429,7 +487,7 @@ export const ProjectModal: React.FC<{ initial?: Project; defaultStage?: Project[
       <form onSubmit={submit} noValidate className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="prj-client" label="Cliente">
-            <ClientSelect id="prj-client" value={clientId} clients={clients} onChange={setClientId} />
+            <ClientPicker id="prj-client" clientId={clientId} clientName={clientName} clients={clients} onChange={(i, n) => { setClientId(i); setClientName(n); }} />
           </Field>
           <Field id="prj-title" label="Projeto">
             <input id="prj-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Identidade visual + lançamento" className={FIELD} />

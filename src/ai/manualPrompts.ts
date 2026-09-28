@@ -21,6 +21,9 @@ const line = (label: string, value: string | undefined | null) => `- ${label}: $
 
 export function clientBlock(c: Client): string {
   return [
+    ...(c.isOwnProfile
+      ? ['- Contexto: este é o PERFIL PRÓPRIO do estrategista, dono da agência (marca pessoal). O conteúdo deve construir autoridade e trazer clientes para a agência; trate as recomendações como para a própria marca, não para um cliente.']
+      : []),
     line('Nome', c.name),
     line('Instagram', c.instagram),
     line('Empresa/marca', c.company),

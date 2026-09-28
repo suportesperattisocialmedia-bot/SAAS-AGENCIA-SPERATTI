@@ -11,7 +11,7 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
-import { engagementFrom, formatMetric } from '../../utils/metrics';
+import { engagementFrom, formatMetric, signedPct } from '../../utils/metrics';
 import { brasiliaDay } from '../../services/dashboardInsights';
 
 interface PerformanceTabProps {
@@ -101,7 +101,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
       <div className="flex items-center gap-1.5 text-[11px] tabular-nums">
         {diffIcon}
         <span className={isPos ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
-          {isPos ? '+' : ''}{comparison.percentDiff}%
+          {signedPct(comparison.percentDiff)}
         </span>
         <span className="text-neutral-500">
           ({isPos ? '+' : ''}{comparison.absoluteDiff?.toLocaleString('pt-BR')} vs anterior)

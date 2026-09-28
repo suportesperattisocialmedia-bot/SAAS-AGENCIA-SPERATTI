@@ -199,7 +199,8 @@ export function applyWeeklyPlan(client: Client, posts: PlannedPost[], now = new 
       priority: 'normal',
       dueDate: due < today ? today : due,
       notes: brief,
-      checklist: PRODUCTION_CHECKLIST[p.format].map((text) => ({ id: generateUUID(), text, done: false }))
+      // No perfil próprio não há etapa de aprovação do cliente.
+      checklist: PRODUCTION_CHECKLIST[p.format].filter((text) => !(client.isOwnProfile && text === 'Aprovação do cliente')).map((text) => ({ id: generateUUID(), text, done: false }))
     });
   });
   return { calendar: posts.length, tasks: posts.length };

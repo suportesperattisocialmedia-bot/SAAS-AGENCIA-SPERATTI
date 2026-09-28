@@ -8,6 +8,10 @@ interface ClientFormModalProps {
   onClose: () => void;
   onSave: (data: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>) => void;
   initialData?: Client | null;
+  /** Cadastro do perfil próprio (marca pessoal do dono da agência). */
+  ownProfile?: boolean;
+  /** Nome sugerido para o perfil próprio. */
+  presetName?: string;
 }
 
 const DEFAULT_OBJECTIVES = [
@@ -50,8 +54,11 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  initialData
+  initialData,
+  ownProfile = false,
+  presetName = ''
 }) => {
+  const isOwn = ownProfile || !!initialData?.isOwnProfile;
   const [formData, setFormData] = useState({
     name: '',
     company: '',
@@ -122,13 +129,13 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
       setIsDirty(false);
     } else {
       setFormData({
-        name: '',
+        name: ownProfile ? presetName : '',
         company: '',
         instagram: '',
         website: '',
         whatsapp: '',
         city: '',
-        segment: '',
+        segment: ownProfile ? 'Marketing digital / Social media' : '',
         subsegment: '',
         targetAudience: '',
         persona: '',
@@ -152,7 +159,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
       setIsDirty(false);
     }
     setErrors({});
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, ownProfile, presetName]);
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -252,7 +259,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
       instagram: normalizedInstagram,
       objectives,
       formats,
-      pillars
+      pillars,
+      ...(isOwn ? { isOwnProfile: true, monthlyDeliverables: undefined } : {})
     });
     setIsDirty(false);
   };
@@ -261,7 +269,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={handleSafeClose}
-      title={initialData ? `Editar Cliente: ${initialData.name}` : 'Cadastrar Novo Cliente'}
+      title={isOwn ? (initialData ? 'Editar meu perfil' : 'Configurar meu perfil') : initialData ? `Editar Cliente: ${initialData.name}` : 'Cadastrar Novo Cliente'}
+      subtitle={isOwn ? 'Seu próprio Instagram: mesma estratégia dos clientes, fora da carteira e do financeiro.' : undefined}
       maxWidth="4xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -435,6 +444,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               />
             </div>
 
+            {!isOwn && (
             <div>
               <label htmlFor="client-package" className="block text-xs font-medium text-neutral-300 mb-1">
                 Pacote mensal (entregas por mês)
@@ -452,6 +462,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               />
               <p className="mt-1 text-[11px] text-neutral-500">Posts, reels, stories e roteiros contratados. Aparece no dashboard como progresso do mês.</p>
             </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-neutral-300 mb-1">
