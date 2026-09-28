@@ -103,7 +103,10 @@ export const ManualAiModal: React.FC<ManualAiModalProps> = ({ isOpen, onClose, t
               </a>
             ))}
           </div>
-          <p className="text-xs text-neutral-500">A IA vai responder com um bloco de código (JSON). Copie a resposta inteira.</p>
+          <p className="text-xs leading-relaxed text-neutral-500">
+            A resposta vem em código (JSON) de propósito: não é para ler lá. Use o botão de copiar do bloco de código da IA e cole abaixo; o sistema monta o relatório
+            formatado.
+          </p>
         </section>
 
         <section className="space-y-2.5">

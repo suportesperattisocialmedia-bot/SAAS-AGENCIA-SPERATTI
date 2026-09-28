@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import type { AccountSnapshot, AudienceInsight, Client, Competitor, Content, ContentIdea } from '../types';
 import { IdeaItemSchema, ProfileDiagnosticResponseSchema, type ProfileDiagnosticResponse } from '../schemas/aiSchemas';
+import { repairJson } from './jsonRepair';
 import { avgMetric, formatMetric, isMetric, sumMetric } from '../utils/metrics';
 
 export interface PromptContext {
@@ -71,24 +72,39 @@ function metricsBlock(contents: Content[], snapshots: AccountSnapshot[]): string
   ].join('\n');
 }
 
-export function postsBlock(contents: Content[], limit = 12): string {
+const PLACEHOLDER_TITLE = /^Publicação \((?:Reels|Carrossel|Foto|Stories|Live)\)$/;
+const UNCLASSIFIED_PILLARS = new Set(['', 'geral', 'sem pilar', 'não classificado']);
+
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > max * 0.7 ? cut.slice(0, lastSpace) : cut).trimEnd()} […]`;
+}
+
+export function postsBlock(contents: Content[], limit = 30, captionMax = 500, label = 'mais recentes'): string {
   if (contents.length === 0) return 'Nenhuma publicação catalogada ainda.';
   const recent = [...contents].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, limit);
-  return recent
-    .map((c, i) => {
-      const m = c.metrics;
-      const metrics = [
-        `views ${formatMetric(m.views)}`,
-        `alcance ${formatMetric(m.reach)}`,
-        `curtidas ${formatMetric(m.likes)}`,
-        `comentários ${formatMetric(m.comments)}`,
-        `salvos ${formatMetric(m.saves)}`,
-        `compart. ${formatMetric(m.shares)}`
-      ].join(' | ');
-      const caption = (c.caption || c.title).replace(/\s+/g, ' ').slice(0, 280);
-      return `${i + 1}. [${c.publishedAt.slice(0, 10)}] ${c.format} (pilar: ${c.pillar})\n   Legenda: "${caption}"\n   Métricas: ${metrics}`;
-    })
-    .join('\n');
+  const lines = recent.map((c, i) => {
+    const m = c.metrics;
+    const metrics = [
+      `views ${formatMetric(m.views)}`,
+      `alcance ${formatMetric(m.reach)}`,
+      `curtidas ${formatMetric(m.likes)}`,
+      `comentários ${formatMetric(m.comments)}`,
+      `salvos ${formatMetric(m.saves)}`,
+      `compart. ${formatMetric(m.shares)}`
+    ].join(' | ');
+    const rawCaption = (c.caption || (PLACEHOLDER_TITLE.test(c.title.trim()) ? '' : c.title)).replace(/\s+/g, ' ').trim();
+    const caption = rawCaption ? `"${clip(rawCaption, captionMax)}"` : 'sem legenda nos dados';
+    const pillar = UNCLASSIFIED_PILLARS.has(c.pillar.trim().toLowerCase()) ? '' : ` · pilar ${c.pillar}`;
+    return `${i + 1}. [${c.publishedAt.slice(0, 10)}] ${c.format}${pillar}\n   Legenda: ${caption}\n   Métricas: ${metrics}`;
+  });
+  const notes: string[] = [];
+  if (contents.length > recent.length) notes.push(`Mostrando as ${recent.length} ${label} de ${contents.length} publicações; as demais entram só nas médias e totais acima.`);
+  if (recent.some((c) => c.caption.replace(/\s+/g, ' ').trim().length > captionMax)) notes.push('Legendas marcadas com […] foram encurtadas aqui para caber no prompt; não trate o corte como defeito da legenda.');
+  if (recent.every((c) => UNCLASSIFIED_PILLARS.has(c.pillar.trim().toLowerCase()))) notes.push('As publicações ainda não foram classificadas por pilar no sistema; se falar de pilares, deduza pelo texto e diga que é hipótese.');
+  return [...lines, ...(notes.length ? ['', ...notes.map((n) => `Obs.: ${n}`)] : [])].join('\n');
 }
 
 export function competitorsBlock(competitors: Competitor[]): string {
@@ -118,15 +134,18 @@ export const HONESTY_RULES = `REGRAS OBRIGATÓRIAS:
 5. Escreva em português do Brasil, com linguagem direta e profissional.`;
 
 export function buildDiagnosticPrompt(ctx: PromptContext): string {
+  const own = Boolean(ctx.client.isOwnProfile);
   return `Você é um estrategista sênior de marketing digital e Instagram. Faça uma análise completa e aprofundada do perfil abaixo, cobrindo perfil, conteúdo, performance e estratégia, e termine com um plano de ação priorizado.
 
-## DADOS DO CLIENTE
+Sua resposta não será lida aqui no chat: ela será copiada e colada num sistema de gestão, que transforma o JSON num relatório formatado. Por isso a resposta precisa ser só o JSON pedido no final.
+
+## ${own ? 'DADOS DO PERFIL (marca própria)' : 'DADOS DO CLIENTE'}
 ${clientBlock(ctx.client)}
 
 ## MÉTRICAS REAIS DISPONÍVEIS
 ${metricsBlock(ctx.contents, ctx.snapshots)}
 
-## PUBLICAÇÕES RECENTES (mais novas primeiro)
+## PUBLICAÇÕES (mais novas primeiro)
 ${postsBlock(ctx.contents)}
 
 ## CONCORRENTES MONITORADOS
@@ -138,7 +157,12 @@ ${audienceBlock(ctx.audienceInsights)}
 ${HONESTY_RULES}
 
 ## FORMATO DA RESPOSTA
-Responda APENAS com um bloco JSON válido, sem nenhum texto antes ou depois, exatamente com esta estrutura (todos os campos em texto corrido, listas com 3 a 6 itens):
+Responda APENAS com um único bloco de código JSON válido, sem nenhum texto antes ou depois, exatamente com a estrutura abaixo.
+- Mantenha os nomes dos campos em inglês, como estão; escreva os valores em português.
+- Cada campo de texto: de 2 a 5 frases (no máximo uns 700 caracteres), em uma única linha, sem quebras de linha dentro do texto.
+- Listas com 3 a 6 itens, cada item com uma ou duas frases.
+- Para citar algo dentro do texto, use aspas simples ('assim'), nunca aspas duplas.
+- Se o JSON não couber numa resposta só, encurte os textos em vez de cortar o JSON.
 
 {
   "profileSection": {
@@ -221,24 +245,48 @@ Responda APENAS com um array JSON válido, sem nenhum texto antes ou depois, com
 ]`;
 }
 
-/** Extrai o JSON de uma resposta colada (tolera ```json, texto antes/depois e aspas tipográficas). */
-export function extractJson(text: string): unknown {
-  const cleaned = text
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .replace(/```(?:json)?/gi, '')
-    .trim();
-  const starts = [cleaned.indexOf('{'), cleaned.indexOf('[')].filter((i) => i >= 0);
-  if (starts.length === 0) throw new Error('Não encontrei um JSON na resposta. Copie a resposta completa da IA.');
-  const start = Math.min(...starts);
-  const close = cleaned[start] === '{' ? '}' : ']';
-  const end = cleaned.lastIndexOf(close);
-  if (end <= start) throw new Error('O JSON da resposta está incompleto. Peça para a IA responder novamente.');
-  try {
-    return JSON.parse(cleaned.slice(start, end + 1));
-  } catch {
-    throw new Error('A resposta não é um JSON válido. Peça para a IA "responder apenas com o JSON válido".');
+export interface ExtractedJson {
+  value: unknown;
+  /** Textos que vieram cortados no fim da linha e foram fechados automaticamente. */
+  closedLines: number;
+}
+
+/**
+ * Extrai o JSON de uma resposta colada. Tolera ```json, texto antes/depois,
+ * aspas tipográficas e os defeitos comuns de cópia (ver jsonRepair).
+ */
+export function extractJsonDetailed(text: string): ExtractedJson {
+  const base = text.replace(/```(?:json)?/gi, '').trim();
+  const typographic = base.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+  let sawJson = false;
+  let complete = false;
+  for (const candidate of base === typographic ? [base] : [base, typographic]) {
+    const starts = [candidate.indexOf('{'), candidate.indexOf('[')].filter((i) => i >= 0);
+    if (starts.length === 0) continue;
+    sawJson = true;
+    const start = Math.min(...starts);
+    const end = candidate.lastIndexOf(candidate[start] === '{' ? '}' : ']');
+    if (end <= start) continue;
+    complete = true;
+    const slice = candidate.slice(start, end + 1);
+    try {
+      return { value: JSON.parse(slice), closedLines: 0 };
+    } catch {
+      const repaired = repairJson(slice);
+      try {
+        return { value: JSON.parse(repaired.text), closedLines: repaired.closedLines };
+      } catch {
+        // tenta o próximo candidato
+      }
+    }
   }
+  if (!sawJson) throw new Error('Não encontrei um JSON na resposta. Copie a resposta completa da IA.');
+  if (!complete) throw new Error('O JSON da resposta está incompleto. Peça para a IA responder novamente.');
+  throw new Error('A resposta não é um JSON válido. Peça para a IA "responder apenas com o JSON válido".');
+}
+
+export function extractJson(text: string): unknown {
+  return extractJsonDetailed(text).value;
 }
 
 function describeIssues(error: z.ZodError): string {
@@ -246,10 +294,15 @@ function describeIssues(error: z.ZodError): string {
   return `A resposta não está no formato esperado (campos com problema: ${fields.join(', ')}).`;
 }
 
-export function parseDiagnosticResponse(text: string): ProfileDiagnosticResponse {
-  const result = ProfileDiagnosticResponseSchema.safeParse(extractJson(text));
+export function parseDiagnosticResponseDetailed(text: string): { data: ProfileDiagnosticResponse; closedLines: number } {
+  const { value, closedLines } = extractJsonDetailed(text);
+  const result = ProfileDiagnosticResponseSchema.safeParse(value);
   if (!result.success) throw new Error(describeIssues(result.error));
-  return result.data;
+  return { data: result.data, closedLines };
+}
+
+export function parseDiagnosticResponse(text: string): ProfileDiagnosticResponse {
+  return parseDiagnosticResponseDetailed(text).data;
 }
 
 const FORMAT_ALIASES: Record<string, string> = { reel: 'Reels', reels: 'Reels', carrossel: 'Carrossel', carousel: 'Carrossel', foto: 'Foto', post: 'Foto', imagem: 'Foto', stories: 'Stories', story: 'Stories', live: 'Live' };

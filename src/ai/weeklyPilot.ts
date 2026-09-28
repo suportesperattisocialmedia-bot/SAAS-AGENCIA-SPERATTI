@@ -70,7 +70,7 @@ ${clientBlock(i.client)}
 ${patternsBlock(i.patterns)}
 
 ## POSTS DE MELHOR DESEMPENHO
-${postsBlock(i.patterns.topPosts, 5)}
+${postsBlock(i.patterns.topPosts, 5, 500, 'melhores')}
 
 ## PUBLICAÇÕES MAIS RECENTES (evite repetir temas)
 ${postsBlock(i.contents, 8)}
